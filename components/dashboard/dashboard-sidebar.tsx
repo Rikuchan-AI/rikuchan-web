@@ -17,9 +17,9 @@ export function DashboardSidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="surface-panel flex h-full flex-col rounded-[1.8rem] border border-white/65 p-5 lg:sticky lg:top-6">
+    <div className="flex h-full flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" compact />
-      <div className="mt-8 space-y-2">
+      <div className="mt-8 space-y-1">
         {links.map((link) => {
           const active = pathname === link.href;
           return (
@@ -27,8 +27,8 @@ export function DashboardSidebar() {
               key={link.href}
               href={link.href}
               className={cn(
-                "block rounded-[1rem] px-4 py-3 text-sm font-medium transition",
-                active ? "bg-foreground text-background" : "text-foreground-soft hover:bg-white/74 hover:text-foreground",
+                "block rounded-md px-3 py-2.5 text-sm font-medium transition",
+                active ? "bg-accent-soft text-accent" : "text-foreground-soft hover:bg-surface-strong hover:text-foreground",
               )}
             >
               {link.label}
@@ -36,8 +36,8 @@ export function DashboardSidebar() {
           );
         })}
       </div>
-      <div className="mt-auto rounded-[1.35rem] border border-line/80 bg-white/64 p-4">
-        <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-soft">Workspace</p>
+      <div className="mt-auto rounded-lg border border-line bg-surface-muted p-4">
+        <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">Workspace</p>
         <p className="mt-3 text-sm font-semibold text-foreground">Rikuchan Starter</p>
         <p className="mt-1 text-sm leading-6 text-foreground-soft">Operational area for API access, billing, and workspace controls.</p>
       </div>

@@ -1,9 +1,12 @@
+import { Sparkles, TrendingDown, Layers } from "lucide-react";
 import type { ValuePillar } from "@/content/marketing/home";
-import { Badge } from "@/components/shared/badge";
-import { Card } from "@/components/shared/card";
+import { GlowCard } from "@/components/shared/glow-card";
+import { IconBox } from "@/components/shared/icon-box";
 import { Container } from "@/components/shared/container";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { SectionShell } from "@/components/shared/section-shell";
+
+const pillarIcons = [Sparkles, TrendingDown, Layers];
 
 type ValuePillarsSectionProps = {
   title: string;
@@ -17,13 +20,16 @@ export function ValuePillarsSection({ title, description, items }: ValuePillarsS
       <Container>
         <SectionHeading title={title} description={description} />
         <div className="mt-10 grid gap-4 lg:grid-cols-3">
-          {items.map((item) => (
-            <Card key={item.title} className="h-full">
-              <Badge tone="accent">{item.tag}</Badge>
-              <h3 className="mt-6 text-[1.45rem] leading-tight font-semibold text-foreground">{item.title}</h3>
-              <p className="mt-4 leading-7 text-foreground-soft">{item.body}</p>
-            </Card>
-          ))}
+          {items.map((item, i) => {
+            const Icon = pillarIcons[i % pillarIcons.length];
+            return (
+              <GlowCard key={item.title} className="h-full">
+                <IconBox icon={Icon} />
+                <h3 className="mt-6 text-[1.45rem] leading-tight font-semibold text-foreground">{item.title}</h3>
+                <p className="mt-4 leading-7 text-foreground-soft">{item.body}</p>
+              </GlowCard>
+            );
+          })}
         </div>
       </Container>
     </SectionShell>

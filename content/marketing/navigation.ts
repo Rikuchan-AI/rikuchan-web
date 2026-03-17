@@ -3,7 +3,7 @@ export const navigationLinks = [
   { label: "How it works", href: "/how-it-works" },
   { label: "Use cases", href: "/use-cases" },
   { label: "Pricing", href: "/pricing" },
-  { label: "FAQ", href: "/faq" },
+  { label: "Docs", href: "/docs" },
 ] as const;
 
 export const footerColumns = [
@@ -14,6 +14,7 @@ export const footerColumns = [
       { label: "How it works", href: "/how-it-works" },
       { label: "Use cases", href: "/use-cases" },
       { label: "Pricing", href: "/pricing" },
+      { label: "Documentation", href: "/docs" },
     ],
   },
   {

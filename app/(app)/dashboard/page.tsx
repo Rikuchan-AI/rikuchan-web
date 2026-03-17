@@ -16,8 +16,8 @@ export default function DashboardOverviewPage() {
         ))}
       </section>
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[1.5rem] border border-line/80 bg-white/72 p-6">
-          <p className="mono text-xs uppercase tracking-[0.18em] text-accent-deep/80">Recommended next steps</p>
+        <div className="rounded-lg border border-line bg-surface p-6">
+          <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Recommended next steps</p>
           <h2 className="mt-4 text-[1.7rem] font-semibold text-foreground">Get the workspace ready for first value</h2>
           <div className="mt-6 space-y-3">
             {[
@@ -26,8 +26,8 @@ export default function DashboardOverviewPage() {
               "Add a first knowledge source",
               "Send a first request and confirm the flow",
             ].map((step) => (
-              <div key={step} className="flex gap-3 rounded-[1.1rem] border border-line/80 bg-background-strong/80 p-4 text-sm text-foreground-soft">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-accent" />
+              <div key={step} className="flex gap-3 rounded-lg border border-line bg-surface-muted p-4 text-sm text-foreground-soft">
+                <span className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-accent" />
                 <span>{step}</span>
               </div>
             ))}
@@ -41,16 +41,16 @@ export default function DashboardOverviewPage() {
             </Button>
           </div>
         </div>
-        <div className="rounded-[1.5rem] border border-line/80 bg-white/72 p-6">
-          <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-soft">Operational status</p>
-          <div className="mt-6 space-y-4">
+        <div className="rounded-lg border border-line bg-surface p-6">
+          <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">Operational status</p>
+          <div className="mt-6 space-y-3">
             {[
               ["Provider access", "Connected"],
               ["Knowledge sources", "1 source ready"],
               ["Workspace plan", "Starter"],
               ["Team access", "Owner only"],
             ].map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between rounded-[1rem] bg-background-strong/80 p-4">
+              <div key={label} className="flex items-center justify-between rounded-md border border-line bg-surface-muted p-4">
                 <span className="text-sm text-foreground-soft">{label}</span>
                 <span className="text-sm font-semibold text-foreground">{value}</span>
               </div>

@@ -4,10 +4,10 @@ type SectionTone = "default" | "muted" | "highlight" | "cta" | "hero";
 
 const toneClasses: Record<SectionTone, string> = {
   default: "",
-  muted: "bg-white/20",
-  highlight: "bg-white/26",
+  muted: "bg-surface-muted",
+  highlight: "bg-surface-muted",
   cta: "",
-  hero: "pt-24 sm:pt-28 lg:pt-32",
+  hero: "pt-24 sm:pt-28 lg:pt-32 hero-gradient",
 };
 
 type SectionShellProps = {

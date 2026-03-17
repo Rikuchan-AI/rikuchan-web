@@ -26,7 +26,7 @@ export default function TrustPage() {
         <Container>
           <div className="grid gap-4 lg:grid-cols-3">
             {["Protected credentials", "Operational visibility", "A cleaner rollout path"].map((item) => (
-              <div key={item} className="rounded-[1.4rem] border border-line/80 bg-white/72 p-6 text-sm leading-7 text-foreground-soft">
+              <div key={item} className="rounded-lg border border-line bg-surface p-6 text-sm leading-7 text-foreground-soft">
                 <p className="text-lg font-semibold text-foreground">{item}</p>
                 <p className="mt-3">
                   Use a more intentional AI setup instead of loosely connected prompts, tools, and provider keys.

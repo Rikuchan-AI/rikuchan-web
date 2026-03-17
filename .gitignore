@@ -5,3 +5,13 @@ out
 coverage
 *.log
 *.tsbuildinfo
+
+# Environment variables (secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+
+# clerk configuration (can include secrets)
+/.clerk/

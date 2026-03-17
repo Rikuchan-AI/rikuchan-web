@@ -25,11 +25,11 @@ export default function HowItWorksPage() {
       />
       <SectionShell>
         <Container>
-          <div className="rounded-[1.8rem] border border-line/70 bg-white/70 p-7 sm:p-9">
-            <p className="mono text-xs uppercase tracking-[0.18em] text-accent-deep/80">Macro flow</p>
+          <div className="rounded-xl border border-line bg-surface p-7 sm:p-9">
+            <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Macro flow</p>
             <div className="mt-6 grid gap-4 lg:grid-cols-4">
               {["Request enters gateway", "Trusted context is evaluated", "Best-fit model path is selected", "Usage stays visible"].map((item) => (
-                <div key={item} className="rounded-[1.2rem] border border-line/80 bg-background-strong/80 p-5 text-sm text-foreground-soft">
+                <div key={item} className="rounded-lg border border-line bg-surface-muted p-5 text-sm text-foreground-soft">
                   {item}
                 </div>
               ))}

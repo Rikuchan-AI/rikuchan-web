@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 import type { UseCase } from "@/content/marketing/home";
 import { Button } from "@/components/shared/button";
 import { Card } from "@/components/shared/card";
@@ -31,10 +32,10 @@ export function UseCasesSection({ title, description, items }: UseCasesSectionPr
                 type="button"
                 onClick={() => setActiveId(item.id)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-medium transition",
+                  "rounded-lg border px-4 py-2 text-sm font-medium transition cursor-pointer",
                   activeItem.id === item.id
-                    ? "border-accent/20 bg-accent-soft text-accent-deep"
-                    : "border-line/80 bg-white/64 text-foreground-soft hover:text-foreground",
+                    ? "border-accent/20 bg-accent-soft text-accent"
+                    : "border-line bg-surface text-foreground-soft hover:text-foreground hover:bg-surface-strong",
                 )}
               >
                 {item.label}
@@ -48,10 +49,10 @@ export function UseCasesSection({ title, description, items }: UseCasesSectionPr
                 type="button"
                 onClick={() => setActiveId(item.id)}
                 className={cn(
-                  "rounded-[1.2rem] border px-4 py-4 text-left text-sm font-medium transition",
+                  "rounded-lg border px-4 py-4 text-left text-sm font-medium transition cursor-pointer",
                   activeItem.id === item.id
-                    ? "border-accent/20 bg-accent-soft text-accent-deep"
-                    : "border-line/80 bg-white/64 text-foreground-soft",
+                    ? "border-accent/20 bg-accent-soft text-accent"
+                    : "border-line bg-surface text-foreground-soft",
                 )}
               >
                 {item.label}
@@ -60,8 +61,8 @@ export function UseCasesSection({ title, description, items }: UseCasesSectionPr
           </div>
           <Card className="overflow-hidden p-0">
             <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="border-b border-line/70 p-6 lg:border-r lg:border-b-0 lg:p-8">
-                <p className="mono text-xs uppercase tracking-[0.18em] text-accent-deep/80">{activeItem.label}</p>
+              <div className="border-b border-line p-6 lg:border-r lg:border-b-0 lg:p-8">
+                <p className="mono text-xs uppercase tracking-[0.18em] text-accent">{activeItem.label}</p>
                 <h3 className="mt-5 text-[2rem] leading-[1.06] font-semibold text-foreground">{activeItem.title}</h3>
                 <p className="mt-5 max-w-[560px] text-[1rem] leading-8 text-foreground-soft">{activeItem.body}</p>
                 <div className="mt-7">
@@ -70,12 +71,12 @@ export function UseCasesSection({ title, description, items }: UseCasesSectionPr
                   </Button>
                 </div>
               </div>
-              <div className="surface-muted p-6 lg:p-8">
-                <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-soft">What matters most</p>
+              <div className="bg-surface-muted p-6 lg:p-8">
+                <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">What matters most</p>
                 <ul className="mt-5 space-y-3">
                   {activeItem.bullets.map((bullet) => (
-                    <li key={bullet} className="flex items-start gap-3 rounded-[1rem] bg-white/72 p-4 text-sm text-foreground-soft">
-                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-accent" />
+                    <li key={bullet} className="flex items-start gap-3 rounded-lg bg-surface p-4 text-sm text-foreground-soft">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" />
                       <span>{bullet}</span>
                     </li>
                   ))}

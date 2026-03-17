@@ -16,7 +16,7 @@ export default function TermsPage() {
       />
       <SectionShell>
         <Container>
-          <div className="max-w-[760px] rounded-[1.5rem] border border-line/80 bg-white/72 p-6 text-sm leading-8 text-foreground-soft sm:p-8">
+          <div className="max-w-[760px] rounded-lg border border-line bg-surface p-6 text-sm leading-8 text-foreground-soft sm:p-8">
             A formal terms page should define account responsibilities, acceptable usage, billing rules, service expectations, and provider-related limitations.
           </div>
         </Container>

@@ -1,38 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f1e8;
-  --background-strong: #fbf8f3;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --surface-muted: rgba(239, 236, 228, 0.78);
-  --foreground: #10221d;
-  --foreground-soft: #5e6c66;
-  --line: rgba(16, 34, 29, 0.1);
-  --line-strong: rgba(16, 34, 29, 0.18);
-  --accent: #0f8b78;
-  --accent-deep: #0a6b5d;
-  --accent-soft: rgba(15, 139, 120, 0.14);
-  --shadow-soft: 0 18px 40px rgba(16, 34, 29, 0.08);
-  --shadow-strong: 0 30px 80px rgba(16, 34, 29, 0.12);
-  --radius-lg: 1.75rem;
-  --radius-md: 1.25rem;
-  --radius-sm: 0.9rem;
+  --background: #09090b;
+  --surface: #18181b;
+  --surface-strong: #27272a;
+  --surface-muted: #0f0f12;
+  --foreground: #fafafa;
+  --foreground-soft: #a1a1aa;
+  --foreground-muted: #71717a;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --accent: #34d399;
+  --accent-deep: #10b981;
+  --accent-soft: rgba(52, 211, 153, 0.10);
+  --accent-foreground: #09090b;
+  --warm: #fbbf24;
+  --warm-soft: rgba(251, 191, 36, 0.08);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.08);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.08);
+  --warning: #fbbf24;
+  --shadow-soft: 0 0 0 1px var(--line);
+  --shadow-strong: 0 0 20px rgba(52, 211, 153, 0.05);
+  --glow-accent: 0 0 40px rgba(52, 211, 153, 0.12);
+  --glow-warm: 0 0 40px rgba(251, 191, 36, 0.08);
+  --radius-lg: 1rem;
+  --radius-md: 0.75rem;
+  --radius-sm: 0.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-background-strong: var(--background-strong);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--foreground);
   --color-foreground-soft: var(--foreground-soft);
+  --color-foreground-muted: var(--foreground-muted);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
   --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-warm: var(--warm);
+  --color-warm-soft: var(--warm-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
 }
@@ -47,21 +65,13 @@ html {
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(15, 139, 120, 0.13), transparent 28%),
-    radial-gradient(circle at 85% 20%, rgba(16, 34, 29, 0.05), transparent 24%),
-    linear-gradient(180deg, #fbf8f3 0%, #f4efe6 55%, #f1ebdf 100%);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), sans-serif;
   text-rendering: optimizeLegibility;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display), sans-serif;
   letter-spacing: -0.03em;
 }
@@ -72,23 +82,25 @@ a {
 }
 
 ::selection {
-  background: rgba(15, 139, 120, 0.18);
+  background: rgba(52, 211, 153, 0.20);
 }
+
+/* --- Surfaces --- */
 
 .surface-panel {
   background: var(--surface);
-  backdrop-filter: blur(14px);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--line);
 }
 
 .surface-strong {
   background: var(--surface-strong);
-  box-shadow: var(--shadow-soft);
 }
 
 .surface-muted {
   background: var(--surface-muted);
 }
+
+/* --- Layout utilities --- */
 
 .section-grid {
   display: grid;
@@ -104,17 +116,35 @@ a {
   font-family: var(--font-mono), monospace;
 }
 
-.radial-ring {
-  position: absolute;
-  inset: auto;
-  border-radius: 9999px;
-  border: 1px solid rgba(16, 34, 29, 0.08);
+/* --- Dark-mode effects --- */
+
+.gradient-text {
+  background: linear-gradient(135deg, #fafafa 0%, #71717a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-@media (max-width: 768px) {
-  body {
-    background:
-      radial-gradient(circle at top left, rgba(15, 139, 120, 0.16), transparent 26%),
-      linear-gradient(180deg, #fbf8f3 0%, #f3ede2 100%);
-  }
+.gradient-text-accent {
+  background: linear-gradient(135deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-card {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.glow-card:hover {
+  box-shadow: 0 0 30px rgba(52, 211, 153, 0.08), 0 0 0 1px rgba(52, 211, 153, 0.15);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.hero-gradient {
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.08) 0%, transparent 70%);
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
 }

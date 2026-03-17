@@ -48,10 +48,10 @@ export type TrustItem = {
 
 export const homePageContent = {
   hero: {
-    eyebrow: "Trusted context and smarter routing for modern AI work",
-    title: "Better AI answers. Less wasted spend.",
+    eyebrow: "AI Gateway for context-aware routing",
+    title: "One gateway for every AI client.",
     description:
-      "Rikuchan adds trusted business context, smarter routing, and usage visibility so people and agents get more useful results without bloated prompts.",
+      "Rikuchan sits between your AI tools and providers. It injects trusted context, routes to the right model, and gives you full visibility into cost and usage — with zero code changes.",
     primaryCta: {
       label: "Create free account",
       href: "/signup",
@@ -60,7 +60,7 @@ export const homePageContent = {
       label: "See how it works",
       href: "/how-it-works",
     },
-    proofItems: ["Grounded answers", "Lean prompts", "Human and agent ready"],
+    proofItems: ["OpenAI-compatible API", "< 50ms overhead", "Zero code changes"],
   } satisfies HeroContent,
   valuePillars: {
     title: "A smarter layer between your work and the model",

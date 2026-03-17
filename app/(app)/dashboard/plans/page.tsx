@@ -10,12 +10,12 @@ export default function DashboardPlansPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="mono text-xs uppercase tracking-[0.18em] text-accent-deep/80">Plans</p>
+        <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Plans</p>
         <h2 className="mt-3 text-[1.8rem] font-semibold text-foreground">Choose the next level only when the workflow earns it</h2>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         {planCards.map((plan, index) => (
-          <div key={plan.name} className="rounded-[1.5rem] border border-line/80 bg-white/72 p-6">
+          <div key={plan.name} className="rounded-lg border border-line bg-surface p-6">
             <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-soft">{plan.status}</p>
             <h3 className="mt-5 text-[1.7rem] font-semibold text-foreground">{plan.name}</h3>
             <p className="mt-2 text-sm text-foreground-soft">{plan.detail}</p>

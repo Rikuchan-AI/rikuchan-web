@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
@@ -13,7 +13,7 @@ type SharedButtonProps = {
 };
 
 type LinkButtonProps = SharedButtonProps &
-  AnchorHTMLAttributes<HTMLAnchorElement> & {
+  Omit<ComponentProps<typeof Link>, "href"> & {
     href: string;
   };
 
@@ -24,10 +24,10 @@ type NativeButtonProps = SharedButtonProps &
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-foreground text-background shadow-[0_14px_28px_rgba(16,34,29,0.18)] hover:bg-accent-deep hover:text-white",
+    "bg-accent text-accent-foreground hover:bg-accent-deep",
   secondary:
-    "border border-line-strong bg-white/70 text-foreground hover:border-accent/40 hover:bg-white",
-  ghost: "text-foreground-soft hover:text-foreground",
+    "border border-line-strong bg-transparent text-foreground hover:bg-surface-strong",
+  ghost: "text-foreground-soft hover:text-foreground hover:bg-surface-strong",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -45,7 +45,7 @@ export function buttonClassName({
   className?: string;
 }) {
   return cn(
-    "inline-flex items-center justify-center rounded-full font-semibold tracking-[-0.02em] transition duration-200 ease-out",
+    "inline-flex items-center justify-center rounded-lg font-medium tracking-[-0.02em] transition duration-200 ease-out cursor-pointer",
     variantClasses[variant],
     sizeClasses[size],
     className,

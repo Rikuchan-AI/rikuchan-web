@@ -41,8 +41,8 @@ export default function PricingPage() {
         <Container>
           <div className="grid gap-4 lg:grid-cols-3">
             {plans.map((plan, index) => (
-              <Card key={plan.name} className={index === 1 ? "border-accent/20 bg-white/80" : ""}>
-                <p className="mono text-xs uppercase tracking-[0.18em] text-accent-deep/80">{plan.name}</p>
+              <Card key={plan.name} className={index === 1 ? "border-accent/20" : ""}>
+                <p className="mono text-xs uppercase tracking-[0.18em] text-accent">{plan.name}</p>
                 <h2 className="mt-5 text-[2.35rem] font-semibold text-foreground">{plan.price}</h2>
                 <p className="mt-3 leading-7 text-foreground-soft">{plan.description}</p>
                 <ul className="mt-6 space-y-3">
