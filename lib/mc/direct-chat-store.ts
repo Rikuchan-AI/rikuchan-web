@@ -101,6 +101,31 @@ function extractGatewayMeta(res: Response): GatewayMeta {
 }
 
 /**
+ * Extract final content from a non-streaming JSON response.
+ * Handles OpenAI and Anthropic formats. Never returns reasoning_content.
+ */
+function extractContentFromResponse(data: Record<string, unknown>): string | null {
+  // OpenAI: { choices: [{ message: { content } }] }
+  const msg = (data.choices as Array<{ message?: { content?: string } }>)?.[0]?.message;
+  if (msg?.content) return msg.content;
+
+  // Anthropic: { content: [{ type: "text", text }] }
+  if (Array.isArray(data.content)) {
+    const textBlock = (data.content as Array<{ type: string; text?: string }>).find(
+      (b) => b.type === "text",
+    );
+    if (textBlock?.text) return textBlock.text;
+  }
+
+  // Error
+  if (data.error && typeof data.error === "object") {
+    return (data.error as { message?: string }).message ?? null;
+  }
+
+  return null;
+}
+
+/**
  * Parse an SSE text chunk and extract content delta.
  * Handles both OpenAI and Anthropic streaming formats.
  */
@@ -112,9 +137,13 @@ function extractDeltaFromSSE(line: string): string | null {
   try {
     const parsed = JSON.parse(data);
 
-    // OpenAI format: { choices: [{ delta: { content: "token" } }] }
+    // OpenAI streaming: { choices: [{ delta: { content: "token" } }] }
     const delta = parsed.choices?.[0]?.delta?.content;
     if (typeof delta === "string") return delta;
+
+    // OpenAI non-streaming in SSE: { choices: [{ message: { content: "full" } }] }
+    const msg = parsed.choices?.[0]?.message?.content;
+    if (typeof msg === "string" && msg) return msg;
 
     // Anthropic format: { type: "content_block_delta", delta: { text: "token" } }
     if (parsed.type === "content_block_delta") {
@@ -193,19 +222,9 @@ async function chatCompletionStream(
   } else {
     // Non-streaming fallback (JSON response)
     const data = await res.json();
-    const msg = data.choices?.[0]?.message;
-    if (msg?.content) {
-      onDelta(msg.content);
-      return;
-    }
-    if (Array.isArray(data.content)) {
-      const textBlock = data.content.find((b: { type: string }) => b.type === "text");
-      if (textBlock?.text) {
-        onDelta(textBlock.text);
-        return;
-      }
-    }
-    onDelta(data.error?.message ?? JSON.stringify(data));
+    const content = extractContentFromResponse(data);
+    if (content) onDelta(content);
+    else onDelta("(empty response)");
   }
 }
 
