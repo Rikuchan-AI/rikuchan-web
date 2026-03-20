@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { ArrowLeft, Send, Loader2, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
+import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 
 function formatTime(ts: number): string {
@@ -93,10 +93,12 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
         >
           {isUser ? (
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          ) : (
+          ) : message.content ? (
             <div className="prose-sm prose-invert max-w-none [&_p]:mb-1 [&_p]:last:mb-0 [&_ul]:ml-3 [&_ul]:list-disc [&_ol]:ml-3 [&_ol]:list-decimal [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface [&_pre]:p-2 [&_pre]:text-xs [&_strong]:font-semibold [&_a]:text-accent [&_a]:underline">
               <Markdown>{message.content}</Markdown>
             </div>
+          ) : (
+            <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground-muted/50" />
           )}
         </div>
         {!isUser && <CopyButton text={message.content} />}
@@ -141,9 +143,12 @@ export default function ConversationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Scroll on new messages and during streaming
+  const lastMsg = conversation?.messages[conversation.messages.length - 1];
+  const streamContent = lastMsg?.content;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.messages.length]);
+  }, [conversation?.messages.length, streamContent]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -263,15 +268,6 @@ export default function ConversationPage() {
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
-        {sending && (
-          <div className="flex items-start">
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-muted px-3 py-2.5">
-              <Loader2 size={14} className="animate-spin text-foreground-muted" />
-              <span className="text-sm text-foreground-muted">Thinking...</span>
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
@@ -297,11 +293,7 @@ export default function ConversationPage() {
             disabled={!input.trim() || sending}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {sending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Send size={14} />
-            )}
+            <Send size={14} className={sending ? "animate-pulse" : ""} />
           </button>
         </div>
       </div>
