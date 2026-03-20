@@ -15,7 +15,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <aside className="hidden lg:block">
           <DashboardSidebar />
         </aside>
-        <div className="min-h-full">
+        <div className="flex min-h-full flex-col">
           <header className="flex flex-col gap-4 border-b border-line bg-surface px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div className="flex items-center gap-3">
               <button
@@ -49,7 +49,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               />
             </div>
           </header>
-          <div className="px-6 py-6 sm:px-8 sm:py-8">{children}</div>
+          <div className="flex-1 px-6 py-6 sm:px-8 sm:py-8">{children}</div>
         </div>
       </div>
 

@@ -6,6 +6,10 @@ export const clerkAppearance = {
     colorBackground: "#18181b",
     colorInputBackground: "#27272a",
     colorInputText: "#fafafa",
+    colorDanger: "#f87171",
+    colorSuccess: "#34d399",
+    colorWarning: "#fbbf24",
+    colorNeutral: "#fafafa",
     borderRadius: "0.5rem",
     fontFamily: "var(--font-body)",
   },
@@ -34,6 +38,14 @@ export const clerkAppearance = {
     formFieldSuccessText: "text-sm",
     otpCodeFieldInput:
       "h-12 w-11 rounded-md border border-line-strong bg-surface-strong text-foreground shadow-none",
+    // UserButton popover/menu
+    userButtonPopoverCard: "rounded-lg border border-line bg-surface shadow-xl",
+    userButtonPopoverActionButton: "text-foreground-soft hover:bg-surface-strong",
+    userButtonPopoverActionButtonText: "text-sm text-foreground-soft",
+    userButtonPopoverActionButtonIcon: "text-foreground-muted",
+    userButtonPopoverFooter: "hidden",
+    userPreviewMainIdentifier: "text-sm font-semibold text-foreground",
+    userPreviewSecondaryIdentifier: "text-xs text-foreground-muted",
   },
 } as const;
 

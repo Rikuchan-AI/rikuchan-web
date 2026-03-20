@@ -18,7 +18,7 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
+    <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" compact />
       <div className="mt-8 space-y-1">
         {links.map((link) => {

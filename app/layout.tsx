@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { IBM_Plex_Mono, Inter, Sora } from "next/font/google";
+import { clerkAppearance } from "@/lib/clerk";
 import { ToastProvider } from "@/components/shared/toast";
 import "./globals.css";
 
@@ -41,15 +42,7 @@ export default function RootLayout({
         <ClerkProvider
           appearance={{
             baseTheme: dark,
-            variables: {
-              colorPrimary: "#34d399",
-              colorBackground: "#18181b",
-              colorInputBackground: "#27272a",
-              colorText: "#fafafa",
-              colorTextSecondary: "#a1a1aa",
-              borderRadius: "0.5rem",
-              fontFamily: "var(--font-body)",
-            },
+            ...clerkAppearance,
           }}
         >
           <ToastProvider>

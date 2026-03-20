@@ -28,6 +28,9 @@ export function ProviderIcon({ provider, size = "md", className = "" }: Provider
       {id === "xai" && (
         <text x="12" y="16" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#fafafa" fontFamily="var(--font-display)">X</text>
       )}
+      {(id === "zai_general" || id === "zai") && (
+        <text x="12" y="16" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#6366f1" fontFamily="var(--font-display)">Z</text>
+      )}
       {id === "deepseek" && (
         <text x="12" y="16" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#4d6bfe" fontFamily="var(--font-display)">DS</text>
       )}
@@ -44,7 +47,7 @@ export function ProviderIcon({ provider, size = "md", className = "" }: Provider
           <rect x="15" y="16" width="5" height="5" fill="#f7d046" />
         </>
       )}
-      {!["anthropic", "openai", "google", "xai", "deepseek", "mistral"].includes(id) && (
+      {!["anthropic", "openai", "google", "xai", "zai_general", "zai", "deepseek", "mistral"].includes(id) && (
         <text x="12" y="16" textAnchor="middle" fontSize="12" fontWeight="bold" fill="var(--foreground-muted)" fontFamily="var(--font-display)">
           {provider.charAt(0).toUpperCase()}
         </text>
