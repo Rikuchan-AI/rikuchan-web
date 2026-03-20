@@ -43,7 +43,7 @@ interface DirectChatStore {
 const STORAGE_KEY = "rikuchan:direct-chat";
 const MAX_CONVERSATIONS = 50;
 const MAX_MESSAGES = 200;
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "glm-4.7-flash";
 
 function load(): DirectConversation[] {
   if (typeof window === "undefined") return [];
@@ -101,7 +101,19 @@ async function chatCompletion(
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
+
+  // OpenAI format: { choices: [{ message: { content } }] }
+  const openai = data.choices?.[0]?.message?.content;
+  if (openai) return openai;
+
+  // Anthropic format: { content: [{ type: "text", text }] }
+  if (Array.isArray(data.content)) {
+    const textBlock = data.content.find((b: { type: string }) => b.type === "text");
+    if (textBlock?.text) return textBlock.text;
+  }
+
+  // Fallback: stringify raw response for debugging
+  return data.error?.message ?? JSON.stringify(data);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
