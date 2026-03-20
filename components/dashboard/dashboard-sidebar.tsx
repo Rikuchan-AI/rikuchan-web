@@ -37,7 +37,7 @@ function NavLink({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
+  const active = pathname === href || (href !== "/dashboard" && href !== "/agents" && pathname.startsWith(href + "/"));
   return (
     <Link
       href={href}
