@@ -187,7 +187,7 @@ async function chatCompletionStream(
 
   // Extract gateway metadata from response headers (available immediately)
   const gateway = extractGatewayMeta(res);
-  onMeta(gateway, gateway.actualModel ?? model);
+  onMeta(gateway, model);
 
   const contentType = res.headers.get("content-type") || "";
   const isSSE = contentType.includes("text/event-stream");

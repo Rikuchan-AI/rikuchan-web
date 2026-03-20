@@ -77,6 +77,9 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
             {message.model && (
               <span className="ml-1.5 normal-case tracking-normal text-foreground-muted/60">
                 {message.model}
+                {gw?.actualModel && gw.actualModel !== message.model && (
+                  <span className="text-foreground-muted/40">{" -> "}{gw.actualModel}</span>
+                )}
               </span>
             )}
           </span>
