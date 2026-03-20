@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore } from "@/lib/mc/projects-store";
@@ -9,11 +9,16 @@ import type { Project } from "@/lib/mc/types-project";
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createProject = useProjectsStore((s) => s.createProject);
+  const groups = useProjectsStore((s) => s.groups);
+
+  const preselectedGroupId = searchParams.get("groupId") ?? "";
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
+  const [groupId, setGroupId] = useState(preselectedGroupId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +28,7 @@ export default function NewProjectPage() {
       description,
       status: "active",
       workspacePath,
+      groupId: groupId || undefined,
       leadAgentModel: "",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -76,6 +82,33 @@ export default function NewProjectPage() {
             className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 transition-colors min-h-[80px]"
             placeholder="What is this project about?"
           />
+        </div>
+
+        <div>
+          <label className="mono text-xs uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
+            Group
+          </label>
+          <select
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 transition-colors appearance-none"
+          >
+            <option value="">No group (ungrouped)</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          {groups.length === 0 && (
+            <p className="mt-1.5 text-xs text-foreground-muted">
+              No groups yet.{" "}
+              <Link href="/agents/projects" className="text-accent hover:text-accent-deep">
+                Create a group first
+              </Link>{" "}
+              to organize projects.
+            </p>
+          )}
         </div>
 
         <div>
