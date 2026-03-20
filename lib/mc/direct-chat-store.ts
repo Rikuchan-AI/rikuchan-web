@@ -1,0 +1,253 @@
+"use client";
+
+import { create } from "zustand";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface DirectChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  timestamp: number;
+}
+
+export interface DirectConversation {
+  id: string;
+  title: string;
+  messages: DirectChatMessage[];
+  model: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface DirectChatStore {
+  conversations: DirectConversation[];
+  activeConversationId: string | null;
+  sending: boolean;
+
+  createConversation: (model?: string) => string;
+  deleteConversation: (id: string) => void;
+  renameConversation: (id: string, title: string) => void;
+  setActiveConversation: (id: string | null) => void;
+  getConversation: (id: string) => DirectConversation | undefined;
+
+  sendMessage: (conversationId: string, content: string) => Promise<void>;
+
+  _hydrate: () => void;
+  _persist: () => void;
+}
+
+// ─── Persistence ─────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = "rikuchan:direct-chat";
+const MAX_CONVERSATIONS = 50;
+const MAX_MESSAGES = 200;
+const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
+function load(): DirectConversation[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function save(conversations: DirectConversation[]) {
+  if (typeof window === "undefined") return;
+  const trimmed = conversations
+    .slice(0, MAX_CONVERSATIONS)
+    .map((c) => ({ ...c, messages: c.messages.slice(-MAX_MESSAGES) }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+}
+
+// ─── Gateway fetch ───────────────────────────────────────────────────────────
+
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:4000";
+
+async function getClerkToken(): Promise<string | null> {
+  try {
+    const clerk = (window as any).Clerk;
+    if (clerk?.session) {
+      return await clerk.session.getToken();
+    }
+  } catch { /* no clerk */ }
+  return null;
+}
+
+async function chatCompletion(
+  messages: { role: string; content: string }[],
+  model: string,
+): Promise<string> {
+  const token = await getClerkToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Gateway ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function mkId() {
+  return `conv-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function mkMsgId() {
+  return `msg-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+}
+
+function generateTitle(content: string): string {
+  const trimmed = content.trim().slice(0, 60);
+  return trimmed.length < content.trim().length ? trimmed + "..." : trimmed;
+}
+
+// ─── Store ───────────────────────────────────────────────────────────────────
+
+export const useDirectChatStore = create<DirectChatStore>((set, get) => ({
+  conversations: [],
+  activeConversationId: null,
+  sending: false,
+
+  _hydrate: () => {
+    set({ conversations: load() });
+  },
+
+  _persist: () => {
+    save(get().conversations);
+  },
+
+  createConversation: (model) => {
+    const id = mkId();
+    const now = Date.now();
+    const conv: DirectConversation = {
+      id,
+      title: "New conversation",
+      messages: [],
+      model: model ?? DEFAULT_MODEL,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({
+      conversations: [conv, ...s.conversations],
+      activeConversationId: id,
+    }));
+    get()._persist();
+    return id;
+  },
+
+  deleteConversation: (id) => {
+    set((s) => ({
+      conversations: s.conversations.filter((c) => c.id !== id),
+      activeConversationId: s.activeConversationId === id ? null : s.activeConversationId,
+    }));
+    get()._persist();
+  },
+
+  renameConversation: (id, title) => {
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === id ? { ...c, title, updatedAt: Date.now() } : c,
+      ),
+    }));
+    get()._persist();
+  },
+
+  setActiveConversation: (id) => {
+    set({ activeConversationId: id });
+  },
+
+  getConversation: (id) => {
+    return get().conversations.find((c) => c.id === id);
+  },
+
+  sendMessage: async (conversationId, content) => {
+    const now = Date.now();
+    const userMsg: DirectChatMessage = {
+      id: mkMsgId(),
+      role: "user",
+      content,
+      timestamp: now,
+    };
+
+    // Append user message
+    set((s) => {
+      const convs = s.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const isFirst = c.messages.length === 0;
+        return {
+          ...c,
+          title: isFirst ? generateTitle(content) : c.title,
+          messages: [...c.messages, userMsg],
+          updatedAt: now,
+        };
+      });
+      return { conversations: convs, sending: true };
+    });
+    get()._persist();
+
+    // Call gateway
+    try {
+      const conv = get().conversations.find((c) => c.id === conversationId);
+      if (!conv) return;
+
+      const apiMessages = conv.messages.map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
+      }));
+
+      const response = await chatCompletion(apiMessages, conv.model);
+
+      const assistantMsg: DirectChatMessage = {
+        id: mkMsgId(),
+        role: "assistant",
+        content: response,
+        model: conv.model,
+        timestamp: Date.now(),
+      };
+
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === conversationId
+            ? { ...c, messages: [...c.messages, assistantMsg], updatedAt: Date.now() }
+            : c,
+        ),
+        sending: false,
+      }));
+    } catch (err) {
+      const errorMsg: DirectChatMessage = {
+        id: mkMsgId(),
+        role: "assistant",
+        content: `Error: ${err instanceof Error ? err.message : "Failed to get response"}`,
+        timestamp: Date.now(),
+      };
+
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === conversationId
+            ? { ...c, messages: [...c.messages, errorMsg], updatedAt: Date.now() }
+            : c,
+        ),
+        sending: false,
+      }));
+    }
+    get()._persist();
+  },
+}));

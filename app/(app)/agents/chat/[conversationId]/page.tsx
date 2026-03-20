@@ -1,0 +1,247 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Markdown from "react-markdown";
+import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
+import { ArrowLeft, Send, Loader2, Pencil, Check, X } from "lucide-react";
+import type { DirectChatMessage } from "@/lib/mc/direct-chat-store";
+
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function MessageBubble({ message }: { message: DirectChatMessage }) {
+  const isUser = message.role === "user";
+
+  return (
+    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+      {!isUser && (
+        <span className="mono mb-1 text-[10px] uppercase tracking-[0.06em] text-foreground-muted">
+          assistant
+          {message.model && (
+            <span className="ml-1.5 normal-case tracking-normal text-foreground-muted/60">
+              {message.model}
+            </span>
+          )}
+        </span>
+      )}
+      <div
+        className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
+          isUser
+            ? "bg-accent text-accent-foreground rounded-br-sm"
+            : "rounded-bl-sm border border-line bg-surface-muted text-foreground"
+        }`}
+      >
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        ) : (
+          <div className="prose-sm prose-invert max-w-none [&_p]:mb-1 [&_p]:last:mb-0 [&_ul]:ml-3 [&_ul]:list-disc [&_ol]:ml-3 [&_ol]:list-decimal [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface [&_pre]:p-2 [&_pre]:text-xs [&_strong]:font-semibold [&_a]:text-accent [&_a]:underline">
+            <Markdown>{message.content}</Markdown>
+          </div>
+        )}
+      </div>
+      <span className="mono mt-1 text-[10px] text-foreground-muted">
+        {formatTime(message.timestamp)}
+      </span>
+    </div>
+  );
+}
+
+const SUGGESTED_PROMPTS = [
+  "What models are available?",
+  "What providers are connected?",
+  "Show my recent usage stats",
+  "How does the RAG pipeline work?",
+  "Summarize the current system status",
+];
+
+export default function ConversationPage() {
+  const { conversationId } = useParams<{ conversationId: string }>();
+  const router = useRouter();
+
+  const conversations = useDirectChatStore((s) => s.conversations);
+  const conversation = conversations.find((c) => c.id === conversationId);
+  const sendMessage = useDirectChatStore((s) => s.sendMessage);
+  const renameConversation = useDirectChatStore((s) => s.renameConversation);
+  const sending = useDirectChatStore((s) => s.sending);
+  const hydrate = useDirectChatStore((s) => s._hydrate);
+
+  const [input, setInput] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    hydrate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation?.messages.length]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [conversationId]);
+
+  const handleSend = async (text?: string) => {
+    const content = text ?? input.trim();
+    if (!content || sending || !conversationId) return;
+    setInput("");
+    await sendMessage(conversationId, content);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleSaveTitle = () => {
+    if (editTitle.trim() && conversationId) {
+      renameConversation(conversationId, editTitle.trim());
+    }
+    setEditing(false);
+  };
+
+  if (!conversation) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-sm text-foreground-muted">Conversation not found</p>
+        <button
+          onClick={() => router.push("/agents/chat")}
+          className="mt-3 text-sm font-medium text-accent hover:text-accent-deep transition-colors"
+        >
+          Back to conversations
+        </button>
+      </div>
+    );
+  }
+
+  const messages = conversation.messages;
+  const showSuggestions = messages.length === 0;
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-line px-1 py-3">
+        <button
+          onClick={() => router.push("/agents/chat")}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-strong hover:text-foreground"
+        >
+          <ArrowLeft size={16} />
+        </button>
+
+        {editing ? (
+          <div className="flex flex-1 items-center gap-2">
+            <input
+              autoFocus
+              className="flex-1 rounded-md border border-line bg-surface-strong px-2 py-1 text-sm text-foreground focus:border-accent/40 focus:outline-none"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveTitle(); if (e.key === "Escape") setEditing(false); }}
+            />
+            <button onClick={handleSaveTitle} className="text-accent hover:text-accent-deep">
+              <Check size={14} />
+            </button>
+            <button onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground">
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <h2 className="truncate font-display text-sm font-semibold tracking-[-0.02em] text-foreground">
+              {conversation.title}
+            </h2>
+            <button
+              onClick={() => { setEditTitle(conversation.title); setEditing(true); }}
+              className="shrink-0 text-foreground-muted hover:text-foreground transition-colors"
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+        )}
+
+        <span className="mono shrink-0 text-[10px] text-foreground-muted">
+          {conversation.model}
+        </span>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {showSuggestions && (
+          <div className="mx-auto max-w-lg space-y-4 pt-8">
+            <div className="text-center">
+              <h3 className="font-display text-lg font-semibold tracking-[-0.03em] text-foreground">
+                Ask the Gateway
+              </h3>
+              <p className="mt-1 text-sm text-foreground-muted">
+                Chat directly with your AI gateway. Context from your RAG is automatically injected.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => handleSend(prompt)}
+                  className="rounded-lg border border-line bg-surface-strong px-4 py-3 text-left text-sm text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+
+        {sending && (
+          <div className="flex items-start">
+            <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-muted px-3 py-2.5">
+              <Loader2 size={14} className="animate-spin text-foreground-muted" />
+              <span className="text-sm text-foreground-muted">Thinking...</span>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-line p-4">
+        <div className="flex gap-2">
+          <textarea
+            ref={inputRef}
+            className="flex-1 resize-none rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent/40 focus:outline-none transition-colors"
+            placeholder="Ask the gateway..."
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = "auto";
+              target.style.height = Math.min(target.scrollHeight, 160) + "px";
+            }}
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={!input.trim() || sending}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {sending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Send size={14} />
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

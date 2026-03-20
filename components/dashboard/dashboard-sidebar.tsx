@@ -19,6 +19,7 @@ const platformLinks = [
 const mcLinks = [
   { label: "Agents", href: "/agents" },
   { label: "Projects", href: "/agents/projects" },
+  { label: "Chat", href: "/agents/chat" },
   { label: "Sessions", href: "/agents/sessions" },
   { label: "Gateway", href: "/agents/gateway" },
   { label: "MC Settings", href: "/agents/settings" },
@@ -59,19 +60,9 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" />
 
-      {/* Platform */}
-      <div className="mt-8 space-y-1">
-        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground-muted">
-          Platform
-        </p>
-        {platformLinks.map((link) => (
-          <NavLink key={link.href} {...link} pathname={pathname} onNavigate={onNavigate} />
-        ))}
-      </div>
-
       {/* Mission Control */}
       {MC_ENABLED && (
-        <div className="mt-6 space-y-1">
+        <div className="mt-8 space-y-1">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground-muted">
             Mission Control
           </p>
@@ -80,6 +71,16 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </div>
       )}
+
+      {/* Platform */}
+      <div className={cn(MC_ENABLED ? "mt-6" : "mt-8", "space-y-1")}>
+        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground-muted">
+          Platform
+        </p>
+        {platformLinks.map((link) => (
+          <NavLink key={link.href} {...link} pathname={pathname} onNavigate={onNavigate} />
+        ))}
+      </div>
 
       <div className="mt-auto rounded-lg border border-line bg-surface-muted p-4">
         <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">Workspace</p>

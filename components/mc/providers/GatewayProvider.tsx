@@ -5,6 +5,7 @@ import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useChatStore } from "@/lib/mc/chat-store";
 import { useNotificationsStore } from "@/lib/mc/notifications-store";
+import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { CommandPalette } from "@/components/mc/CommandPalette";
 import { Mascot } from "@/components/shared/mascot";
 import { RefreshCw, WifiOff } from "lucide-react";
@@ -112,6 +113,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
   const hydrateProjects = useProjectsStore((s) => s.hydrate);
   const hydrateChat = useChatStore((s) => s._hydrateFromStorage);
   const hydrateNotifications = useNotificationsStore((s) => s._hydrate);
+  const hydrateDirectChat = useDirectChatStore((s) => s._hydrate);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Cmd+K shortcut
@@ -132,6 +134,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
     hydrateProjects();
     hydrateChat();
     hydrateNotifications();
+    hydrateDirectChat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
