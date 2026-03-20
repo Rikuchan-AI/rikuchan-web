@@ -1,7 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
 import { AuthConfigurationNotice } from "@/components/auth/auth-configuration-notice";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
-import { clerkAppearance, clerkIsConfigured } from "@/lib/clerk";
+import { clerkIsConfigured } from "@/lib/clerk";
 
 export const metadata = {
   title: "Login",
@@ -15,7 +15,7 @@ export default function LoginPage() {
       description="Continue to your operational dashboard for API access, billing, and workspace settings."
     >
       {clerkIsConfigured() ? (
-        <SignIn appearance={clerkAppearance} />
+        <SignIn />
       ) : (
         <AuthConfigurationNotice />
       )}
