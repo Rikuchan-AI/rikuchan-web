@@ -126,7 +126,7 @@ function useAvailableModels() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    gatewayFetch<{ models: GatewayModel[] }>("/models")
+    gatewayFetch<{ models: GatewayModel[] }>("/v1/models")
       .then((data) => setModels(data.models.filter((m) => m.available)))
       .catch(() => {})
       .finally(() => setLoading(false));
