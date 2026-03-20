@@ -21,13 +21,13 @@ export const clerkAppearance = {
     // --- Card containers (force dark on all surfaces) ---
     rootBox: "w-full",
     cardBox: "!w-full !shadow-none",
-    card: "!rounded-lg !border !border-[#27272a] !bg-[#18181b] !shadow-none",
+    card: "!rounded-lg !border !border-[#27272a] !bg-[#18181b] !bg-none !shadow-none",
     header: "!text-left",
     headerTitle:
       "!text-[1.25rem] !font-semibold !tracking-[-0.03em] !text-[#fafafa]",
     headerSubtitle: "!text-sm !leading-6 !text-[#a1a1aa]",
     main: "!bg-[#18181b]",
-    footer: "!bg-[#18181b] !border-t !border-[#27272a]",
+    footer: "!bg-[#18181b] !bg-none !border-t !border-[#27272a]",
 
     // --- Sign-in / Sign-up forms ---
     socialButtonsBlockButton:
@@ -72,18 +72,21 @@ export const clerkAppearance = {
     userPreviewAvatarBox: "!ring-1 !ring-[#3f3f46]",
 
     // --- UserProfile modal ---
-    modalBackdrop: "!bg-black/60",
-    modalContent: "!rounded-xl !border !border-[#27272a] !bg-[#18181b] !shadow-2xl",
+    modalBackdrop: "!bg-black/60 !backdrop-blur-sm",
+    modalContent:
+      "!rounded-xl !border !border-[#27272a] !bg-[#18181b] !shadow-2xl !bg-none",
     modalCloseButton: "!text-[#71717a] hover:!text-[#fafafa]",
-    navbar: "!bg-[#18181b] !border-r !border-[#27272a]",
+    navbar:
+      "!bg-[#18181b] !bg-none !border-r !border-[#27272a]",
     navbarButton:
       "!rounded-md !text-sm !text-[#a1a1aa] hover:!bg-[#27272a] hover:!text-[#fafafa]",
     navbarButtonIcon: "!text-[#71717a]",
     navbarMobileMenuButton: "!text-[#a1a1aa]",
-    pageScrollBox: "!bg-[#18181b]",
-    page: "!bg-[#18181b]",
-    profilePage: "!bg-[#18181b]",
-    profileSection: "!border !border-[#27272a] !bg-[#0f0f12] !rounded-lg",
+    pageScrollBox: "!bg-[#18181b] !bg-none",
+    page: "!bg-[#18181b] !bg-none",
+    profilePage: "!bg-[#18181b] !bg-none",
+    profileSection:
+      "!border !border-[#27272a] !bg-[#0f0f12] !bg-none !rounded-lg",
     profileSectionTitle: "!border-b !border-[#27272a]",
     profileSectionTitleText:
       "!text-xs !font-semibold !uppercase !tracking-[0.14em] !text-[#71717a]",
@@ -91,10 +94,10 @@ export const clerkAppearance = {
     profileSectionPrimaryButton:
       "!rounded-md !bg-[#27272a] !text-sm !font-medium !text-[#fafafa] hover:!bg-[#3f3f46] !border !border-[#3f3f46]",
     profileSectionItem: "!border-b !border-[#27272a]/50",
-    profileSectionItemList: "!bg-transparent",
+    profileSectionItemList: "!bg-transparent !bg-none",
     accordionTriggerButton:
       "!rounded-md !text-sm !text-[#a1a1aa] hover:!bg-[#27272a]",
-    accordionContent: "!bg-[#18181b]",
+    accordionContent: "!bg-[#18181b] !bg-none",
     formFieldAction: "!text-sm !font-medium !text-[#34d399] hover:!text-[#10b981]",
     badge:
       "!rounded-full !bg-[rgba(52,211,153,0.15)] !px-2 !py-0.5 !text-[10px] !font-semibold !uppercase !tracking-wider !text-[#34d399] !border !border-[rgba(52,211,153,0.25)]",

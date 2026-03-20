@@ -222,6 +222,12 @@ a {
   animation: heartbeat-pulse 1.5s ease-in-out infinite;
 }
 
+/* --- Clerk dev mode: remove diagonal hatching pattern --- */
+.cl-internal-b3fm6y,
+[class*="cl-"] {
+  background-image: none !important;
+}
+
 /* --- Scrollbar --- */
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
