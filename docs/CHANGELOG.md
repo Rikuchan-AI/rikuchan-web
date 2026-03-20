@@ -27,6 +27,30 @@
   - Mission Control section now appears before Platform
   - New "Chat" link added between Projects and Sessions
 
+- **SSE Streaming Chat** (P0.2)
+  - Tokens appear incrementally instead of waiting for full response
+  - Blinking cursor while waiting for first token
+  - Handles both OpenAI and Anthropic SSE formats
+  - Perceived latency: 15-35s down to ~2s TTFB
+
+- **Dynamic Model Selector**
+  - Dropdown in chat header fetches available models from gateway `GET /v1/models`
+  - Filters by user's configured provider credentials (`available: true`)
+  - Grouped by provider, persisted per conversation
+  - Shows fallback model when gateway reroutes: `glm-4.7 -> glm-4.7-flash`
+
+- **Reasoning Content Filter**
+  - Never shows `reasoning_content` (chain-of-thought) to user
+  - Handles edge case where provider returns empty `content` with reasoning
+
+### Performance (ADR-002)
+
+- **Provider connection pooling** (gateway) — Singleton httpx pool (50/20 limits), eliminates TCP+TLS per request
+- **pgvector HNSW query rewrite** (Supabase) — CTE forces index scan, 3500ms down to 234ms (15x)
+- **Agent HTTP client pooling** — Supabase (20/10) and Ollama (10/5) singletons
+- **BM25 non-blocking rebuild** — Searches not blocked during 5-min index refresh
+- **Granular timing instrumentation** — Gateway: `auth_ms`, `body_parse_ms`, `rag_ms`, `route_ms`, `adapt_ms`, `connect_ms` in logs + `x-rikuchan-timing` header. Agent: `embed_ms`, `vector_ms`, `bm25_ms`, `rerank_ms`, `merge_ms` in `search_meta`
+
 ### Bug Fixes (Gateway — `rikuchan-ai-gateway`)
 
 - **CORS `expose_headers`** — Added `x-rikuchan-*` response headers to CORS config so browsers can read RAG/provider metadata
