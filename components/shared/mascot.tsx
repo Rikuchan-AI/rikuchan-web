@@ -20,7 +20,6 @@ export function Mascot({ size = "md", className, glow = false }: MascotProps) {
       className={cn(
         "relative inline-flex items-center justify-center flex-shrink-0",
         sizes[size],
-        glow && "drop-shadow-[0_0_12px_rgba(52,211,153,0.3)]",
         className,
       )}
     >
@@ -31,47 +30,22 @@ export function Mascot({ size = "md", className, glow = false }: MascotProps) {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         aria-label="Rikuchan mascot"
+        style={glow ? { filter: "drop-shadow(0 0 12px rgba(52,211,153,0.3))" } : undefined}
       >
-        {/* Ears */}
-        <path
-          d="M10 20L16 6L22 20"
-          stroke="#34d399"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="rgba(52, 211, 153, 0.08)"
-        />
-        <path
-          d="M26 20L32 6L38 20"
-          stroke="#34d399"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="rgba(52, 211, 153, 0.08)"
-        />
+        {/* Left ear */}
+        <polygon points="6,20 12,4 18,20" fill="#34d399" />
+        {/* Right ear */}
+        <polygon points="30,20 36,4 42,20" fill="#34d399" />
         {/* Head */}
-        <rect
-          x="8"
-          y="18"
-          width="32"
-          height="24"
-          rx="8"
-          stroke="#34d399"
-          strokeWidth="2"
-          fill="rgba(52, 211, 153, 0.05)"
-        />
-        {/* Left eye */}
-        <circle cx="18" cy="29" r="2.5" fill="#34d399" />
-        {/* Right eye — warm glow */}
-        <circle cx="30" cy="29" r="2.5" fill="#fbbf24" />
-        {/* Nose */}
-        <path
-          d="M22.5 34L24 36L25.5 34"
-          stroke="#a1a1aa"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <rect x="8" y="18" width="32" height="24" rx="8" fill="#18181b" stroke="#27272a" strokeWidth="1" />
+        {/* Left eye — accent green */}
+        <circle cx="19" cy="30" r="4" fill="#34d399" />
+        <circle cx="20" cy="29" r="1.5" fill="#09090b" />
+        {/* Right eye — warm amber */}
+        <circle cx="29" cy="30" r="4" fill="#fbbf24" />
+        <circle cx="30" cy="29" r="1.5" fill="#09090b" />
+        {/* Nose — chevron */}
+        <path d="M22 36 L24 34 L26 36" stroke="#a1a1aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
       </svg>
     </span>
   );
