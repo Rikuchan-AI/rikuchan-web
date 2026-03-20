@@ -21,7 +21,7 @@ export default function MCSettingsPage() {
         Mission Control Settings
       </h2>
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-6">
         <HeartbeatModelSelector
           freeModels={freeModels}
           freeModelsLoading={freeModelsLoading}
