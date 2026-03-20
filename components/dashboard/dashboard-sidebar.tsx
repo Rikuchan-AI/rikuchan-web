@@ -19,6 +19,7 @@ const platformLinks = [
 const mcLinks = [
   { label: "Agents", href: "/agents" },
   { label: "Projects", href: "/agents/projects" },
+  { label: "Groups", href: "/agents/groups" },
   { label: "Chat", href: "/agents/chat" },
   { label: "Sessions", href: "/agents/sessions" },
   { label: "Gateway", href: "/agents/gateway" },
