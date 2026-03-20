@@ -82,7 +82,10 @@ async function chatCompletion(
   model: string,
 ): Promise<string> {
   const token = await getClerkToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-client-id": "rikuchan-web",
+  };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
