@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { FolderPlus, Plus, Radio, Search } from "lucide-react";
+
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway } from "@/lib/mc/agent-files";
@@ -140,65 +141,102 @@ export default function ProjectsPage() {
       </div>
 
       {/* Draft group form */}
-      {draftGroup && (
-        <div className="rounded-xl border border-line bg-surface p-5 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr_auto] gap-3">
-          <input
-            type="text"
-            value={draftGroup.name}
-            onChange={(e) => setDraftGroup({ ...draftGroup, name: e.target.value })}
-            placeholder="Group name"
-            className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
-            autoFocus
-          />
-          <input
-            type="text"
-            value={draftGroup.gateway?.url ?? ""}
-            onChange={(e) => setDraftGroup({
-              ...draftGroup,
-              gateway: {
-                url: e.target.value,
-                token: draftGroup.gateway?.token ?? "",
-              },
-            })}
-            placeholder="ws://gateway-for-group:18789"
-            className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
-          />
-          <input
-            type="password"
-            value={draftGroup.gateway?.token ?? ""}
-            onChange={(e) => setDraftGroup({
-              ...draftGroup,
-              gateway: {
-                url: draftGroup.gateway?.url ?? "",
-                token: e.target.value,
-              },
-            })}
-            placeholder="Token (optional)"
-            className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setDraftGroup(null)}
-              className="h-10 px-4 rounded-lg border border-line-strong text-sm font-medium text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreateGroup}
-              disabled={savingGroup || !draftGroup.name.trim()}
-              className="h-10 px-4 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-deep transition-colors disabled:opacity-50"
-            >
-              Save
-            </button>
+      {draftGroup && (() => {
+        const savedGateways = groups
+          .filter((g) => g.gateway?.url)
+          .map((g) => ({ url: g.gateway!.url, token: g.gateway!.token, groupName: g.name }));
+
+        return (
+          <div className="rounded-xl border border-accent/20 bg-surface p-5 space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr_auto] gap-3">
+              <input
+                type="text"
+                value={draftGroup.name}
+                onChange={(e) => setDraftGroup({ ...draftGroup, name: e.target.value })}
+                placeholder="Group name"
+                className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter" && draftGroup.name.trim()) handleCreateGroup(); }}
+              />
+              <input
+                type="text"
+                value={draftGroup.gateway?.url ?? ""}
+                onChange={(e) => setDraftGroup({
+                  ...draftGroup,
+                  gateway: { url: e.target.value, token: draftGroup.gateway?.token ?? "" },
+                })}
+                placeholder="ws://gateway:18789"
+                list="saved-gateways-projects"
+                className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
+              />
+              {savedGateways.length > 0 && (
+                <datalist id="saved-gateways-projects">
+                  {savedGateways.map((gw) => (
+                    <option key={`${gw.url}-${gw.groupName}`} value={gw.url}>
+                      {gw.groupName}
+                    </option>
+                  ))}
+                </datalist>
+              )}
+              <input
+                type="password"
+                value={draftGroup.gateway?.token ?? ""}
+                onChange={(e) => setDraftGroup({
+                  ...draftGroup,
+                  gateway: { url: draftGroup.gateway?.url ?? "", token: e.target.value },
+                })}
+                placeholder="Token (optional)"
+                className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setDraftGroup(null)}
+                  className="h-10 px-4 rounded-lg border border-line-strong text-sm font-medium text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateGroup}
+                  disabled={savingGroup || !draftGroup.name.trim()}
+                  className="h-10 px-4 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-deep transition-colors disabled:opacity-50"
+                >
+                  {savingGroup ? "Creating..." : "Save"}
+                </button>
+              </div>
+            </div>
+
+            {savedGateways.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-foreground-muted uppercase tracking-wider">Saved gateways:</span>
+                {savedGateways.map((gw) => (
+                  <button
+                    key={`${gw.url}-${gw.groupName}`}
+                    onClick={() => setDraftGroup({
+                      ...draftGroup,
+                      gateway: { url: gw.url, token: gw.token ?? "" },
+                    })}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-mono border transition-colors ${
+                      draftGroup.gateway?.url === gw.url
+                        ? "border-accent/40 bg-accent-soft text-accent"
+                        : "border-line bg-surface-strong text-foreground-muted hover:text-foreground hover:border-accent/20"
+                    }`}
+                  >
+                    <Radio size={10} />
+                    {gw.groupName}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              value={draftGroup.description ?? ""}
+              onChange={(e) => setDraftGroup({ ...draftGroup, description: e.target.value })}
+              placeholder="What this group owns..."
+              className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 min-h-[72px] resize-none"
+            />
           </div>
-          <textarea
-            value={draftGroup.description ?? ""}
-            onChange={(e) => setDraftGroup({ ...draftGroup, description: e.target.value })}
-            placeholder="What this group owns..."
-            className="lg:col-span-4 rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 min-h-[84px]"
-          />
-        </div>
-      )}
+        );
+      })()}
 
       {/* Search and filters */}
       <div className="flex items-center gap-4">
