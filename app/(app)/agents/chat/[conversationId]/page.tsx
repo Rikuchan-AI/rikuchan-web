@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { ArrowLeft, Send, Loader2, Pencil, Check, X, BookOpen } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 
 function formatTime(ts: number): string {
@@ -43,12 +43,32 @@ function GatewayInfo({ gateway }: { gateway: GatewayMeta }) {
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted/40 transition-colors hover:bg-surface-strong hover:text-foreground-muted"
+      title="Copy message"
+    >
+      {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+    </button>
+  );
+}
+
 function MessageBubble({ message }: { message: DirectChatMessage }) {
   const isUser = message.role === "user";
   const gw = message.gateway;
 
   return (
-    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`group flex flex-col ${isUser ? "items-end" : "items-start"}`}>
       {!isUser && (
         <div className="mb-1 flex items-center gap-2">
           <span className="mono text-[10px] uppercase tracking-[0.06em] text-foreground-muted">
@@ -62,20 +82,24 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
           {gw && <RagBadge gateway={gw} />}
         </div>
       )}
-      <div
-        className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
-          isUser
-            ? "bg-accent text-accent-foreground rounded-br-sm"
-            : "rounded-bl-sm border border-line bg-surface-muted text-foreground"
-        }`}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-        ) : (
-          <div className="prose-sm prose-invert max-w-none [&_p]:mb-1 [&_p]:last:mb-0 [&_ul]:ml-3 [&_ul]:list-disc [&_ol]:ml-3 [&_ol]:list-decimal [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface [&_pre]:p-2 [&_pre]:text-xs [&_strong]:font-semibold [&_a]:text-accent [&_a]:underline">
-            <Markdown>{message.content}</Markdown>
-          </div>
-        )}
+      <div className="flex items-start gap-1">
+        {isUser && <CopyButton text={message.content} />}
+        <div
+          className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
+            isUser
+              ? "bg-accent text-accent-foreground rounded-br-sm"
+              : "rounded-bl-sm border border-line bg-surface-muted text-foreground"
+          }`}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          ) : (
+            <div className="prose-sm prose-invert max-w-none [&_p]:mb-1 [&_p]:last:mb-0 [&_ul]:ml-3 [&_ul]:list-disc [&_ol]:ml-3 [&_ol]:list-decimal [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface [&_pre]:p-2 [&_pre]:text-xs [&_strong]:font-semibold [&_a]:text-accent [&_a]:underline">
+              <Markdown>{message.content}</Markdown>
+            </div>
+          )}
+        </div>
+        {!isUser && <CopyButton text={message.content} />}
       </div>
       <div className="mt-1 flex items-center gap-2">
         <span className="mono text-[10px] text-foreground-muted">
