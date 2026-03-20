@@ -46,6 +46,16 @@ export default async function DashboardBillingPage() {
         </section>
       </div>
 
+      {/* Empty state */}
+      {usage.cost_by_provider.length === 0 && usage.cost_by_model.length === 0 && usage.total_requests_24h === 0 && (
+        <section className="rounded-lg border border-line bg-surface p-8 text-center">
+          <p className="text-foreground-soft">No usage data yet. Connect a provider and start making requests.</p>
+          <Button href="/dashboard/settings" variant="secondary" size="lg" className="mt-4">
+            Go to Settings
+          </Button>
+        </section>
+      )}
+
       {/* Usage by provider */}
       {usage.cost_by_provider.length > 0 && (
         <section className="rounded-lg border border-line bg-surface p-6">

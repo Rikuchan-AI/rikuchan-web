@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { IBM_Plex_Mono, Inter, Sora } from "next/font/google";
+import { ToastProvider } from "@/components/shared/toast";
 import "./globals.css";
 
 const bodyFont = Inter({
@@ -51,7 +52,9 @@ export default function RootLayout({
             },
           }}
         >
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </ClerkProvider>
       </body>
     </html>

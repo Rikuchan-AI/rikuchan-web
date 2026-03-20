@@ -13,7 +13,7 @@ const links = [
   { label: "Settings", href: "/dashboard/settings" },
 ] as const;
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -26,6 +26,7 @@ export function DashboardSidebar() {
             <Link
               key={link.href}
               href={link.href}
+              onClick={onNavigate}
               className={cn(
                 "block rounded-md px-3 py-2.5 text-sm font-medium transition",
                 active ? "bg-accent-soft text-accent" : "text-foreground-soft hover:bg-surface-strong hover:text-foreground",

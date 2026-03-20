@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/shared/button";
+import { useToast } from "@/components/shared/toast";
+import { ProviderIcon } from "@/components/shared/provider-icon";
 import { clientConnectProvider, clientDisconnectProvider } from "@/lib/gateway-client";
 
 type ProviderStatus = {
@@ -29,6 +31,7 @@ export function SettingsForm({
   workspaceName: string;
 }) {
   const { getToken } = useAuth();
+  const toast = useToast();
   const [providers, setProviders] = useState(initialProviders);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connectKey, setConnectKey] = useState("");
@@ -46,8 +49,9 @@ export function SettingsForm({
       );
       setConnectProvider(null);
       setConnectKey("");
+      toast.success(`${PROVIDER_LABELS[provider] || provider} connected`);
     } catch (e) {
-      console.error("Failed to connect provider:", e);
+      toast.error(`Failed to connect ${PROVIDER_LABELS[provider] || provider}`);
     } finally {
       setConnecting(null);
     }
@@ -62,8 +66,9 @@ export function SettingsForm({
       setProviders((prev) =>
         prev.map((p) => (p.provider === provider ? { ...p, connected: false, auth_kind: null } : p)),
       );
+      toast.success(`${PROVIDER_LABELS[provider] || provider} disconnected`);
     } catch (e) {
-      console.error("Failed to disconnect provider:", e);
+      toast.error(`Failed to disconnect ${PROVIDER_LABELS[provider] || provider}`);
     }
   }
 
@@ -93,6 +98,7 @@ export function SettingsForm({
               <div className="flex items-center justify-between rounded-md border border-line bg-surface-muted p-4">
                 <div className="flex items-center gap-3">
                   <span className={`h-2.5 w-2.5 rounded-full ${p.connected ? "bg-accent" : "bg-foreground-muted"}`} />
+                  <ProviderIcon provider={p.provider} size="sm" />
                   <span className="text-sm font-medium text-foreground">{PROVIDER_LABELS[p.provider] || p.provider}</span>
                   {p.connected && p.auth_kind && (
                     <span className="rounded bg-surface-strong px-2 py-0.5 text-xs text-foreground-muted">{p.auth_kind}</span>

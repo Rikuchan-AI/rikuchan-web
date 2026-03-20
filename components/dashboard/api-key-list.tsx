@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/shared/button";
+import { useToast } from "@/components/shared/toast";
 import { clientCreateApiKey, clientRevokeApiKey, clientRotateApiKey } from "@/lib/gateway-client";
 import type { ApiKeyCreated } from "@/lib/gateway-client";
 
@@ -32,6 +33,7 @@ function timeAgo(iso: string | null): string {
 
 export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
   const { getToken } = useAuth();
+  const toast = useToast();
   const [keys, setKeys] = useState<ApiKey[]>(initialKeys);
   const [newKey, setNewKey] = useState<ApiKeyCreated | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -50,13 +52,13 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
       setNewKey(created);
       setName("");
       setShowCreate(false);
-      // Refresh list from server
+      toast.success("API key created");
       const res = await fetch(`${process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:4000"}/v1/api-keys`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setKeys(await res.json());
     } catch (e) {
-      console.error("Failed to create API key:", e);
+      toast.error("Failed to create API key");
     } finally {
       setCreating(false);
     }
@@ -70,8 +72,9 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
       if (!token) return;
       await clientRevokeApiKey(token, prefix);
       setKeys((prev) => prev.map((k) => (k.key_prefix === prefix ? { ...k, is_active: false } : k)));
+      toast.success("API key revoked");
     } catch (e) {
-      console.error("Failed to revoke key:", e);
+      toast.error("Failed to revoke key");
     } finally {
       setRevoking(null);
     }
@@ -84,18 +87,20 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
       if (!token) return;
       const created = await clientRotateApiKey(token, prefix);
       setNewKey(created);
+      toast.success("API key rotated");
       const res = await fetch(`${process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:4000"}/v1/api-keys`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setKeys(await res.json());
     } catch (e) {
-      console.error("Failed to rotate key:", e);
+      toast.error("Failed to rotate key");
     }
   }
 
   function handleCopy(text: string) {
     navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success("Copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   }
 
@@ -138,12 +143,15 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.slice(0, 100))}
                 placeholder="e.g. Production app"
-                className="mt-2 w-full rounded-md border border-line-strong bg-surface-muted px-4 py-3 text-sm text-foreground outline-none focus:border-accent"
+                className={`mt-2 w-full rounded-md border bg-surface-muted px-4 py-3 text-sm text-foreground outline-none focus:border-accent ${name.length >= 100 ? "border-warning" : "border-line-strong"}`}
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
+              {name.length >= 100 && (
+                <span className="mt-1 block text-xs text-warning">Maximum 100 characters</span>
+              )}
             </label>
             <div className="flex gap-3">
               <Button onClick={handleCreate} disabled={creating || !name.trim()}>
