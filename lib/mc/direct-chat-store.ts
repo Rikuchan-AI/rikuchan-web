@@ -38,6 +38,7 @@ interface DirectChatStore {
   createConversation: (model?: string) => string;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
+  setConversationModel: (id: string, model: string) => void;
   setActiveConversation: (id: string | null) => void;
   getConversation: (id: string) => DirectConversation | undefined;
 
@@ -287,6 +288,15 @@ export const useDirectChatStore = create<DirectChatStore>((set, get) => ({
     set((s) => ({
       conversations: s.conversations.map((c) =>
         c.id === id ? { ...c, title, updatedAt: Date.now() } : c,
+      ),
+    }));
+    get()._persist();
+  },
+
+  setConversationModel: (id, model) => {
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === id ? { ...c, model, updatedAt: Date.now() } : c,
       ),
     }));
     get()._persist();

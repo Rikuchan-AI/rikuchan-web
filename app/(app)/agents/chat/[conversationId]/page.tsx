@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
+import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy, ChevronDown } from "lucide-react";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
+import { gatewayFetch } from "@/lib/mc/gateway-api";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -113,6 +114,72 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
   );
 }
 
+interface GatewayModel {
+  id: string;
+  provider: string;
+  tier: string;
+  available: boolean;
+}
+
+function useAvailableModels() {
+  const [models, setModels] = useState<GatewayModel[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    gatewayFetch<{ models: GatewayModel[] }>("/models")
+      .then((data) => setModels(data.models.filter((m) => m.available)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { models, loading };
+}
+
+function ModelSelector({
+  currentModel,
+  models,
+  onChange,
+}: {
+  currentModel: string;
+  models: GatewayModel[];
+  onChange: (model: string) => void;
+}) {
+  if (models.length === 0) {
+    return (
+      <span className="mono shrink-0 text-[10px] text-foreground-muted">
+        {currentModel}
+      </span>
+    );
+  }
+
+  // Group models by provider
+  const grouped = models.reduce<Record<string, GatewayModel[]>>((acc, m) => {
+    (acc[m.provider] ??= []).push(m);
+    return acc;
+  }, {});
+
+  return (
+    <div className="relative shrink-0">
+      <select
+        value={currentModel}
+        onChange={(e) => onChange(e.target.value)}
+        className="mono appearance-none rounded-md border border-line bg-surface-strong py-1 pl-2 pr-6 text-[10px] text-foreground-muted transition-colors hover:border-accent/30 hover:text-foreground focus:border-accent/40 focus:outline-none"
+      >
+        {Object.entries(grouped).map(([provider, providerModels]) => (
+          <optgroup key={provider} label={provider}>
+            {providerModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <ChevronDown size={10} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+    </div>
+  );
+}
+
 const SUGGESTED_PROMPTS = [
   "What models are available?",
   "What providers are connected?",
@@ -129,8 +196,10 @@ export default function ConversationPage() {
   const conversation = conversations.find((c) => c.id === conversationId);
   const sendMessage = useDirectChatStore((s) => s.sendMessage);
   const renameConversation = useDirectChatStore((s) => s.renameConversation);
+  const setConversationModel = useDirectChatStore((s) => s.setConversationModel);
   const sending = useDirectChatStore((s) => s.sending);
   const hydrate = useDirectChatStore((s) => s._hydrate);
+  const { models: availableModels } = useAvailableModels();
 
   const [input, setInput] = useState("");
   const [editing, setEditing] = useState(false);
@@ -233,9 +302,11 @@ export default function ConversationPage() {
           </div>
         )}
 
-        <span className="mono shrink-0 text-[10px] text-foreground-muted">
-          {conversation.model}
-        </span>
+        <ModelSelector
+          currentModel={conversation.model}
+          models={availableModels}
+          onChange={(model) => setConversationModel(conversationId, model)}
+        />
       </div>
 
       {/* Messages */}
