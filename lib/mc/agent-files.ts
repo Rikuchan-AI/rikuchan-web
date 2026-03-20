@@ -1,4 +1,4 @@
-import { useGatewayStore } from "./gateway-store";
+import { useGatewayStore, registerExternalRpcResponseId, unregisterExternalRpcResponseId } from "./gateway-store";
 
 // ─── Core file templates for new agents ─────────────────────────────────────
 
@@ -128,7 +128,9 @@ export function createAgentViaGateway(params: {
     }
 
     const id = `create-agent-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
     const timeout = setTimeout(() => {
+      unregisterExternalRpcResponseId(id);
       resolve({ ok: false, error: "Request timed out" });
     }, 10000);
 
@@ -138,6 +140,7 @@ export function createAgentViaGateway(params: {
         if (msg.type === "res" && msg.id === id) {
           ws.removeEventListener("message", handler);
           clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
           if (msg.ok) {
             const payload = msg.payload as { agentId?: string };
             resolve({ ok: true, agentId: payload.agentId });
@@ -174,7 +177,9 @@ export function setAgentFileViaGateway(agentId: string, fileName: string, conten
     }
 
     const id = `set-file-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
     const timeout = setTimeout(() => {
+      unregisterExternalRpcResponseId(id);
       resolve({ ok: false, error: "Request timed out" });
     }, 10000);
 
@@ -184,6 +189,7 @@ export function setAgentFileViaGateway(agentId: string, fileName: string, conten
         if (msg.type === "res" && msg.id === id) {
           ws.removeEventListener("message", handler);
           clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
           if (msg.ok) {
             resolve({ ok: true });
           } else {
@@ -218,7 +224,9 @@ export function listAgentFilesViaGateway(agentId: string): Promise<{
     }
 
     const id = `list-files-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
     const timeout = setTimeout(() => {
+      unregisterExternalRpcResponseId(id);
       resolve({ ok: false, error: "Request timed out" });
     }, 10000);
 
@@ -228,6 +236,7 @@ export function listAgentFilesViaGateway(agentId: string): Promise<{
         if (msg.type === "res" && msg.id === id) {
           ws.removeEventListener("message", handler);
           clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
           if (msg.ok) {
             const payload = msg.payload as { files?: Array<{ name: string; path: string; missing: boolean; size?: number; content?: string }> };
             resolve({ ok: true, files: payload.files });
@@ -263,7 +272,9 @@ export function getAgentFileViaGateway(agentId: string, fileName: string): Promi
     }
 
     const id = `get-file-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
     const timeout = setTimeout(() => {
+      unregisterExternalRpcResponseId(id);
       resolve({ ok: false, error: "Request timed out" });
     }, 10000);
 
@@ -273,6 +284,7 @@ export function getAgentFileViaGateway(agentId: string, fileName: string): Promi
         if (msg.type === "res" && msg.id === id) {
           ws.removeEventListener("message", handler);
           clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
           if (msg.ok) {
             const payload = msg.payload as { file?: { content?: string } };
             resolve({ ok: true, content: payload.file?.content });
