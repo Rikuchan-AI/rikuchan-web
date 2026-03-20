@@ -129,10 +129,9 @@ async function chatCompletion(
 
   const data = await res.json();
 
-  // OpenAI format: { choices: [{ message: { content, reasoning_content } }] }
+  // OpenAI format: { choices: [{ message: { content } }] }
   const msg = data.choices?.[0]?.message;
-  const openai = msg?.content || msg?.reasoning_content;
-  if (openai) return { content: openai, gateway };
+  if (msg?.content) return { content: msg.content, gateway };
 
   // Anthropic format: { content: [{ type: "text", text }] }
   if (Array.isArray(data.content)) {
