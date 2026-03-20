@@ -43,6 +43,36 @@
   - Never shows `reasoning_content` (chain-of-thought) to user
   - Handles edge case where provider returns empty `content` with reasoning
 
+- **Model Selector Loading State**
+  - Shows RikuLoader (animated mascot spinner) while models are being fetched
+  - Falls back to static model name if fetch fails
+
+- **Model Fallback Display**
+  - Assistant label shows requested model, with `->` arrow to actual model on fallback
+  - Example: `glm-4.7 -> glm-4.7-flash`
+
+- **Dedicated Groups Page** (`/agents/groups`)
+  - Full CRUD: create, edit (inline), delete groups
+  - GroupCard with project count, agent badge, gateway URL link
+  - Saved gateway reuse: datalist dropdown + quick-select chips for existing gateway URLs
+  - Auto-creates agent in OpenClaw gateway on group creation
+  - "Groups" added to MC sidebar between Projects and Chat
+
+- **Groups-First Project Flow**
+  - Removed group creation form from Projects page (groups managed exclusively on Groups page)
+  - "New Project" requires at least one group to exist
+  - When no groups: shows "Create a Group first" with link to `/agents/groups`
+
+- **New Task Button** (Board)
+  - "New Task" button on project board with inline form
+  - Title, description, priority selector (low/medium/high/critical)
+  - Creates task in backlog status
+
+### Bug Fixes (Web)
+
+- **Sidebar highlight** — "Agents" link no longer highlights on all MC sub-routes (`/agents/projects`, `/agents/chat`, etc.)
+- **RPC response handling** — All gateway WebSocket RPC calls now register IDs with `externalRpcResponseIds` to prevent "Unmatched RPC response" errors
+
 ### Performance (ADR-002)
 
 - **Provider connection pooling** (gateway) — Singleton httpx pool (50/20 limits), eliminates TCP+TLS per request
