@@ -7,6 +7,7 @@ import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy, ChevronDown } from "lucide-react";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 import { gatewayFetch } from "@/lib/mc/gateway-api";
+import { RikuLoader } from "@/components/shared/riku-loader";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -141,12 +142,18 @@ function useAvailableModels() {
 function ModelSelector({
   currentModel,
   models,
+  loading,
   onChange,
 }: {
   currentModel: string;
   models: GatewayModel[];
+  loading: boolean;
   onChange: (model: string) => void;
 }) {
+  if (loading) {
+    return <RikuLoader size="sm" />;
+  }
+
   if (models.length === 0) {
     return (
       <span className="mono shrink-0 text-[10px] text-foreground-muted">
@@ -202,7 +209,7 @@ export default function ConversationPage() {
   const setConversationModel = useDirectChatStore((s) => s.setConversationModel);
   const sending = useDirectChatStore((s) => s.sending);
   const hydrate = useDirectChatStore((s) => s._hydrate);
-  const { models: availableModels } = useAvailableModels();
+  const { models: availableModels, loading: modelsLoading } = useAvailableModels();
 
   const [input, setInput] = useState("");
   const [editing, setEditing] = useState(false);
@@ -308,6 +315,7 @@ export default function ConversationPage() {
         <ModelSelector
           currentModel={conversation.model}
           models={availableModels}
+          loading={modelsLoading}
           onChange={(model) => setConversationModel(conversationId, model)}
         />
       </div>
