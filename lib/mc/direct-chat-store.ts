@@ -4,11 +4,19 @@ import { create } from "zustand";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface GatewayMeta {
+  rag?: string;        // "hit:3", "skipped", "disabled"
+  provider?: string;   // "anthropic", "zai_general"
+  actualModel?: string; // set when different from requested
+  latencyMs?: number;
+}
+
 export interface DirectChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   model?: string;
+  gateway?: GatewayMeta;
   timestamp: number;
 }
 
@@ -77,10 +85,15 @@ async function getClerkToken(): Promise<string | null> {
   return null;
 }
 
+interface ChatCompletionResult {
+  content: string;
+  gateway: GatewayMeta;
+}
+
 async function chatCompletion(
   messages: { role: string; content: string }[],
   model: string,
-): Promise<string> {
+): Promise<ChatCompletionResult> {
   const token = await getClerkToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -103,21 +116,32 @@ async function chatCompletion(
     throw new Error(`Gateway ${res.status}: ${text}`);
   }
 
+  // Extract gateway metadata from response headers
+  const gateway: GatewayMeta = {};
+  const ragHeader = res.headers.get("x-rikuchan-rag");
+  if (ragHeader) gateway.rag = ragHeader;
+  const provider = res.headers.get("x-rikuchan-provider");
+  if (provider) gateway.provider = provider;
+  const actualModel = res.headers.get("x-rikuchan-model");
+  if (actualModel) gateway.actualModel = actualModel;
+  const latency = res.headers.get("x-rikuchan-latency-ms");
+  if (latency) gateway.latencyMs = parseFloat(latency);
+
   const data = await res.json();
 
   // OpenAI format: { choices: [{ message: { content, reasoning_content } }] }
   const msg = data.choices?.[0]?.message;
   const openai = msg?.content || msg?.reasoning_content;
-  if (openai) return openai;
+  if (openai) return { content: openai, gateway };
 
   // Anthropic format: { content: [{ type: "text", text }] }
   if (Array.isArray(data.content)) {
     const textBlock = data.content.find((b: { type: string }) => b.type === "text");
-    if (textBlock?.text) return textBlock.text;
+    if (textBlock?.text) return { content: textBlock.text, gateway };
   }
 
   // Fallback: stringify raw response for debugging
-  return data.error?.message ?? JSON.stringify(data);
+  return { content: data.error?.message ?? JSON.stringify(data), gateway };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -229,13 +253,14 @@ export const useDirectChatStore = create<DirectChatStore>((set, get) => ({
         content: m.content,
       }));
 
-      const response = await chatCompletion(apiMessages, conv.model);
+      const result = await chatCompletion(apiMessages, conv.model);
 
       const assistantMsg: DirectChatMessage = {
         id: mkMsgId(),
         role: "assistant",
-        content: response,
-        model: conv.model,
+        content: result.content,
+        model: result.gateway.actualModel ?? conv.model,
+        gateway: result.gateway,
         timestamp: Date.now(),
       };
 

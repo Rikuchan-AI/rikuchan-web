@@ -4,27 +4,63 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { ArrowLeft, Send, Loader2, Pencil, Check, X } from "lucide-react";
-import type { DirectChatMessage } from "@/lib/mc/direct-chat-store";
+import { ArrowLeft, Send, Loader2, Pencil, Check, X, BookOpen } from "lucide-react";
+import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function RagBadge({ gateway }: { gateway: GatewayMeta }) {
+  if (!gateway.rag) return null;
+  const isHit = gateway.rag.startsWith("hit:");
+  const chunks = isHit ? gateway.rag.split(":")[1] : null;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+        isHit
+          ? "bg-emerald-500/10 text-emerald-400"
+          : "bg-foreground-muted/10 text-foreground-muted"
+      }`}
+    >
+      <BookOpen size={10} />
+      {isHit ? `RAG ${chunks} chunks` : `RAG ${gateway.rag}`}
+    </span>
+  );
+}
+
+function GatewayInfo({ gateway }: { gateway: GatewayMeta }) {
+  const parts: string[] = [];
+  if (gateway.provider) parts.push(gateway.provider);
+  if (gateway.latencyMs) parts.push(`${Math.round(gateway.latencyMs)}ms`);
+  if (parts.length === 0) return null;
+
+  return (
+    <span className="mono text-[10px] text-foreground-muted/50">
+      {parts.join(" · ")}
+    </span>
+  );
+}
+
 function MessageBubble({ message }: { message: DirectChatMessage }) {
   const isUser = message.role === "user";
+  const gw = message.gateway;
 
   return (
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
       {!isUser && (
-        <span className="mono mb-1 text-[10px] uppercase tracking-[0.06em] text-foreground-muted">
-          assistant
-          {message.model && (
-            <span className="ml-1.5 normal-case tracking-normal text-foreground-muted/60">
-              {message.model}
-            </span>
-          )}
-        </span>
+        <div className="mb-1 flex items-center gap-2">
+          <span className="mono text-[10px] uppercase tracking-[0.06em] text-foreground-muted">
+            assistant
+            {message.model && (
+              <span className="ml-1.5 normal-case tracking-normal text-foreground-muted/60">
+                {message.model}
+              </span>
+            )}
+          </span>
+          {gw && <RagBadge gateway={gw} />}
+        </div>
       )}
       <div
         className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
@@ -41,9 +77,12 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
           </div>
         )}
       </div>
-      <span className="mono mt-1 text-[10px] text-foreground-muted">
-        {formatTime(message.timestamp)}
-      </span>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="mono text-[10px] text-foreground-muted">
+          {formatTime(message.timestamp)}
+        </span>
+        {!isUser && gw && <GatewayInfo gateway={gw} />}
+      </div>
     </div>
   );
 }
