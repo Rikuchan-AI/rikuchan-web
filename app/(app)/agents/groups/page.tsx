@@ -156,15 +156,20 @@ export default function GroupsPage() {
     };
     await createGroup(group);
 
+    // Try to auto-create agent in gateway (best-effort, non-blocking)
     if (isConnected) {
-      const slug = group.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "default";
-      const workspaceBase = stateDir ? stateDir.replace(/\/?$/, "") : "/data";
-      const result = await createAgentViaGateway({
-        name: group.name,
-        workspace: `${workspaceBase}/workspace/${slug}`,
-      });
-      if (result.ok && result.agentId) {
-        await updateGroup(group.id, { agentId: result.agentId });
+      try {
+        const slug = group.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "default";
+        const workspaceBase = stateDir ? stateDir.replace(/\/?$/, "") : "/data";
+        const result = await createAgentViaGateway({
+          name: group.name,
+          workspace: `${workspaceBase}/workspace/${slug}`,
+        });
+        if (result.ok && result.agentId) {
+          await updateGroup(group.id, { agentId: result.agentId });
+        }
+      } catch {
+        // Agent creation is optional — group is already saved
       }
     }
 
