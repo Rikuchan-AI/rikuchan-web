@@ -39,7 +39,7 @@ export default function ProjectSettingsPage() {
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="mx-auto max-w-xl space-y-6">
       {/* General settings */}
       <div className="rounded-lg border border-line bg-surface p-5 space-y-4">
         <h3

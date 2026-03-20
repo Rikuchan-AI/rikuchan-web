@@ -18,7 +18,7 @@ export default function NewAgentPage() {
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="mx-auto max-w-xl space-y-6">
       {/* Back link */}
       <Link
         href="/agents"

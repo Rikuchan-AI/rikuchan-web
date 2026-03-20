@@ -35,7 +35,7 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="mx-auto max-w-xl space-y-6">
       <Link
         href="/agents/projects"
         className="inline-flex items-center gap-1.5 text-sm text-foreground-muted hover:text-foreground transition-colors"

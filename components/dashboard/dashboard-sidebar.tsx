@@ -57,7 +57,7 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
-      <LogoLockup href="/" compact />
+      <LogoLockup href="/" />
 
       {/* Platform */}
       <div className="mt-8 space-y-1">
