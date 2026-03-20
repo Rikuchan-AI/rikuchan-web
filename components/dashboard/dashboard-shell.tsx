@@ -43,7 +43,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <UserButton
                 appearance={{
                   elements: {
-                    avatarBox: "h-10 w-10 ring-1 ring-line-strong",
+                    avatarBox: "h-10 w-10",
                   },
                 }}
               />
