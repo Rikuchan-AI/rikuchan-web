@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 type ToastType = "success" | "error" | "info";
@@ -36,6 +36,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), TOAST_DURATION);
   }, []);
 
+  // Register global toast for MC modules that call toast() outside React
+  useEffect(() => {
+    _registerGlobalToast(add);
+    return () => { _globalAdd = null; };
+  }, [add]);
+
   const ctx: ToastContextValue = {
     success: (m) => add("success", m),
     error: (m) => add("error", m),
@@ -70,4 +76,19 @@ export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used within ToastProvider");
   return ctx;
+}
+
+// Global toast function — works outside React components (used by MC modules)
+let _globalAdd: ((type: ToastType, message: string) => void) | null = null;
+
+export function _registerGlobalToast(add: (type: ToastType, message: string) => void) {
+  _globalAdd = add;
+}
+
+export function toast(type: ToastType, message: string) {
+  if (_globalAdd) {
+    _globalAdd(type, message);
+  } else {
+    console.warn("[toast] ToastProvider not mounted yet:", type, message);
+  }
 }

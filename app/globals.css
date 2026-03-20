@@ -28,6 +28,32 @@
   --radius-lg: 1rem;
   --radius-md: 0.75rem;
   --radius-sm: 0.5rem;
+
+  /* Mission Control — Agent status */
+  --status-online: #34d399;
+  --status-idle: #fbbf24;
+  --status-thinking: #a78bfa;
+  --status-degraded: #fb923c;
+  --status-offline: #52525b;
+
+  /* Mission Control — Project status */
+  --project-active: #34d399;
+  --project-paused: #fbbf24;
+  --project-archived: #52525b;
+
+  /* Mission Control — Task status */
+  --task-backlog: #52525b;
+  --task-progress: #34d399;
+  --task-review: #fbbf24;
+  --task-blocked: #f87171;
+  --task-done: #3f3f46;
+
+  /* Mission Control — Pipeline step status */
+  --step-pending: #3f3f46;
+  --step-running: #34d399;
+  --step-success: #34d399;
+  --step-failed: #f87171;
+  --step-skipped: #52525b;
 }
 
 @theme inline {
@@ -175,3 +201,30 @@ a {
   0%, 100% { opacity: 0.2; }
   50% { opacity: 0.5; }
 }
+
+/* --- Mission Control animations --- */
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0; transform: scale(2); }
+}
+
+@keyframes heartbeat-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.animate-heartbeat {
+  animation: heartbeat-pulse 1.5s ease-in-out infinite;
+}
+
+/* --- Scrollbar --- */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--foreground-muted); }

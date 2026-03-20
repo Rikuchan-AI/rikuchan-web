@@ -1,0 +1,190 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { X, Send, Crown } from "lucide-react";
+import { ChatBubble } from "./ChatBubble";
+import { useChatStore } from "@/lib/mc/chat-store";
+import { buildLeadSystemPrompt, parseLeadActions, stripActionBlocks, executeLeadActions } from "@/lib/mc/em-chat";
+import { useProjectsStore, selectProjectById, useProjectTasks } from "@/lib/mc/projects-store";
+import { EM_SUGGESTED_PROMPTS } from "@/lib/mc/types-chat";
+import type { ChatMessage } from "@/lib/mc/types-chat";
+
+interface EMChatSheetProps {
+  projectId: string;
+  onClose: () => void;
+}
+
+export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
+  const project = useProjectsStore(selectProjectById(projectId));
+  const tasks = useProjectTasks(projectId);
+
+  const session = useChatStore((s) => s.getChatSession({ mode: "em", projectId }));
+  const sendMessage = useChatStore((s) => s.sendMessage);
+  const markRead = useChatStore((s) => s.markRead);
+
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const executedActionsRef = useRef<Set<string>>(new Set());
+
+  const messages = session?.messages ?? [];
+  const leadAgent = project?.roster.find((m) => m.role === "lead");
+  const showSuggestions = messages.length === 0;
+
+  // Execute actions from new agent messages
+  useEffect(() => {
+    for (const msg of messages) {
+      if (msg.role === "agent" && !executedActionsRef.current.has(msg.id)) {
+        const actions = parseLeadActions(msg.content);
+        if (actions.length > 0) {
+          executedActionsRef.current.add(msg.id);
+          executeLeadActions(actions, projectId);
+        }
+      }
+    }
+  }, [messages, projectId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (session) markRead(session.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const handleSend = async (text?: string) => {
+    const content = text ?? input.trim();
+    if (!content || sending || !leadAgent || !project) return;
+    setSending(true);
+    setInput("");
+    await sendMessage({
+      mode: "em",
+      content,
+      agentId: leadAgent.agentId,
+      agentName: leadAgent.agentName,
+      projectId,
+    });
+    setSending(false);
+  };
+
+  if (!project || !leadAgent) return null;
+
+  return (
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+
+      {/* Sheet */}
+      <div
+        role="dialog"
+        aria-label="Lead Agent Chat"
+        className="fixed right-0 top-0 bottom-0 z-50 w-[440px] max-w-full bg-surface border-l border-line flex flex-col"
+        style={{ animation: "slideInRight 0.2s ease-out" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent-soft">
+              <Crown size={14} className="text-accent" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{leadAgent.agentName}</p>
+              <p className="text-xs text-foreground-muted">{project.name}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* Suggested prompts */}
+          {showSuggestions && (
+            <div className="rounded-lg border border-line bg-surface-muted p-4 space-y-3">
+              <p className="text-xs text-foreground-muted font-medium">Suggested prompts:</p>
+              <div className="grid grid-cols-1 gap-2">
+                {EM_SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => handleSend(prompt)}
+                    className="text-left rounded-lg border border-line bg-surface-strong px-3 py-2 text-xs text-foreground-soft hover:border-accent/30 hover:text-foreground transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg) => {
+            // Strip action blocks from display
+            const displayMsg: ChatMessage = msg.role === "agent"
+              ? { ...msg, content: stripActionBlocks(msg.content) }
+              : msg;
+
+            const actions = msg.role === "agent" ? parseLeadActions(msg.content) : [];
+
+            return (
+              <div key={msg.id}>
+                <ChatBubble message={displayMsg} />
+                {/* Action chips */}
+                {actions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5 ml-0">
+                    {actions.map((action, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 bg-accent-soft text-accent rounded px-2 py-1 text-xs font-medium"
+                      >
+                        &#10003; {action.type.replace(/_/g, " ")}
+                        {action.title ? `: "${String(action.title)}"` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-line p-4 flex gap-2">
+          <input
+            className="flex-1 rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent/40 focus:outline-none transition-colors"
+            placeholder="Direct the team..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={!input.trim() || sending}
+            className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
+    </>
+  );
+}

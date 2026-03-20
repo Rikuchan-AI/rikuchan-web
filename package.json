@@ -11,12 +11,17 @@
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",
     "@clerk/themes": "^2.4.57",
+    "@hello-pangea/dnd": "^18.0.1",
+    "@supabase/supabase-js": "^2.99.3",
     "framer-motion": "^12.37.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "recharts": "^3.8.0"
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",
