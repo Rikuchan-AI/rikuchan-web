@@ -24,28 +24,32 @@ function AgentCard({
   currentTask,
   assignedCount,
   onSelectTask,
+  loading,
 }: {
   member: RosterMember;
   agentStatus?: { status: string; lastActivityAt: number };
   currentTask?: { id: string; title: string };
   assignedCount: number;
   onSelectTask: (taskId: string) => void;
+  loading?: boolean;
 }) {
   const status = agentStatus?.status ?? "offline";
   const isOnline = status === "online" || status === "idle";
   const isWorking = status === "online";
 
-  const statusDot = isWorking
-    ? "bg-emerald-400 animate-pulse"
-    : status === "idle"
-      ? "bg-zinc-400"
-      : status === "degraded"
-        ? "bg-amber-400"
-        : status === "error" || status === "offline"
-          ? "bg-red-400"
-          : isOnline
-            ? "bg-emerald-400"
-            : "bg-red-400";
+  const statusDot = loading
+    ? "bg-foreground-muted/40 animate-pulse"
+    : isWorking
+      ? "bg-emerald-400 animate-pulse"
+      : status === "idle"
+        ? "bg-zinc-400"
+        : status === "degraded"
+          ? "bg-amber-400"
+          : status === "error" || status === "offline"
+            ? "bg-red-400"
+            : isOnline
+              ? "bg-emerald-400"
+              : "bg-red-400";
 
   const initials = member.agentName
     .split(/\s+/)
@@ -73,11 +77,9 @@ function AgentCard({
       </div>
 
       {/* Heartbeat */}
-      {agentStatus && (
-        <p className="mono text-[9px] text-foreground-muted/60">
-          {isOnline ? formatTimeSince(agentStatus.lastActivityAt) : status}
-        </p>
-      )}
+      <p className="mono text-[9px] text-foreground-muted/60">
+        {loading ? "…" : agentStatus ? (isOnline ? formatTimeSince(agentStatus.lastActivityAt) : status) : "offline"}
+      </p>
 
       {/* Current task */}
       {currentTask && (
@@ -107,6 +109,7 @@ function AgentCard({
 
 export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPanelProps) {
   const agents = useGatewayStore((s) => s.agents);
+  const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
 
   if (roster.length === 0) {
     return (
@@ -122,7 +125,13 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
         Agents ({roster.length})
       </p>
       {roster.map((member) => {
-        const gwAgent = agents.find((a) => a.id === member.agentId);
+        const gwAgent = agentsLoaded
+          ? agents.find((a) =>
+              a.id === member.agentId ||
+              a.id.includes(member.agentId) ||
+              member.agentId.includes(a.id)
+            )
+          : undefined;
         const assignedTasks = tasks.filter(
           (t) => t.assignedAgentId === member.agentId && t.status !== "done",
         );
@@ -140,6 +149,7 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
             currentTask={workingTask}
             assignedCount={assignedTasks.length}
             onSelectTask={onSelectTask}
+            loading={!agentsLoaded}
           />
         );
       })}
