@@ -83,7 +83,7 @@ export function BoardHeader({
       )}
 
       {/* Lifecycle controls */}
-      {project.status !== "active" && onActivate && (
+      {project.status !== "active" && project.status !== "paused" && onActivate && (
         <button
           onClick={onActivate}
           disabled={lifecycleLoading}
