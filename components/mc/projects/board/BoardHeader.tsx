@@ -9,6 +9,7 @@ interface BoardHeaderProps {
   project: Project;
   leadAgentName?: string;
   leadAgentOnline?: boolean;
+  agentsLoaded?: boolean;
   operationMode: OperationMode;
   onModeChange: (mode: OperationMode) => void;
   onNewTask: () => void;
@@ -38,6 +39,7 @@ export function BoardHeader({
   project,
   leadAgentName,
   leadAgentOnline,
+  agentsLoaded,
   operationMode,
   onModeChange,
   onNewTask,
@@ -74,11 +76,15 @@ export function BoardHeader({
         >
           <Crown size={12} className="text-accent" />
           <span>{leadAgentName}</span>
-          <span
-            className={`h-2 w-2 rounded-full ${
-              leadAgentOnline ? "bg-emerald-400 animate-pulse" : "bg-foreground-muted"
-            }`}
-          />
+          {!agentsLoaded ? (
+            <span className="h-2 w-2 rounded-full bg-foreground-muted/40 animate-pulse" />
+          ) : (
+            <span
+              className={`h-2 w-2 rounded-full ${
+                leadAgentOnline ? "bg-emerald-400 animate-pulse" : "bg-foreground-muted"
+              }`}
+            />
+          )}
         </button>
       )}
 

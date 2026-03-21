@@ -170,13 +170,15 @@ export default function BoardPage() {
 
   const gwAgents = useGatewayStore((s) => s.agents);
   const gwConnected = useGatewayStore((s) => s.status === "connected");
+  const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
   const leadGwId = leadAgent?.gatewayAgentId ?? leadAgent?.agentId;
   const leadGwAgent = gwAgents.find((a) =>
     a.id === leadGwId ||
     (leadGwId && (a.id.includes(leadGwId) || leadGwId.includes(a.id)))
   );
-  const leadAgentOnline = leadGwAgent?.status === "online" || leadGwAgent?.status === "idle";
+  // Only evaluate online status after agents have been loaded from gateway
+  const leadAgentOnline = agentsLoaded && (leadGwAgent?.status === "online" || leadGwAgent?.status === "idle");
 
   // Auto-restore heartbeat for active projects whose lead is offline
   // (e.g. after gateway restart or first load after activation)
@@ -302,6 +304,7 @@ export default function BoardPage() {
         project={project}
         leadAgentName={leadAgent?.agentName}
         leadAgentOnline={leadAgentOnline}
+        agentsLoaded={agentsLoaded}
         operationMode={operationMode}
         onModeChange={setOperationMode}
         onNewTask={() => setShowCreateModal(true)}
