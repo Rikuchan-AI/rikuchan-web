@@ -48,19 +48,23 @@ const mcLinks: NavItem[] = [
   { label: "Agents", href: "/agents", icon: Users },
   { label: "Projects", href: "/agents/projects", icon: FolderKanban },
   { label: "Groups", href: "/agents/groups", icon: Layers },
-  { label: "Chat", href: "/agents/chat", icon: MessageSquare },
   { label: "Sessions", href: "/agents/sessions", icon: Activity },
   { label: "Gateway", href: "/agents/gateway", icon: Globe },
   { label: "MC Settings", href: "/agents/settings", icon: SlidersHorizontal },
 ];
 
+const chatLinks: NavItem[] = [
+  { label: "Chat", href: "/agents/chat", icon: MessageSquare },
+];
+
 interface CollapsedState {
   mc: boolean;
+  chat: boolean;
   platform: boolean;
 }
 
 function useCollapsedState(): [CollapsedState, (section: keyof CollapsedState) => void] {
-  const [collapsed, setCollapsed] = useState<CollapsedState>({ mc: false, platform: false });
+  const [collapsed, setCollapsed] = useState<CollapsedState>({ mc: false, chat: false, platform: false });
 
   useEffect(() => {
     try {
@@ -196,6 +200,22 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 pathname={pathname}
                 onNavigate={onNavigate}
                 badge={mcBadges[link.href]}
+              />
+            ))}
+        </div>
+      )}
+
+      {/* Chat */}
+      {MC_ENABLED && (
+        <div className="mt-6 space-y-1">
+          <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
+          {!collapsed.chat &&
+            chatLinks.map((link) => (
+              <NavLink
+                key={link.href}
+                {...link}
+                pathname={pathname}
+                onNavigate={onNavigate}
               />
             ))}
         </div>
