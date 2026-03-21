@@ -23,7 +23,6 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
   const thinkingAgents = useChatStore((s) => s.thinkingAgents);
-  const isThinking = leadAgent ? thinkingAgents.has(leadAgent.agentId) : false;
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -33,6 +32,7 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
   const messages = session?.messages ?? [];
   const leadAgent = project?.roster.find((m) => m.role === "lead");
   const showSuggestions = messages.length === 0;
+  const isThinking = leadAgent ? thinkingAgents.has(leadAgent.agentId) : false;
 
   // Execute actions from new agent messages
   useEffect(() => {
