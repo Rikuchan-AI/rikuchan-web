@@ -174,16 +174,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const agentIdFromGw = gatewaySessionKey.split(":")[1] ?? "";
     set((s) => {
       const allKeys = Object.keys(s.sessions);
-      const matches = allKeys.filter((k) => {
-        const session = s.sessions[k];
-        return session.agentId === agentIdFromGw ||
-          session.agentId.includes(agentIdFromGw) ||
-          agentIdFromGw.includes(session.agentId);
-      });
-      // Prefer the most recently updated session among matches
-      const sessionKey = matches.sort((a, b) =>
+
+      const agentMatches = (session: AgentChatSession) =>
+        session.agentId === agentIdFromGw ||
+        session.agentId.includes(agentIdFromGw) ||
+        agentIdFromGw.includes(session.agentId);
+
+      const lastMessageIsUser = (session: AgentChatSession) => {
+        const last = session.messages[session.messages.length - 1];
+        return last?.role === "user";
+      };
+
+      // Priority 1: session with pending user message (last msg is user) + agentId match
+      // Priority 2: most recently updated session with agentId match
+      const pending = allKeys.filter((k) => agentMatches(s.sessions[k]) && lastMessageIsUser(s.sessions[k]));
+      const fallback = allKeys.filter((k) => agentMatches(s.sessions[k]));
+
+      const candidates = pending.length > 0 ? pending : fallback;
+      const sessionKey = candidates.sort((a, b) =>
         (s.sessions[b].updatedAt ?? 0) - (s.sessions[a].updatedAt ?? 0)
       )[0];
+
       const session = sessionKey ? s.sessions[sessionKey] : undefined;
       if (!session || !sessionKey) return s;
 

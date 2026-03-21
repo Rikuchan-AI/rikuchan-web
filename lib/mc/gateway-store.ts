@@ -873,7 +873,6 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
             // Dispatch accumulated text to chat-store
             const accumulated = runAccumulator.get(runId);
             runAccumulator.delete(runId);
-            console.log(`[Chat] lifecycle.end runId=${runId.slice(0,8)} sessionKey=${sessionKey} accumulated=${accumulated?.text?.length ?? 0}chars`);
             if (accumulated?.text) {
               try {
                 const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { receiveMessage: (k: string, m: import("./types-chat").ChatMessage) => void; setThinking: (k: string, v: boolean) => void } } };
@@ -927,7 +926,6 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
               if (existing) {
                 existing.text += delta;
               } else {
-                console.log(`[Chat] assistant stream start runId=${runId.slice(0,8)} sessionKey=${sessionKey}`);
                 runAccumulator.set(runId, { sessionKey, text: delta });
               }
             }
