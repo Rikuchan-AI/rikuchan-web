@@ -16,12 +16,6 @@ const LEAD_ALWAYS_ON_HEARTBEAT: RosterHeartbeatConfig = {
   // no activeHours → no sleep window
 };
 
-// Paused state: very long interval so gateway stops sending prompts
-const LEAD_PAUSED_HEARTBEAT: RosterHeartbeatConfig = {
-  enabled: false,
-  intervalSeconds: 86400, // 24h — effectively disabled
-  focus: [],
-};
 
 // ─── Workspace file builders ────────────────────────────────────────────────
 
@@ -378,11 +372,6 @@ export async function pauseProject(projectId: string): Promise<ActivationResult>
     );
   }
 
-  // Disable heartbeat — agent goes idle while project is paused
-  await syncHeartbeatToGateway(leadGwId, LEAD_PAUSED_HEARTBEAT).catch(() => {
-    /* non-fatal */
-  });
-
   await store.updateProject(projectId, { status: "paused" });
   return { ok: true };
 }
@@ -426,15 +415,6 @@ Resume from where you left off. Address blocked tasks first, then continue with 
   if (!chatResult.ok) {
     console.warn("[Resume] Failed to open session:", chatResult.error);
   }
-
-  // Re-enable permanent heartbeat on resume
-  const hbConfig: RosterHeartbeatConfig = lead.heartbeatConfig
-    ? { ...LEAD_ALWAYS_ON_HEARTBEAT, intervalSeconds: lead.heartbeatConfig.intervalSeconds }
-    : LEAD_ALWAYS_ON_HEARTBEAT;
-
-  await syncHeartbeatToGateway(leadGwId, hbConfig, sessionKey).catch(() => {
-    /* non-fatal */
-  });
 
   await store.updateProject(projectId, { status: "active" });
   return { ok: true };
