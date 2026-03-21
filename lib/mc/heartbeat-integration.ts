@@ -192,21 +192,22 @@ export function syncHeartbeatToGateway(
           const currentConfig = msg.payload?.config as { agents?: { list?: Array<Record<string, unknown>> } } | undefined;
           const agentsList = currentConfig?.agents?.list ?? [];
 
-          // Update agent's heartbeat config
-          const updatedList = agentsList.map((a) => {
-            if ((a.id as string) === agentId) {
-              return {
-                ...a,
-                heartbeat: {
-                  every: config.intervalSeconds,
-                  ...(config.activeHours ? {
-                    activeHours: { start: config.activeHours.start, end: config.activeHours.end },
-                  } : {}),
-                },
-              };
-            }
-            return a;
-          });
+          const heartbeatPatch = {
+            every: config.intervalSeconds,
+            ...(config.activeHours ? {
+              activeHours: { start: config.activeHours.start, end: config.activeHours.end },
+            } : {}),
+          };
+
+          const agentInList = agentsList.some((a) => (a.id as string) === agentId);
+          console.log(`[HB] syncHeartbeatToGateway agentId=${agentId} found=${agentInList} listIds=${agentsList.map((a) => a.id).join(",")}`);
+
+          // Update existing entry or append if agent not yet in list
+          const updatedList = agentInList
+            ? agentsList.map((a) =>
+                (a.id as string) === agentId ? { ...a, heartbeat: heartbeatPatch } : a,
+              )
+            : [...agentsList, { id: agentId, heartbeat: heartbeatPatch }];
 
           // Patch
           const patchId = `hb-patch-${Date.now()}`;
