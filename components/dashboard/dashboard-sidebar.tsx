@@ -188,9 +188,25 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" />
 
-      {/* Mission Control */}
+      {/* Chat */}
       {MC_ENABLED && (
         <div className="mt-8 space-y-1">
+          <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
+          {!collapsed.chat &&
+            chatLinks.map((link) => (
+              <NavLink
+                key={link.href}
+                {...link}
+                pathname={pathname}
+                onNavigate={onNavigate}
+              />
+            ))}
+        </div>
+      )}
+
+      {/* Mission Control */}
+      {MC_ENABLED && (
+        <div className="mt-6 space-y-1">
           <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
           {!collapsed.mc &&
             mcLinks.map((link) => (
@@ -200,22 +216,6 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 pathname={pathname}
                 onNavigate={onNavigate}
                 badge={mcBadges[link.href]}
-              />
-            ))}
-        </div>
-      )}
-
-      {/* Chat */}
-      {MC_ENABLED && (
-        <div className="mt-6 space-y-1">
-          <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
-          {!collapsed.chat &&
-            chatLinks.map((link) => (
-              <NavLink
-                key={link.href}
-                {...link}
-                pathname={pathname}
-                onNavigate={onNavigate}
               />
             ))}
         </div>
