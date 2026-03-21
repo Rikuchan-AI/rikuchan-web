@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Paperclip, Upload, X } from "lucide-react";
 import type { Task, FileAttachment } from "@/lib/mc/types-project";
 import { useProjectsStore } from "@/lib/mc/projects-store";
@@ -18,6 +18,7 @@ interface TaskFilesTabProps {
 export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
   const updateTask = useProjectsStore((s) => s.updateTask);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   const attachments = task.attachments ?? [];
 
@@ -55,6 +56,7 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      setDragging(false);
       handleFilesSelected(e.dataTransfer.files);
     },
     [handleFilesSelected],
@@ -62,6 +64,13 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    setDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragging(false);
+    }
   }, []);
 
   // Truncate long filenames
@@ -118,10 +127,22 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
         onClick={() => fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line hover:border-accent/40 bg-surface-muted/50 hover:bg-accent-soft/10 px-4 py-6 cursor-pointer transition-colors flex-shrink-0"
+        onDragLeave={handleDragLeave}
+        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 cursor-pointer transition-colors flex-shrink-0 ${
+          dragging
+            ? "border-accent/60 bg-accent/5"
+            : "border-line hover:border-accent/40 bg-surface-muted/50 hover:bg-accent-soft/10"
+        }`}
       >
-        <Upload size={20} className="text-foreground-muted" />
-        <p className="text-xs text-foreground-muted">Drop files or <span className="text-accent">browse</span></p>
+        <Upload size={20} className={dragging ? "text-accent" : "text-foreground-muted"} />
+        <p className="text-xs text-foreground-muted">
+          {dragging ? (
+            <span className="text-accent font-medium">Release to attach</span>
+          ) : (
+            <>Drop files or <span className="text-accent">browse</span></>
+          )}
+        </p>
+        <p className="text-[10px] text-foreground-muted/60">Multiple files supported</p>
         <input
           ref={fileInputRef}
           type="file"

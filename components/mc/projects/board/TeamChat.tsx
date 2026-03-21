@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, MessageSquare, Send } from "lucide-react";
+import { X, MessageSquare } from "lucide-react";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useChatStore } from "@/lib/mc/chat-store";
 import { ChatBubble } from "@/components/mc/projects/chat/ChatBubble";
+import { ChatInput } from "@/components/mc/projects/chat/ChatInput";
 import type { ChatMessage } from "@/lib/mc/types-chat";
 
 interface TeamChatProps {
@@ -45,9 +46,8 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id]);
 
-  const handleSend = async () => {
-    const content = input.trim();
-    if (!content || sending || !leadAgent || !project) return;
+  const handleSend = async (content: string) => {
+    if (!leadAgent || !project) return;
     setSending(true);
     setInput("");
     await sendMessage({
@@ -111,22 +111,15 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
         </div>
 
         {/* Input */}
-        <div className="border-t border-line p-4 flex gap-2">
-          <input
-            className="flex-1 rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent/40 focus:outline-none transition-colors"
+        <div className="border-t border-line p-4">
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={handleSend}
             placeholder={leadAgent ? `Message ${leadAgent.agentName}...` : "No lead agent assigned"}
             disabled={!leadAgent}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            sending={sending}
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || sending || !leadAgent}
-            className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send size={14} />
-          </button>
         </div>
       </div>
 

@@ -190,6 +190,19 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     }));
     await getStorageAdapter().createTask(projectId, task);
     get().sendProjectCommand({ type: "task_create", projectId, task });
+
+    // Auto-delegate: if project is active, not manual, and task is unassigned in backlog
+    if (task.status === "backlog" && !task.assignedAgentId) {
+      const project = get().projects.find((p) => p.id === projectId);
+      if (project && project.status === "active" && project.operationMode !== "manual") {
+        // Dynamic import to avoid circular dependency (em-delegation imports projects-store)
+        import("./em-delegation").then(({ triggerEMDelegation }) => {
+          triggerEMDelegation(task, project).catch((err) => {
+            console.warn("[Projects] Auto-delegation failed:", err);
+          });
+        }).catch(() => { /* ignore import errors */ });
+      }
+    }
   },
 
   updateTask: async (projectId, taskId, updates) => {

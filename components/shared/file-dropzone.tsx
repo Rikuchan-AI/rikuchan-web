@@ -18,23 +18,31 @@ export function FileDropzone({ files, onChange, id = "file-dropzone" }: FileDrop
 
   const readFiles = useCallback(
     (fileList: FileList) => {
-      Array.from(fileList).forEach((file) => {
+      const fileArray = Array.from(fileList);
+      if (fileArray.length === 0) return;
+
+      const now = Date.now();
+      let completed = 0;
+      const newEntries: RosterContextFile[] = new Array(fileArray.length);
+
+      fileArray.forEach((file, i) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-          const content = ev.target?.result as string;
-          onChange([
-            ...files,
-            {
-              id: `ctx-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-              name: file.name,
-              content,
-              mimeType: file.type || "text/plain",
-              addedAt: Date.now(),
-            },
-          ]);
+          newEntries[i] = {
+            id: `ctx-${now}-${i}-${Math.random().toString(16).slice(2, 6)}`,
+            name: file.name,
+            content: ev.target?.result as string,
+            mimeType: file.type || "text/plain",
+            addedAt: now,
+          };
+          completed += 1;
+          if (completed === fileArray.length) {
+            onChange([...files, ...newEntries]);
+          }
         };
         reader.readAsText(file);
       });
+
       if (inputRef.current) inputRef.current.value = "";
     },
     [files, onChange],

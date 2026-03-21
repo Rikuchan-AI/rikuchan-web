@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Crown, Plus, Search, Filter, MessageSquare, Heart, Shield, Calendar } from "lucide-react";
+import { Crown, Plus, Search, Filter, MessageSquare, Heart, Shield, Calendar, Play, Pause, Loader2 } from "lucide-react";
 import type { Project } from "@/lib/mc/types-project";
 import type { OperationMode } from "@/lib/mc/pipeline-governance";
 
@@ -17,6 +17,10 @@ interface BoardHeaderProps {
   onHealth: () => void;
   onApprovals: () => void;
   onSprintPlanning: () => void;
+  onActivate?: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
+  lifecycleLoading?: boolean;
   search: string;
   onSearchChange: (value: string) => void;
   blockedOnly: boolean;
@@ -42,6 +46,10 @@ export function BoardHeader({
   onHealth,
   onApprovals,
   onSprintPlanning,
+  onActivate,
+  onPause,
+  onResume,
+  lifecycleLoading,
   search,
   onSearchChange,
   blockedOnly,
@@ -71,6 +79,41 @@ export function BoardHeader({
               leadAgentOnline ? "bg-emerald-400 animate-pulse" : "bg-foreground-muted"
             }`}
           />
+        </button>
+      )}
+
+      {/* Lifecycle controls */}
+      {project.status !== "active" && onActivate && (
+        <button
+          onClick={onActivate}
+          disabled={lifecycleLoading}
+          title="Activate project — start the board lead session"
+          className="flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-400/20 disabled:opacity-50"
+        >
+          {lifecycleLoading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          Activate
+        </button>
+      )}
+      {project.status === "active" && onPause && (
+        <button
+          onClick={onPause}
+          disabled={lifecycleLoading}
+          title="Pause project — lead saves state and goes idle"
+          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-foreground-soft transition-colors hover:border-amber-400/30 hover:text-amber-400 disabled:opacity-50"
+        >
+          {lifecycleLoading ? <Loader2 size={12} className="animate-spin" /> : <Pause size={12} />}
+          Pause
+        </button>
+      )}
+      {project.status === "paused" && onResume && (
+        <button
+          onClick={onResume}
+          disabled={lifecycleLoading}
+          title="Resume project — lead wakes up from WORKING.md"
+          className="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
+        >
+          {lifecycleLoading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          Resume
         </button>
       )}
 

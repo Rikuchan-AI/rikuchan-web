@@ -7,6 +7,8 @@ import type { DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
 
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
+import { useGatewayStore } from "@/lib/mc/gateway-store";
+import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
 import { canTransition, type OperationMode } from "@/lib/mc/pipeline-governance";
@@ -154,11 +156,16 @@ export default function BoardPage() {
   const [showHealth, setShowHealth] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const [showSprintPlanning, setShowSprintPlanning] = useState(false);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const leadAgent = project?.roster.find((m) => m.role === "lead");
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
+
+  const gwAgents = useGatewayStore((s) => s.agents);
+  const leadGwAgent = gwAgents.find((a) => a.id === leadAgent?.agentId);
+  const leadAgentOnline = leadGwAgent?.status === "online" || leadGwAgent?.status === "idle";
 
   const STALE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -229,6 +236,29 @@ export default function BoardPage() {
     setShowNewTask(true);
   };
 
+  const handleActivate = async () => {
+    if (!project || lifecycleLoading) return;
+    setLifecycleLoading(true);
+    const result = await activateProject(project.id);
+    setLifecycleLoading(false);
+    if (!result.ok) console.error("[Board] Activation failed:", result.error);
+  };
+
+  const handlePause = async () => {
+    if (!project || lifecycleLoading) return;
+    setLifecycleLoading(true);
+    await pauseProject(project.id);
+    setLifecycleLoading(false);
+  };
+
+  const handleResume = async () => {
+    if (!project || lifecycleLoading) return;
+    setLifecycleLoading(true);
+    const result = await resumeProject(project.id);
+    setLifecycleLoading(false);
+    if (!result.ok) console.error("[Board] Resume failed:", result.error);
+  };
+
   if (!project) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -243,7 +273,7 @@ export default function BoardPage() {
       <BoardHeader
         project={project}
         leadAgentName={leadAgent?.agentName}
-        leadAgentOnline={true}
+        leadAgentOnline={leadAgentOnline}
         operationMode={operationMode}
         onModeChange={setOperationMode}
         onNewTask={() => setShowCreateModal(true)}
@@ -252,6 +282,10 @@ export default function BoardPage() {
         onHealth={() => setShowHealth(true)}
         onApprovals={() => setShowApprovals(true)}
         onSprintPlanning={() => setShowSprintPlanning(true)}
+        onActivate={project.status !== "active" ? handleActivate : undefined}
+        onPause={project.status === "active" ? handlePause : undefined}
+        onResume={project.status === "paused" ? handleResume : undefined}
+        lifecycleLoading={lifecycleLoading}
         search={search}
         onSearchChange={setSearch}
         blockedOnly={blockedOnly}

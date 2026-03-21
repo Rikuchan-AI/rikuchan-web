@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Crown } from "lucide-react";
+import { X, Crown } from "lucide-react";
 import { ChatBubble } from "./ChatBubble";
+import { ChatInput } from "./ChatInput";
 import { useChatStore } from "@/lib/mc/chat-store";
 import { buildLeadSystemPrompt, parseLeadActions, stripActionBlocks, executeLeadActions } from "@/lib/mc/em-chat";
 import { useProjectsStore, selectProjectById, useProjectTasks } from "@/lib/mc/projects-store";
@@ -61,8 +62,7 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const handleSend = async (text?: string) => {
-    const content = text ?? input.trim();
+  const handleSend = async (content: string) => {
     if (!content || sending || !leadAgent || !project) return;
     setSending(true);
     setInput("");
@@ -161,21 +161,14 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
         </div>
 
         {/* Input */}
-        <div className="border-t border-line p-4 flex gap-2">
-          <input
-            className="flex-1 rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent/40 focus:outline-none transition-colors"
-            placeholder="Direct the team..."
+        <div className="border-t border-line p-4">
+          <ChatInput
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onChange={setInput}
+            onSend={handleSend}
+            placeholder="Direct the team..."
+            sending={sending}
           />
-          <button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || sending}
-            className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send size={14} />
-          </button>
         </div>
       </div>
 
