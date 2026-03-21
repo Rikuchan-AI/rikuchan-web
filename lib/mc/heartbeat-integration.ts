@@ -161,6 +161,7 @@ function formatAge(ts: number | undefined): string {
 export function syncHeartbeatToGateway(
   agentId: string,
   config: RosterHeartbeatConfig,
+  sessionKey?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   return new Promise((resolve) => {
     const store = useGatewayStore.getState();
@@ -194,6 +195,7 @@ export function syncHeartbeatToGateway(
 
           const heartbeatPatch = {
             every: config.intervalSeconds,
+            ...(sessionKey ? { session: sessionKey } : {}),
             ...(config.activeHours ? {
               activeHours: { start: config.activeHours.start, end: config.activeHours.end },
             } : {}),

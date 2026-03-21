@@ -314,12 +314,6 @@ export async function activateProject(
     ? { ...LEAD_ALWAYS_ON_HEARTBEAT, intervalSeconds: lead.heartbeatConfig.intervalSeconds }
     : LEAD_ALWAYS_ON_HEARTBEAT;
 
-  const hbResult = await syncHeartbeatToGateway(effectiveAgentId, hbConfig);
-  if (!hbResult.ok) {
-    console.warn("[Activation] Failed to configure heartbeat:", hbResult.error);
-    // Non-fatal: the agent will still receive the activation message
-  }
-
   // ── Step 4: Open session — send activation message ────────────────────────
 
   onStep?.("opening-session");
@@ -328,6 +322,12 @@ export async function activateProject(
     ? store.groups.find((g) => g.id === project.groupId)
     : undefined;
   const sessionKey = buildAgentSessionKey(effectiveAgentId, project, group?.agentId);
+
+  const hbResult = await syncHeartbeatToGateway(effectiveAgentId, hbConfig, sessionKey);
+  if (!hbResult.ok) {
+    console.warn("[Activation] Failed to configure heartbeat:", hbResult.error);
+    // Non-fatal: the agent will still receive the activation message
+  }
   const activationMessage = buildActivationMessage(project, lead);
 
   const chatResult = await sendChatMessage(sessionKey, activationMessage);
@@ -432,7 +432,7 @@ Resume from where you left off. Address blocked tasks first, then continue with 
     ? { ...LEAD_ALWAYS_ON_HEARTBEAT, intervalSeconds: lead.heartbeatConfig.intervalSeconds }
     : LEAD_ALWAYS_ON_HEARTBEAT;
 
-  await syncHeartbeatToGateway(leadGwId, hbConfig).catch(() => {
+  await syncHeartbeatToGateway(leadGwId, hbConfig, sessionKey).catch(() => {
     /* non-fatal */
   });
 

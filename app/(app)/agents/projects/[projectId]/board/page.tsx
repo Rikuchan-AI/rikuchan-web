@@ -11,6 +11,7 @@ import { RikuPageLoader } from "@/components/shared/riku-loader";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
 import { syncHeartbeatToGateway } from "@/lib/mc/heartbeat-integration";
+import { buildAgentSessionKey } from "@/lib/mc/session-routing";
 import type { RosterHeartbeatConfig } from "@/lib/mc/types-project";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
@@ -177,12 +178,13 @@ export default function BoardPage() {
   // Auto-restore heartbeat for active projects whose lead is offline
   // (e.g. after gateway restart or first load after activation)
   useEffect(() => {
-    if (!leadAgent || !gwConnected || project?.status !== "active" || leadAgentOnline) return;
+    if (!leadAgent || !project || !gwConnected || project.status !== "active" || leadAgentOnline) return;
     const gwId = leadAgent.gatewayAgentId ?? leadAgent.agentId;
     const hbConfig: RosterHeartbeatConfig = leadAgent.heartbeatConfig
       ? { enabled: true, intervalSeconds: leadAgent.heartbeatConfig.intervalSeconds, focus: ["board-review", "agent-health", "task-progress"] }
       : { enabled: true, intervalSeconds: 60, focus: ["board-review", "agent-health", "task-progress"] };
-    syncHeartbeatToGateway(gwId, hbConfig).catch(() => { /* non-fatal */ });
+    const sessionKey = buildAgentSessionKey(gwId, project);
+    syncHeartbeatToGateway(gwId, hbConfig, sessionKey).catch(() => { /* non-fatal */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gwConnected, project?.status, leadAgentOnline]);
 
