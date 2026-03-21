@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Plus } from "lucide-react";
-import type { Task, TaskPriority, RosterMember } from "@/lib/mc/types-project";
+import { X, Plus, Upload, Paperclip } from "lucide-react";
+import type { Task, TaskPriority, RosterMember, RosterContextFile } from "@/lib/mc/types-project";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -50,11 +50,41 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState<string[]>([]);
+  const [contextNote, setContextNote] = useState("");
+  const [contextFiles, setContextFiles] = useState<RosterContextFile[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const titleRef = useRef<HTMLInputElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploaded = e.target.files;
+    if (!uploaded) return;
+    Array.from(uploaded).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const content = ev.target?.result as string;
+        setContextFiles((prev) => [
+          ...prev,
+          {
+            id: `ctx-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            name: file.name,
+            content,
+            mimeType: file.type,
+            addedAt: Date.now(),
+          },
+        ]);
+      };
+      reader.readAsText(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const removeContextFile = useCallback((id: string) => {
+    setContextFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
 
   // Focus title on mount
   useEffect(() => {
@@ -142,6 +172,8 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
       subtasks: [],
       tags: allTags,
       attachments: [],
+      contextNote: contextNote.trim() || undefined,
+      contextFiles: contextFiles.length > 0 ? contextFiles : undefined,
       createdAt: now,
       updatedAt: now,
     };
@@ -351,6 +383,74 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
             ) : (
               <p className="text-xs text-foreground-muted/60">No acceptance criteria defined</p>
             )}
+          </div>
+
+          {/* Context for agent */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                Context Note
+              </label>
+              <textarea
+                value={contextNote}
+                onChange={(e) => setContextNote(e.target.value)}
+                placeholder="Additional context for the agent — links, decisions, constraints, prior art..."
+                rows={3}
+                className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted/50 focus:border-accent/40 focus:outline-none resize-none transition-colors"
+              />
+              <p className="mt-1 text-[11px] text-foreground-muted">
+                Injected alongside the task description when delegating to an agent.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                Context Files {contextFiles.length > 0 && `(${contextFiles.length})`}
+              </label>
+
+              {contextFiles.length > 0 && (
+                <div className="space-y-1 mb-2">
+                  {contextFiles.map((f) => (
+                    <div key={f.id} className="flex items-center justify-between rounded-md border border-line bg-surface-strong px-3 py-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip size={11} className="text-foreground-muted shrink-0" />
+                        <span className="text-xs text-foreground truncate">{f.name}</span>
+                        <span className="text-[10px] text-foreground-muted shrink-0">
+                          {(f.content.length / 1024).toFixed(1)}KB
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeContextFile(f.id)}
+                        className="text-foreground-muted hover:text-danger transition-colors ml-2 shrink-0"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".md,.txt,.json,.yaml,.yml,.ts,.js,.py,.go,.rb,.sh,.toml,.csv,.env.example"
+                onChange={handleFileUpload}
+                className="sr-only"
+                id="task-context-file-upload"
+              />
+              <label
+                htmlFor="task-context-file-upload"
+                className="flex items-center gap-2 w-fit cursor-pointer h-8 px-3 rounded-lg border border-dashed border-line hover:border-accent/40 text-xs text-foreground-muted hover:text-foreground transition-colors"
+              >
+                <Upload size={12} />
+                Upload files
+              </label>
+              <p className="mt-1 text-[11px] text-foreground-muted">
+                Specs, docs, code snippets, YAML — text files only.
+              </p>
+            </div>
           </div>
         </div>
 

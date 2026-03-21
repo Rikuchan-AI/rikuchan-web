@@ -255,6 +255,9 @@ export interface Task {
   updatedAt: number;
   tags: string[];
   attachments: FileAttachment[];
+  /** Context injected into the agent prompt alongside the task */
+  contextNote?: string;
+  contextFiles?: RosterContextFile[];
   // EM delegation
   delegationStatus?: TaskDelegationStatus;
   emDecisionReason?: string;
