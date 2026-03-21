@@ -177,18 +177,18 @@ function StepIdentity({
 
       <div>
         <FieldLabel required>Role</FieldLabel>
-        <div className="relative">
+        <div className="relative group/role">
           <input
             type="text"
             list="role-suggestions"
             value={role}
             onChange={(e) => onChange("role", e.target.value)}
             placeholder="developer, devops, qa, designer..."
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50"
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
           />
-          {/* Covers the native datalist arrow */}
+          {/* Covers the native datalist arrow + custom chevron with hover */}
           <div className="pointer-events-none absolute right-0 top-px bottom-px w-10 rounded-r-md bg-surface-strong flex items-center justify-end pr-3">
-            <ChevronDown size={14} strokeWidth={2.5} className="text-white" />
+            <ChevronDown size={14} strokeWidth={2.5} className="text-white/40 group-hover/role:text-white transition-colors" />
           </div>
           {role && (
             <button
