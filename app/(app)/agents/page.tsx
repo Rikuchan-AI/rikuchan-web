@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentGrid } from "@/components/mc/agents/AgentGrid";
 import { GatewayStatus } from "@/components/mc/gateway/GatewayStatus";
@@ -27,6 +28,13 @@ export default function AgentsPage() {
         <h2 className="font-display text-xl font-semibold tracking-[-0.03em] text-foreground">
           Agents
         </h2>
+        <Link
+          href="/agents/new"
+          className="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-deep transition-colors"
+        >
+          <Plus size={14} />
+          New Agent
+        </Link>
       </div>
 
       {/* Collapsible gateway panel */}

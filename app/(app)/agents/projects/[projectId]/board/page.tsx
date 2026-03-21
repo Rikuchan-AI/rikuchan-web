@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import { Plus, MessageSquare, Heart, Shield, Calendar } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
@@ -240,53 +240,24 @@ export default function BoardPage() {
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <BoardHeader
-            project={project}
-            leadAgentName={leadAgent?.agentName}
-            leadAgentOnline={true}
-            operationMode={operationMode}
-            onModeChange={setOperationMode}
-            onNewTask={() => setShowCreateModal(true)}
-            onEMChat={() => setShowEMChat(true)}
-            search={search}
-            onSearchChange={setSearch}
-            blockedOnly={blockedOnly}
-            onBlockedOnlyChange={setBlockedOnly}
-            searchInputRef={searchInputRef}
-          />
-        </div>
-        <button
-          onClick={() => setShowTeamChat(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
-          title="Team Chat"
-        >
-          <MessageSquare size={12} className="text-accent" />
-          <span className="hidden xl:inline">Team Chat</span>
-        </button>
-        <button
-          onClick={() => setShowHealth(true)}
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
-          title="Agent Health"
-        >
-          <Heart size={14} />
-        </button>
-        <button
-          onClick={() => setShowApprovals(true)}
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
-          title="Approval Queue"
-        >
-          <Shield size={14} />
-        </button>
-        <button
-          onClick={() => setShowSprintPlanning(true)}
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
-          title="Sprint Planning"
-        >
-          <Calendar size={14} />
-        </button>
-      </div>
+      <BoardHeader
+        project={project}
+        leadAgentName={leadAgent?.agentName}
+        leadAgentOnline={true}
+        operationMode={operationMode}
+        onModeChange={setOperationMode}
+        onNewTask={() => setShowCreateModal(true)}
+        onEMChat={() => setShowEMChat(true)}
+        onTeamChat={() => setShowTeamChat(true)}
+        onHealth={() => setShowHealth(true)}
+        onApprovals={() => setShowApprovals(true)}
+        onSprintPlanning={() => setShowSprintPlanning(true)}
+        search={search}
+        onSearchChange={setSearch}
+        blockedOnly={blockedOnly}
+        onBlockedOnlyChange={setBlockedOnly}
+        searchInputRef={searchInputRef}
+      />
 
       {/* Create Task Modal (from header button) */}
       {showCreateModal && (

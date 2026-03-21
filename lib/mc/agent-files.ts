@@ -444,3 +444,104 @@ export function setAgentSpawnConfigViaGateway(
     ws.send(JSON.stringify({ type: "req", id: getId, method: "config.get", params: {} }));
   });
 }
+
+/**
+ * Patch per-agent config fields and/or global agent defaults after agent creation.
+ * - perAgent: written to agents.list[x] entry (subagents, humanDelay, etc.)
+ * - globalDefaults: merged into agents.defaults (thinkingDefault, verboseDefault, etc.)
+ * Only non-empty/non-null values are applied.
+ */
+export function patchAgentDefaults(params: {
+  agentId: string;
+  perAgent: Record<string, unknown>;
+  globalDefaults: Record<string, unknown>;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { agentId, perAgent, globalDefaults } = params;
+
+  // Nothing to do
+  const hasPerAgent = Object.keys(perAgent).length > 0;
+  const hasGlobal = Object.keys(globalDefaults).length > 0;
+  if (!hasPerAgent && !hasGlobal) return Promise.resolve({ ok: true });
+
+  return new Promise((resolve) => {
+    const store = useGatewayStore.getState();
+    const ws = store._ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      resolve({ ok: false, error: "Gateway not connected" });
+      return;
+    }
+
+    const getId = `config-get-defaults-${Date.now()}`;
+    const getTimeout = setTimeout(() => resolve({ ok: false, error: "Timed out getting config" }), 10000);
+
+    const getHandler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== "res" || msg.id !== getId) return;
+        ws.removeEventListener("message", getHandler);
+        clearTimeout(getTimeout);
+
+        if (!msg.ok) {
+          resolve({ ok: false, error: "Failed to get config" });
+          return;
+        }
+
+        const baseHash = msg.payload?.hash as string | undefined;
+        const config = msg.payload?.config as {
+          agents?: {
+            list?: Array<Record<string, unknown>>;
+            defaults?: Record<string, unknown>;
+          };
+        } | undefined;
+
+        const agentsList = config?.agents?.list ?? [];
+        const existingDefaults = config?.agents?.defaults ?? {};
+
+        // Merge per-agent fields into this agent's list entry
+        const updatedList = agentsList.map((a) => {
+          if ((a.id as string) !== agentId) return a;
+          const merged: Record<string, unknown> = { ...a };
+          for (const [k, v] of Object.entries(perAgent)) {
+            if (v !== null && v !== undefined && v !== "") merged[k] = v;
+          }
+          return merged;
+        });
+
+        // Merge global defaults
+        const updatedDefaults: Record<string, unknown> = { ...existingDefaults };
+        for (const [k, v] of Object.entries(globalDefaults)) {
+          if (v !== null && v !== undefined && v !== "") updatedDefaults[k] = v;
+        }
+
+        const patchPayload: Record<string, unknown> = { agents: { list: updatedList } };
+        if (Object.keys(updatedDefaults).length > 0) {
+          (patchPayload.agents as Record<string, unknown>).defaults = updatedDefaults;
+        }
+
+        const patchId = `config-patch-defaults-${Date.now()}`;
+        const patchTimeout = setTimeout(() => resolve({ ok: false, error: "Patch timed out" }), 10000);
+
+        const patchHandler = (event2: MessageEvent) => {
+          try {
+            const msg2 = JSON.parse(event2.data);
+            if (msg2.type !== "res" || msg2.id !== patchId) return;
+            ws.removeEventListener("message", patchHandler);
+            clearTimeout(patchTimeout);
+            resolve({ ok: !!msg2.ok, error: msg2.error?.message });
+          } catch { /* ignore */ }
+        };
+
+        ws.addEventListener("message", patchHandler);
+        ws.send(JSON.stringify({
+          type: "req",
+          id: patchId,
+          method: "config.patch",
+          params: { baseHash, raw: JSON.stringify(patchPayload) },
+        }));
+      } catch { /* ignore */ }
+    };
+
+    ws.addEventListener("message", getHandler);
+    ws.send(JSON.stringify({ type: "req", id: getId, method: "config.get", params: {} }));
+  });
+}

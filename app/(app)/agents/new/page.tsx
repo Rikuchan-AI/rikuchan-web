@@ -4,11 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Check, Plus,
-  Crown, Brain, Wrench, Cpu, Eye,
+  Crown, Brain, Wrench, Cpu, Settings2,
 } from "lucide-react";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
-import { createAgentViaGateway, setAgentFileViaGateway } from "@/lib/mc/agent-files";
+import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults } from "@/lib/mc/agent-files";
+import { InfoTooltip } from "@/components/mc/ui/InfoTooltip";
 import {
   generateIdentityMd,
   generateSoulMd,
@@ -28,6 +29,7 @@ const STEPS = [
   { id: 2, label: "Soul",     icon: Brain },
   { id: 3, label: "Tools",    icon: Wrench },
   { id: 4, label: "Model",    icon: Cpu },
+  { id: 5, label: "Defaults", icon: Settings2 },
 ];
 
 function StepIndicator({ current }: { current: number }) {
@@ -74,13 +76,9 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 
 // ─── Step 1: Identity ────────────────────────────────────────────────────────
 
-const ROLE_OPTIONS = [
-  { value: "lead",       label: "Lead Agent" },
-  { value: "developer",  label: "Developer" },
-  { value: "reviewer",   label: "Reviewer" },
-  { value: "researcher", label: "Researcher" },
-  { value: "documenter", label: "Documenter" },
-  { value: "custom",     label: "Custom" },
+const ROLE_SUGGESTIONS = [
+  "lead", "developer", "reviewer", "researcher", "documenter",
+  "devops", "qa", "designer", "analyst", "security", "ops", "custom",
 ];
 
 const EMOJI_OPTIONS = [
@@ -164,24 +162,18 @@ function StepIdentity({
 
       <div>
         <FieldLabel required>Role</FieldLabel>
-        <select
+        <input
+          type="text"
+          list="role-suggestions"
           value={role}
           onChange={(e) => onChange("role", e.target.value)}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-        {role === "custom" && (
-          <input
-            type="text"
-            value={customRole}
-            onChange={(e) => onChange("customRole", e.target.value)}
-            placeholder="Custom role label..."
-            className="mt-2 w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
-          />
-        )}
+          placeholder="developer, devops, qa, designer..."
+          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+        />
+        <datalist id="role-suggestions">
+          {ROLE_SUGGESTIONS.map((r) => <option key={r} value={r} />)}
+        </datalist>
+        <p className="mt-1 text-[10px] text-foreground-muted">Choose from suggestions or type a custom role</p>
       </div>
 
       <div>
@@ -610,6 +602,339 @@ function StepModel({
   );
 }
 
+// ─── Step 5: Agent Defaults ──────────────────────────────────────────────────
+
+function FieldWithInfo({ label, tooltip, children }: { label: string; tooltip: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <label className="mono text-xs uppercase text-foreground-muted" style={{ letterSpacing: "0.18em" }}>{label}</label>
+        <InfoTooltip text={tooltip} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+        checked ? "bg-accent" : "bg-surface-strong border border-line"
+      }`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
+    </button>
+  );
+}
+
+function NumberInput({ value, onChange, placeholder, min, max }: {
+  value: number | "";
+  onChange: (v: number | "") => void;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <input
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      placeholder={placeholder ?? "Default"}
+      onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+      className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+    />
+  );
+}
+
+function SelectInput({ value, onChange, options }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
+    >
+      <option value="">Inherit default</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
+interface DefaultsState {
+  // per-agent
+  allowSubagents: string;
+  subagentModel: string;
+  humanDelayEnabled: boolean;
+  // global
+  thinkingDefault: string;
+  verboseDefault: string;
+  elevatedDefault: string;
+  typingMode: string;
+  blockStreamingDefault: string;
+  blockStreamingBreak: string;
+  contextTokens: number | "";
+  bootstrapMaxChars: number | "";
+  bootstrapTotalMaxChars: number | "";
+  bootstrapTruncWarning: string;
+  skipBootstrap: boolean;
+  maxConcurrent: number | "";
+  timeoutSeconds: number | "";
+  envelopeTimestamp: string;
+  envelopeElapsed: string;
+  envelopeTimezone: string;
+  userTimezone: string;
+  timeFormat: string;
+  imageMaxDimension: number | "";
+  repoRoot: string;
+}
+
+function StepDefaults({ state, onChange }: {
+  state: DefaultsState;
+  onChange: <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => void;
+}) {
+  const [globalOpen, setGlobalOpen] = useState(true);
+
+  return (
+    <div className="space-y-6">
+      {/* Per-agent section */}
+      <div className="rounded-xl border border-line bg-surface-strong p-4 space-y-4">
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Per-Agent Overrides</p>
+
+        <FieldWithInfo label="Allowed Sub-agents" tooltip="Comma-separated IDs of agents this agent is allowed to spawn as sub-agents. Leave empty to allow none, or use * to allow any.">
+          <input
+            type="text"
+            value={state.allowSubagents}
+            onChange={(e) => onChange("allowSubagents", e.target.value)}
+            placeholder="agent-id-1, agent-id-2  (or * for any)"
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+          />
+        </FieldWithInfo>
+
+        <FieldWithInfo label="Sub-agent Model" tooltip="Default model used when this agent spawns sub-agents. Leave empty to inherit the global model.">
+          <input
+            type="text"
+            value={state.subagentModel}
+            onChange={(e) => onChange("subagentModel", e.target.value)}
+            placeholder="e.g. claude-haiku-4-5-20251001"
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
+          />
+        </FieldWithInfo>
+
+        <FieldWithInfo label="Human Delay" tooltip="Add realistic typing delays between message blocks so responses feel more natural to end users.">
+          <div className="flex items-center gap-2">
+            <Toggle checked={state.humanDelayEnabled} onChange={(v) => onChange("humanDelayEnabled", v)} />
+            <span className="text-xs text-foreground-muted">{state.humanDelayEnabled ? "Enabled" : "Disabled"}</span>
+          </div>
+        </FieldWithInfo>
+      </div>
+
+      {/* Global defaults section */}
+      <div className="rounded-xl border border-warning/20 bg-surface p-4 space-y-4">
+        <button
+          type="button"
+          onClick={() => setGlobalOpen((v) => !v)}
+          className="flex items-center justify-between w-full"
+        >
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Global Defaults</p>
+            <span className="rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning font-medium">
+              ⚠ Applies to all agents
+            </span>
+          </div>
+          <span className="text-foreground-muted text-xs">{globalOpen ? "▲" : "▼"}</span>
+        </button>
+
+        {globalOpen && (
+          <div className="space-y-4 pt-2 border-t border-warning/10">
+            <p className="text-[11px] text-foreground-muted">
+              These settings are written to <code className="font-mono">agents.defaults</code> and affect all agents unless overridden per-session.
+              Leave fields empty to keep existing values.
+            </p>
+
+            {/* Behavior group */}
+            <div className="grid grid-cols-2 gap-4">
+              <FieldWithInfo label="Thinking" tooltip="Controls how much reasoning the model does before answering. Higher = slower but smarter. Leave empty to inherit global default.">
+                <SelectInput value={state.thinkingDefault} onChange={(v) => onChange("thinkingDefault", v)} options={[
+                  { value: "off",      label: "Off" },
+                  { value: "minimal",  label: "Minimal" },
+                  { value: "low",      label: "Low" },
+                  { value: "medium",   label: "Medium" },
+                  { value: "high",     label: "High" },
+                  { value: "xhigh",    label: "Extra High" },
+                  { value: "adaptive", label: "Adaptive" },
+                ]} />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Verbose" tooltip="How detailed agent responses are. 'full' includes tool traces and reasoning steps in each reply.">
+                <SelectInput value={state.verboseDefault} onChange={(v) => onChange("verboseDefault", v)} options={[
+                  { value: "off",  label: "Off" },
+                  { value: "on",   label: "On" },
+                  { value: "full", label: "Full" },
+                ]} />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Elevated" tooltip="Permission elevation level for exec and write operations. 'ask' prompts the user each time a privileged action is needed.">
+                <SelectInput value={state.elevatedDefault} onChange={(v) => onChange("elevatedDefault", v)} options={[
+                  { value: "off",  label: "Off" },
+                  { value: "on",   label: "On" },
+                  { value: "ask",  label: "Ask" },
+                  { value: "full", label: "Full" },
+                ]} />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Typing Mode" tooltip="When to show a typing indicator to the user. 'message' shows it while the agent is generating a reply.">
+                <SelectInput value={state.typingMode} onChange={(v) => onChange("typingMode", v)} options={[
+                  { value: "never",    label: "Never" },
+                  { value: "instant",  label: "Instant" },
+                  { value: "thinking", label: "Thinking" },
+                  { value: "message",  label: "Message" },
+                ]} />
+              </FieldWithInfo>
+            </div>
+
+            {/* Block streaming */}
+            <div className="space-y-3">
+              <FieldWithInfo label="Block Streaming" tooltip="Buffer the agent's reply into a single message instead of streaming word-by-word. Useful for channels that don't support live streaming.">
+                <SelectInput value={state.blockStreamingDefault} onChange={(v) => onChange("blockStreamingDefault", v)} options={[
+                  { value: "off", label: "Off (stream live)" },
+                  { value: "on",  label: "On (buffer reply)" },
+                ]} />
+              </FieldWithInfo>
+              {state.blockStreamingDefault === "on" && (
+                <FieldWithInfo label="Break Point" tooltip="When to flush the buffered reply. 'text_end' flushes after each text block, 'message_end' flushes after the full message is complete.">
+                  <SelectInput value={state.blockStreamingBreak} onChange={(v) => onChange("blockStreamingBreak", v)} options={[
+                    { value: "text_end",    label: "Text End" },
+                    { value: "message_end", label: "Message End" },
+                  ]} />
+                </FieldWithInfo>
+              )}
+            </div>
+
+            {/* Context & Bootstrap */}
+            <div className="grid grid-cols-2 gap-4">
+              <FieldWithInfo label="Context Tokens" tooltip="Maximum context window size in tokens. Leave empty to use the model's full context window.">
+                <NumberInput value={state.contextTokens} onChange={(v) => onChange("contextTokens", v)} min={1000} placeholder="Model max" />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Max Concurrent" tooltip="Maximum number of parallel sessions this agent can run simultaneously. Default is 1.">
+                <NumberInput value={state.maxConcurrent} onChange={(v) => onChange("maxConcurrent", v)} min={1} max={20} placeholder="1" />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Timeout (seconds)" tooltip="Auto-cancel a session after this many seconds of running. Leave empty for no timeout.">
+                <NumberInput value={state.timeoutSeconds} onChange={(v) => onChange("timeoutSeconds", v)} min={0} placeholder="No timeout" />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Image Max Dimension" tooltip="Maximum pixel width/height for images attached to messages. Larger images are resized before sending. Default: 1200px.">
+                <NumberInput value={state.imageMaxDimension} onChange={(v) => onChange("imageMaxDimension", v)} min={64} placeholder="1200" />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Bootstrap Max Chars" tooltip="Max characters injected from each workspace file (SOUL.md, etc.) into the system prompt. Default: 20,000.">
+                <NumberInput value={state.bootstrapMaxChars} onChange={(v) => onChange("bootstrapMaxChars", v)} min={0} placeholder="20000" />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Bootstrap Total Chars" tooltip="Total character budget across ALL workspace files injected into the system prompt. Default: 150,000.">
+                <NumberInput value={state.bootstrapTotalMaxChars} onChange={(v) => onChange("bootstrapTotalMaxChars", v)} min={0} placeholder="150000" />
+              </FieldWithInfo>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FieldWithInfo label="Truncation Warning" tooltip="Whether to warn the agent when its workspace files were truncated due to size limits.">
+                <SelectInput value={state.bootstrapTruncWarning} onChange={(v) => onChange("bootstrapTruncWarning", v)} options={[
+                  { value: "off",    label: "Off" },
+                  { value: "once",   label: "Once" },
+                  { value: "always", label: "Always" },
+                ]} />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Time Format" tooltip="Clock format used when the agent displays times to the user.">
+                <SelectInput value={state.timeFormat} onChange={(v) => onChange("timeFormat", v)} options={[
+                  { value: "auto", label: "Auto" },
+                  { value: "12",   label: "12h" },
+                  { value: "24",   label: "24h" },
+                ]} />
+              </FieldWithInfo>
+            </div>
+
+            {/* Toggles */}
+            <div className="flex items-center gap-6">
+              <FieldWithInfo label="Skip Bootstrap" tooltip="Don't inject workspace files (SOUL.md, AGENTS.md, etc.) into the system prompt. Useful for lightweight or ephemeral agents.">
+                <div className="flex items-center gap-2 mt-1">
+                  <Toggle checked={state.skipBootstrap} onChange={(v) => onChange("skipBootstrap", v)} />
+                  <span className="text-xs text-foreground-muted">{state.skipBootstrap ? "Skipped" : "Injected"}</span>
+                </div>
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Envelope Timestamp" tooltip="Include absolute timestamps in each message envelope sent to the agent.">
+                <div className="flex items-center gap-2 mt-1">
+                  <Toggle
+                    checked={state.envelopeTimestamp === "on" || state.envelopeTimestamp === ""}
+                    onChange={(v) => onChange("envelopeTimestamp", v ? "on" : "off")}
+                  />
+                  <span className="text-xs text-foreground-muted">
+                    {state.envelopeTimestamp === "off" ? "Off" : "On"}
+                  </span>
+                </div>
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Envelope Elapsed" tooltip="Include elapsed time since session start in each message envelope.">
+                <div className="flex items-center gap-2 mt-1">
+                  <Toggle
+                    checked={state.envelopeElapsed === "on" || state.envelopeElapsed === ""}
+                    onChange={(v) => onChange("envelopeElapsed", v ? "on" : "off")}
+                  />
+                  <span className="text-xs text-foreground-muted">
+                    {state.envelopeElapsed === "off" ? "Off" : "On"}
+                  </span>
+                </div>
+              </FieldWithInfo>
+            </div>
+
+            {/* Timezone & Repo */}
+            <div className="grid grid-cols-2 gap-4">
+              <FieldWithInfo label="Envelope Timezone" tooltip="Timezone used for timestamps in message envelopes (e.g. 'America/Sao_Paulo'). Defaults to UTC.">
+                <input
+                  type="text"
+                  value={state.envelopeTimezone}
+                  onChange={(e) => onChange("envelopeTimezone", e.target.value)}
+                  placeholder="utc, local, America/Sao_Paulo..."
+                  className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+                />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="User Timezone" tooltip="Timezone shown to the agent as the user's local time.">
+                <input
+                  type="text"
+                  value={state.userTimezone}
+                  onChange={(e) => onChange("userTimezone", e.target.value)}
+                  placeholder="e.g. America/Sao_Paulo"
+                  className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
+                />
+              </FieldWithInfo>
+
+              <FieldWithInfo label="Repo Root" tooltip="Root directory of the project repository. Shown to the agent in its system prompt for path-aware behavior.">
+                <input
+                  type="text"
+                  value={state.repoRoot}
+                  onChange={(e) => onChange("repoRoot", e.target.value)}
+                  placeholder="/home/user/project"
+                  className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
+                />
+              </FieldWithInfo>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main wizard ─────────────────────────────────────────────────────────────
 
 export default function NewAgentPage() {
@@ -653,6 +978,22 @@ export default function NewAgentPage() {
   const [idleAction, setIdleAction] = useState<IdleAction>("standby");
   const [maxRetries, setMaxRetries] = useState(3);
   const [sandboxMode, setSandboxMode] = useState<SandboxMode>("host");
+
+  // Step 5 — Defaults
+  const [defaults, setDefaults] = useState<DefaultsState>({
+    allowSubagents: "", subagentModel: "", humanDelayEnabled: false,
+    thinkingDefault: "", verboseDefault: "", elevatedDefault: "",
+    typingMode: "", blockStreamingDefault: "", blockStreamingBreak: "",
+    contextTokens: "", bootstrapMaxChars: "", bootstrapTotalMaxChars: "",
+    bootstrapTruncWarning: "", skipBootstrap: false,
+    maxConcurrent: "", timeoutSeconds: "",
+    envelopeTimestamp: "", envelopeElapsed: "", envelopeTimezone: "",
+    userTimezone: "", timeFormat: "", imageMaxDimension: "", repoRoot: "",
+  });
+
+  const handleDefaultsChange = <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => {
+    setDefaults((prev) => ({ ...prev, [field]: value }));
+  };
 
   const identityFields = { name, displayName, role, customRole, emoji, theme, description };
   const handleIdentityChange = (field: string, value: string) => {
@@ -719,10 +1060,43 @@ export default function NewAgentPage() {
       await setAgentFileViaGateway(agentId, file.name, file.content);
     }
 
+    // Write defaults to gateway config
+    const perAgent: Record<string, unknown> = {};
+    if (defaults.allowSubagents.trim()) {
+      const ids = defaults.allowSubagents.split(",").map((s) => s.trim()).filter(Boolean);
+      perAgent.subagents = { allowAgents: ids, ...(defaults.subagentModel ? { model: defaults.subagentModel } : {}) };
+    }
+    if (defaults.humanDelayEnabled) perAgent.humanDelay = { enabled: true };
+
+    const globalDefaults: Record<string, unknown> = {};
+    if (defaults.thinkingDefault)      globalDefaults.thinkingDefault = defaults.thinkingDefault;
+    if (defaults.verboseDefault)       globalDefaults.verboseDefault = defaults.verboseDefault;
+    if (defaults.elevatedDefault)      globalDefaults.elevatedDefault = defaults.elevatedDefault;
+    if (defaults.typingMode)           globalDefaults.typingMode = defaults.typingMode;
+    if (defaults.blockStreamingDefault) globalDefaults.blockStreamingDefault = defaults.blockStreamingDefault;
+    if (defaults.blockStreamingDefault === "on" && defaults.blockStreamingBreak)
+      globalDefaults.blockStreamingBreak = defaults.blockStreamingBreak;
+    if (defaults.contextTokens !== "")     globalDefaults.contextTokens = defaults.contextTokens;
+    if (defaults.bootstrapMaxChars !== "") globalDefaults.bootstrapMaxChars = defaults.bootstrapMaxChars;
+    if (defaults.bootstrapTotalMaxChars !== "") globalDefaults.bootstrapTotalMaxChars = defaults.bootstrapTotalMaxChars;
+    if (defaults.bootstrapTruncWarning)    globalDefaults.bootstrapPromptTruncationWarning = defaults.bootstrapTruncWarning;
+    if (defaults.skipBootstrap)            globalDefaults.skipBootstrap = true;
+    if (defaults.maxConcurrent !== "")     globalDefaults.maxConcurrent = defaults.maxConcurrent;
+    if (defaults.timeoutSeconds !== "")    globalDefaults.timeoutSeconds = defaults.timeoutSeconds;
+    if (defaults.envelopeTimestamp)        globalDefaults.envelopeTimestamp = defaults.envelopeTimestamp;
+    if (defaults.envelopeElapsed)          globalDefaults.envelopeElapsed = defaults.envelopeElapsed;
+    if (defaults.envelopeTimezone)         globalDefaults.envelopeTimezone = defaults.envelopeTimezone;
+    if (defaults.userTimezone)             globalDefaults.userTimezone = defaults.userTimezone;
+    if (defaults.timeFormat)               globalDefaults.timeFormat = defaults.timeFormat;
+    if (defaults.imageMaxDimension !== "") globalDefaults.imageMaxDimensionPx = defaults.imageMaxDimension;
+    if (defaults.repoRoot)                 globalDefaults.repoRoot = defaults.repoRoot;
+
+    await patchAgentDefaults({ agentId, perAgent, globalDefaults });
+
     router.push(`/agents/${agentId}`);
   };
 
-  const STEP_ICONS = [Crown, Brain, Wrench, Cpu];
+  const STEP_ICONS = [Crown, Brain, Wrench, Cpu, Settings2];
   const StepIcon = STEP_ICONS[step - 1];
 
   return (
@@ -797,6 +1171,9 @@ export default function NewAgentPage() {
             onChange={handleModelChange}
           />
         )}
+        {step === 5 && (
+          <StepDefaults state={defaults} onChange={handleDefaultsChange} />
+        )}
 
         {error && (
           <div className="mt-4 rounded-md border border-danger/20 bg-danger/5 px-4 py-3">
@@ -819,7 +1196,7 @@ export default function NewAgentPage() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-foreground-muted">Step {step} of {STEPS.length}</span>
-          {step < 4 ? (
+          {step < STEPS.length ? (
             <button
               type="button"
               onClick={() => canProceed && setStep((s) => s + 1)}

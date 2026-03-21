@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Crown, Plus, Search, Filter } from "lucide-react";
+import { Crown, Plus, Search, Filter, MessageSquare, Heart, Shield, Calendar } from "lucide-react";
 import type { Project } from "@/lib/mc/types-project";
 import type { OperationMode } from "@/lib/mc/pipeline-governance";
 
@@ -13,6 +13,10 @@ interface BoardHeaderProps {
   onModeChange: (mode: OperationMode) => void;
   onNewTask: () => void;
   onEMChat: () => void;
+  onTeamChat: () => void;
+  onHealth: () => void;
+  onApprovals: () => void;
+  onSprintPlanning: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   blockedOnly: boolean;
@@ -34,6 +38,10 @@ export function BoardHeader({
   onModeChange,
   onNewTask,
   onEMChat,
+  onTeamChat,
+  onHealth,
+  onApprovals,
+  onSprintPlanning,
   search,
   onSearchChange,
   blockedOnly,
@@ -121,6 +129,39 @@ export function BoardHeader({
       >
         <Plus size={14} />
         New Task
+      </button>
+
+      <div className="h-5 w-px bg-line" />
+
+      {/* Right-side action buttons */}
+      <button
+        onClick={onTeamChat}
+        className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+        title="Team Chat"
+      >
+        <MessageSquare size={12} className="text-accent" />
+        <span className="hidden xl:inline">Team Chat</span>
+      </button>
+      <button
+        onClick={onHealth}
+        className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+        title="Agent Health"
+      >
+        <Heart size={14} />
+      </button>
+      <button
+        onClick={onApprovals}
+        className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+        title="Approval Queue"
+      >
+        <Shield size={14} />
+      </button>
+      <button
+        onClick={onSprintPlanning}
+        className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+        title="Sprint Planning"
+      >
+        <Calendar size={14} />
       </button>
     </div>
   );
