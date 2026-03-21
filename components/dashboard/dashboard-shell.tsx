@@ -123,12 +123,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Breadcrumbs />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/signup"
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-line-strong bg-transparent px-4 text-sm font-medium text-foreground-soft hover:bg-surface-strong hover:text-foreground transition-colors"
-            >
-              Invite teammate
-            </Link>
             <UserButton
               appearance={{
                 elements: {
@@ -139,7 +133,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto px-6 py-6 sm:px-8 sm:py-8">
+        <main className="flex-1 overflow-auto px-6 py-6 sm:px-8 sm:py-8 animate-fade-in">
           {children}
         </main>
       </div>

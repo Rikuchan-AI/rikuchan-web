@@ -28,7 +28,7 @@ export interface Project {
   createdAt: number;
   updatedAt: number;
   roster: RosterMember[];
-  taskCount: { backlog: number; progress: number; review: number; done: number };
+  taskCount: { backlog: number; progress: number; review: number; blocked?: number; done: number };
   memoryDocCount: number;
 }
 

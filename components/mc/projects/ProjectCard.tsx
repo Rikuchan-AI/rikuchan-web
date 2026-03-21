@@ -35,7 +35,7 @@ export function ProjectCard({ project, group, index = 0 }: ProjectCardProps) {
     >
       <Link
         href={`/agents/projects/${project.id}`}
-        className="block rounded-lg border border-line bg-surface p-5 glow-card transition-all duration-300"
+        className="block rounded-lg border border-line bg-surface p-5 glow-card card-hover transition-all duration-300"
       >
         {/* Header: status badge + name */}
         <div className="flex items-center justify-between mb-2">
@@ -65,18 +65,14 @@ export function ProjectCard({ project, group, index = 0 }: ProjectCardProps) {
           </p>
         )}
 
-        <p
-          className="mono text-xs text-foreground-muted truncate mb-4"
-          title={project.workspacePath}
-        >
-          {project.workspacePath}
-        </p>
-
         {/* Metric row */}
         <div className="flex items-center gap-3 mb-4 text-xs text-foreground-muted">
           <MetricPill label="BKL" value={taskCount.backlog} color="var(--task-backlog)" />
           <MetricPill label="PRG" value={taskCount.progress} color="var(--task-progress)" />
           <MetricPill label="REV" value={taskCount.review} color="var(--task-review)" />
+          {(taskCount.blocked ?? 0) > 0 && (
+            <MetricPill label="BLK" value={taskCount.blocked!} color="var(--danger)" />
+          )}
           <MetricPill label="DNE" value={taskCount.done} color="var(--task-done)" />
         </div>
 

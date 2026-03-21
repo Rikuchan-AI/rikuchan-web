@@ -65,7 +65,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
       initial="hidden"
       animate="visible"
       custom={index}
-      className="relative rounded-lg bg-surface border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)] p-4 transition-all duration-300"
+      className="relative rounded-lg bg-surface border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)] p-4 card-hover transition-all duration-300"
       style={{
         borderLeftColor: borderColor,
         borderLeftWidth: "3px",

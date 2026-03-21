@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LogoLockup } from "@/components/shared/logo-lockup";
+import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { cn } from "@/lib/utils";
 
 const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
@@ -93,12 +94,14 @@ function NavLink({
   icon: Icon,
   pathname,
   onNavigate,
+  badge,
 }: {
   href: string;
   label: string;
   icon: LucideIcon;
   pathname: string;
   onNavigate?: () => void;
+  badge?: React.ReactNode;
 }) {
   const active =
     pathname === href ||
@@ -116,6 +119,7 @@ function NavLink({
     >
       <Icon size={16} className="shrink-0" />
       {label}
+      {badge && <span className="ml-auto">{badge}</span>}
     </Link>
   );
 }
@@ -142,9 +146,39 @@ function SectionHeader({
   );
 }
 
+function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="rounded-full bg-accent/10 text-accent text-[9px] font-medium px-1.5 py-0.5 min-w-[18px] text-center">
+      {count}
+    </span>
+  );
+}
+
+function GatewayDot({ connected }: { connected: boolean }) {
+  return (
+    <span
+      className={cn(
+        "h-2 w-2 rounded-full",
+        connected ? "bg-emerald-400" : "bg-red-400",
+      )}
+    />
+  );
+}
+
 export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const [collapsed, toggle] = useCollapsedState();
+
+  const agentCount = useGatewayStore((s) => s.agents.filter((a) => a.status === "online").length);
+  const sessionCount = useGatewayStore((s) => s.sessions.filter((s) => s.status === "active").length);
+  const gatewayStatus = useGatewayStore((s) => s.status);
+
+  const mcBadges: Record<string, React.ReactNode> = {
+    "/agents": agentCount > 0 ? <CountBadge count={agentCount} /> : undefined,
+    "/agents/sessions": sessionCount > 0 ? <CountBadge count={sessionCount} /> : undefined,
+    "/agents/gateway": <GatewayDot connected={gatewayStatus === "connected"} />,
+  };
 
   return (
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
@@ -156,7 +190,13 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
           {!collapsed.mc &&
             mcLinks.map((link) => (
-              <NavLink key={link.href} {...link} pathname={pathname} onNavigate={onNavigate} />
+              <NavLink
+                key={link.href}
+                {...link}
+                pathname={pathname}
+                onNavigate={onNavigate}
+                badge={mcBadges[link.href]}
+              />
             ))}
         </div>
       )}
@@ -170,12 +210,9 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
       </div>
 
-      <div className="mt-auto rounded-lg border border-line bg-surface-muted p-4">
-        <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">Workspace</p>
-        <p className="mt-3 text-sm font-semibold text-foreground">Rikuchan Starter</p>
-        <p className="mt-1 text-sm leading-6 text-foreground-soft">
-          Operational area for API access, billing, and workspace controls.
-        </p>
+      <div className="mt-auto flex items-center gap-2 rounded-md px-3 py-2">
+        <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+        <span className="text-sm font-medium text-foreground-soft truncate">Rikuchan Starter</span>
       </div>
     </div>
   );

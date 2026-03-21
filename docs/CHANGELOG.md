@@ -2,6 +2,14 @@
 
 ## 2026-03-20
 
+### UI/UX — Mission Control Dashboard Fixes (ADR-003)
+
+- **ProjectCard** — Remove `workspacePath` display; internal file system path is not user-facing info
+- **ProjectCard** — Add `blocked` pill (BLK) in red when `taskCount.blocked > 0`; `taskCount` type extended with optional `blocked?: number`
+- **DashboardShell** — Remove "Invite teammate" button (linked to `/signup`, no invite flow exists)
+- **BoardHeader** — Add `title` tooltips to mode toggle: Manual / Supervised / Autonomous with one-line description each
+- **DashboardSidebar** — Simplify workspace card from full `p-4` block with description to single inline status pill (`● Rikuchan Starter`); saves ~80px vertical space
+
 ### New Features
 
 - **Direct Gateway Chat** (`/agents/chat`)

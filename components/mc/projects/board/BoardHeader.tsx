@@ -20,10 +20,10 @@ interface BoardHeaderProps {
   searchInputRef?: RefObject<HTMLInputElement | null>;
 }
 
-const MODE_CONFIG: Record<OperationMode, { label: string; color: string; activeColor: string }> = {
-  manual: { label: "Manual", color: "text-red-400", activeColor: "bg-red-400/15 text-red-400 border-red-400/30" },
-  supervised: { label: "Supervised", color: "text-amber-400", activeColor: "bg-amber-400/15 text-amber-400 border-amber-400/30" },
-  autonomous: { label: "Autonomous", color: "text-emerald-400", activeColor: "bg-emerald-400/15 text-emerald-400 border-emerald-400/30" },
+const MODE_CONFIG: Record<OperationMode, { label: string; color: string; activeColor: string; tooltip: string }> = {
+  manual: { label: "Manual", color: "text-red-400", activeColor: "bg-red-400/15 text-red-400 border-red-400/30", tooltip: "Every action requires human approval" },
+  supervised: { label: "Supervised", color: "text-amber-400", activeColor: "bg-amber-400/15 text-amber-400 border-amber-400/30", tooltip: "Agents execute, human reviews transitions" },
+  autonomous: { label: "Autonomous", color: "text-emerald-400", activeColor: "bg-emerald-400/15 text-emerald-400 border-emerald-400/30", tooltip: "Lead agent delegates without approval" },
 };
 
 export function BoardHeader({
@@ -75,6 +75,7 @@ export function BoardHeader({
             <button
               key={mode}
               onClick={() => onModeChange(mode)}
+              title={config.tooltip}
               className={`rounded-md px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider transition-colors ${
                 active ? config.activeColor + " border" : "text-foreground-muted hover:text-foreground border border-transparent"
               }`}
