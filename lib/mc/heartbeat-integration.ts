@@ -194,6 +194,7 @@ export function syncHeartbeatToGateway(
           const agentsList = currentConfig?.agents?.list ?? [];
 
           const heartbeatPatch = {
+            enabled: config.enabled ?? true,
             every: config.intervalSeconds,
             ...(sessionKey ? { session: sessionKey } : {}),
             ...(config.activeHours ? {

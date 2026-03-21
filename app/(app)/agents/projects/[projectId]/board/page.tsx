@@ -172,7 +172,10 @@ export default function BoardPage() {
   const gwConnected = useGatewayStore((s) => s.status === "connected");
   // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
   const leadGwId = leadAgent?.gatewayAgentId ?? leadAgent?.agentId;
-  const leadGwAgent = gwAgents.find((a) => a.id === leadGwId);
+  const leadGwAgent = gwAgents.find((a) =>
+    a.id === leadGwId ||
+    (leadGwId && (a.id.includes(leadGwId) || leadGwId.includes(a.id)))
+  );
   const leadAgentOnline = leadGwAgent?.status === "online" || leadGwAgent?.status === "idle";
 
   // Auto-restore heartbeat for active projects whose lead is offline
