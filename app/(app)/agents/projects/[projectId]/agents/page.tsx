@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
   Crown, FileText, Paperclip, X, ChevronDown,
-  ChevronRight, Plus, Upload,
+  ChevronRight, Plus, Upload, UserMinus,
 } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
-import type { RosterMember, RosterContextFile } from "@/lib/mc/types-project";
+import type { RosterMember, RosterContextFile, RosterRole } from "@/lib/mc/types-project";
+import { ROLE_DEFAULT_PERMISSIONS, ROLE_DEFAULT_HEARTBEAT } from "@/lib/mc/types-project";
 
 // ─── Context overlay editor ────────────────────────────────────────────────────
 
@@ -154,12 +155,14 @@ function RosterMemberCard({
   currentTask,
   projectId,
   onUpdateMember,
+  onRemoveMember,
 }: {
   member: RosterMember;
   agentStatus?: string;
   currentTask?: string;
   projectId: string;
   onUpdateMember: (agentId: string, updates: Partial<RosterMember>) => void;
+  onRemoveMember: (agentId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -208,6 +211,16 @@ function RosterMemberCard({
             </span>
           )}
 
+          {member.role !== "lead" && (
+            <button
+              type="button"
+              onClick={() => onRemoveMember(member.agentId)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-danger/10 hover:text-danger transition-colors"
+              title="Remove from roster"
+            >
+              <UserMinus size={13} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -254,13 +267,43 @@ function RosterMemberCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const ROLE_OPTIONS: { value: RosterRole; label: string }[] = [
+  { value: "developer",  label: "Developer" },
+  { value: "reviewer",   label: "Reviewer" },
+  { value: "researcher", label: "Researcher" },
+  { value: "documenter", label: "Documenter" },
+  { value: "lead",       label: "Lead" },
+  { value: "custom",     label: "Custom" },
+];
+
 export default function RosterPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProjectsStore(selectProjectById(projectId));
   const agents = useGatewayStore((s) => s.agents);
   const updateProject = useProjectsStore((s) => s.updateProject);
 
+  const [addOpen, setAddOpen] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [selectedRole, setSelectedRole] = useState<RosterRole>("developer");
+  const [adding, setAdding] = useState(false);
+  const addPanelRef = useRef<HTMLDivElement>(null);
+
   const roster = project?.roster ?? [];
+
+  // Close add panel on outside click
+  useEffect(() => {
+    if (!addOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (addPanelRef.current && !addPanelRef.current.contains(e.target as Node)) {
+        setAddOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [addOpen]);
+
+  const rosterAgentIds = new Set(roster.map((m) => m.agentId));
+  const availableAgents = agents.filter((a) => !rosterAgentIds.has(a.id));
 
   const handleUpdateMember = async (agentId: string, updates: Partial<RosterMember>) => {
     if (!project) return;
@@ -270,16 +313,32 @@ export default function RosterPage() {
     await updateProject(projectId, { roster: newRoster });
   };
 
-  if (roster.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-foreground-muted text-sm mb-2">No agents in roster</p>
-        <p className="text-foreground-muted text-xs">
-          Add agents when creating or editing the project.
-        </p>
-      </div>
-    );
-  }
+  const handleAddMember = async () => {
+    if (!project || !selectedAgentId) return;
+    const agent = agents.find((a) => a.id === selectedAgentId);
+    if (!agent) return;
+    setAdding(true);
+    const newMember: RosterMember = {
+      agentId: agent.id,
+      agentName: agent.name,
+      role: selectedRole,
+      permissions: ROLE_DEFAULT_PERMISSIONS[selectedRole],
+      heartbeatConfig: ROLE_DEFAULT_HEARTBEAT[selectedRole],
+      addedAt: Date.now(),
+    };
+    await updateProject(projectId, { roster: [...project.roster, newMember] });
+    setAdding(false);
+    setAddOpen(false);
+    setSelectedAgentId("");
+    setSelectedRole("developer");
+  };
+
+  const handleRemoveMember = async (agentId: string) => {
+    if (!project) return;
+    await updateProject(projectId, {
+      roster: project.roster.filter((m) => m.agentId !== agentId),
+    });
+  };
 
   const leadFirst = [...roster].sort((a, b) => {
     if (a.role === "lead") return -1;
@@ -293,26 +352,91 @@ export default function RosterPage() {
         <p className="mono text-xs text-foreground-muted" style={{ letterSpacing: "0.12em" }}>
           {roster.length} AGENT{roster.length !== 1 ? "S" : ""} IN ROSTER
         </p>
-        <p className="text-xs text-foreground-muted">
-          Expand an agent to edit project-specific context
-        </p>
+        <div className="relative" ref={addPanelRef}>
+          <button
+            type="button"
+            onClick={() => setAddOpen((v) => !v)}
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-line bg-surface hover:bg-surface-strong text-xs text-foreground-soft hover:text-foreground transition-colors"
+          >
+            <Plus size={12} />
+            Add Agent
+          </button>
+
+          {addOpen && (
+            <div className="absolute right-0 top-9 z-20 w-72 rounded-xl border border-line bg-surface shadow-xl p-4 space-y-3">
+              <p className="mono text-[10px] uppercase text-foreground-muted" style={{ letterSpacing: "0.16em" }}>
+                Add to Roster
+              </p>
+
+              {availableAgents.length === 0 ? (
+                <p className="text-xs text-foreground-muted py-2">All agents are already in the roster.</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[11px] text-foreground-muted">Agent</label>
+                    <select
+                      value={selectedAgentId}
+                      onChange={(e) => setSelectedAgentId(e.target.value)}
+                      className="w-full rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
+                    >
+                      <option value="">Select agent…</option>
+                      {availableAgents.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] text-foreground-muted">Role</label>
+                    <select
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value as RosterRole)}
+                      className="w-full rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
+                    >
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddMember}
+                    disabled={!selectedAgentId || adding}
+                    className="w-full h-8 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent-deep transition-colors disabled:opacity-50"
+                  >
+                    {adding ? "Adding…" : "Add to Roster"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-3">
-        {leadFirst.map((member) => {
-          const agent = agents.find((a) => a.id === member.agentId);
-          return (
-            <RosterMemberCard
-              key={member.agentId}
-              member={member}
-              agentStatus={agent?.status}
-              currentTask={agent?.currentTask}
-              projectId={projectId}
-              onUpdateMember={handleUpdateMember}
-            />
-          );
-        })}
-      </div>
+      {roster.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-foreground-muted text-sm mb-2">No agents in roster</p>
+          <p className="text-foreground-muted text-xs">Click "Add Agent" to add agents to this project.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {leadFirst.map((member) => {
+            const agent = agents.find((a) => a.id === member.agentId);
+            return (
+              <RosterMemberCard
+                key={member.agentId}
+                member={member}
+                agentStatus={agent?.status}
+                currentTask={agent?.currentTask}
+                projectId={projectId}
+                onUpdateMember={handleUpdateMember}
+                onRemoveMember={handleRemoveMember}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
