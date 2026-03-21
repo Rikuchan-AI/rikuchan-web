@@ -175,6 +175,11 @@ function pushActivity(
 const ONLINE_THRESHOLD_MS  = 5 * 60 * 1000;   // 5 min — recently active
 const IDLE_THRESHOLD_MS    = 30 * 60 * 1000;  // 30 min — still responsive but not active
 
+function toMs(ts: number): number {
+  // If timestamp looks like seconds (< year 2100 in seconds = 4102444800), convert to ms
+  return ts < 4_102_444_800 ? ts * 1000 : ts;
+}
+
 function resolveAgentStatus(heartbeat: Record<string, unknown> | undefined): Agent["status"] {
   if (!heartbeat) return "offline";
 
@@ -186,7 +191,7 @@ function resolveAgentStatus(heartbeat: Record<string, unknown> | undefined): Age
   const lastSuccess = heartbeat.lastSuccessAt as number | null | undefined;
   if (!lastSuccess || lastSuccess <= 0) return "offline";
 
-  const age = Date.now() - lastSuccess;
+  const age = Date.now() - toMs(lastSuccess);
   if (age < ONLINE_THRESHOLD_MS) return "online";
   if (age < IDLE_THRESHOLD_MS) return "idle";
   return "offline";
@@ -204,11 +209,12 @@ function healthAgentToAgent(
 
   // If agent has very recent session activity, consider it online
   const recentSession = sessions?.recent?.[0];
-  if (recentSession?.updatedAt && (Date.now() - recentSession.updatedAt) < ONLINE_THRESHOLD_MS) {
+  if (recentSession?.updatedAt && (Date.now() - toMs(recentSession.updatedAt)) < ONLINE_THRESHOLD_MS) {
     if (status === "idle" || status === "offline") status = "online";
   }
 
-  const lastSuccessAt = (heartbeat?.lastSuccessAt as number) ?? 0;
+  const lastSuccessAtRaw = (heartbeat?.lastSuccessAt as number) ?? 0;
+  const lastSuccessAt = lastSuccessAtRaw > 0 ? toMs(lastSuccessAtRaw) : 0;
 
   return {
     id: agentId,
