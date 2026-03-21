@@ -317,6 +317,8 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     let connectReqId: string | null = null;
     // Track pending RPC callbacks
     const rpcCallbacks = new Map<string, (msg: Record<string, unknown>) => void>();
+    // Accumulate assistant text per runId for chat-store routing
+    const runAccumulator = new Map<string, { sessionKey: string; text: string }>();
 
     ws.onopen = () => {
       tcpOpened = true;
@@ -805,6 +807,13 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
                 ),
               }));
             }
+            // Mark session as thinking in chat-store
+            if (sessionKey) {
+              try {
+                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
+                useChatStore.getState().setThinking(sessionKey, true);
+              } catch { /* ignore */ }
+            }
             pushLog(set, get, "INFO", `Agent run started (${runId.slice(0, 8)})`, agentId);
             if (agentId) pushActivity(set, "session_started", agentId, agentName, "Started processing");
           } else if (phase === "end") {
@@ -815,6 +824,27 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
                   a.id === agentId ? { ...a, status: "online" as const, lastActivityAt: ts } : a
                 ),
               }));
+            }
+            // Dispatch accumulated text to chat-store
+            const accumulated = runAccumulator.get(runId);
+            runAccumulator.delete(runId);
+            if (accumulated?.text) {
+              try {
+                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { receiveMessage: (k: string, m: import("./types-chat").ChatMessage) => void; setThinking: (k: string, v: boolean) => void } } };
+                const chatStore = useChatStore.getState();
+                chatStore.setThinking(accumulated.sessionKey, false);
+                chatStore.receiveMessage(accumulated.sessionKey, {
+                  id: `agent-${runId}-${ts}`,
+                  role: "agent",
+                  content: accumulated.text,
+                  timestamp: ts,
+                });
+              } catch { /* ignore */ }
+            } else if (sessionKey) {
+              try {
+                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
+                useChatStore.getState().setThinking(sessionKey, false);
+              } catch { /* ignore */ }
             }
             pushLog(set, get, "INFO", `Agent run completed (${runId.slice(0, 8)})`, agentId);
             if (agentId) pushActivity(set, "session_completed", agentId, agentName, "Completed processing");
@@ -842,6 +872,18 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
                 a.id === agentId ? { ...a, status: "thinking" as const, lastActivityAt: ts } : a
               ),
             }));
+          }
+          // Accumulate text for chat-store routing
+          if (sessionKey && data) {
+            const delta = (data.delta as string) ?? (data.text as string) ?? "";
+            if (delta) {
+              const existing = runAccumulator.get(runId);
+              if (existing) {
+                existing.text += delta;
+              } else {
+                runAccumulator.set(runId, { sessionKey, text: delta });
+              }
+            }
           }
           break;
         }

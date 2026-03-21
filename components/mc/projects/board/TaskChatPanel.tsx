@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChatBubble } from "@/components/mc/projects/chat/ChatBubble";
+import { ChatBubble, TypingIndicator } from "@/components/mc/projects/chat/ChatBubble";
 import { ChatInput } from "@/components/mc/projects/chat/ChatInput";
 import { useChatStore } from "@/lib/mc/chat-store";
 import type { Task, Project } from "@/lib/mc/types-project";
@@ -19,6 +19,8 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
   const session = useChatStore((s) => s.getChatSession({ mode: "task", taskId: task.id }));
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
+  const thinkingAgents = useChatStore((s) => s.thinkingAgents);
+  const isThinking = task.assignedAgentId ? thinkingAgents.has(task.assignedAgentId) : false;
 
   const messages = session?.messages ?? [];
 
@@ -68,6 +70,7 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
         {messages.map((msg) => (
           <ChatBubble key={msg.id} message={msg} />
         ))}
+        {isThinking && <TypingIndicator agentName={task.assignedAgentName ?? "Agent"} />}
         <div ref={bottomRef} />
       </div>
 

@@ -10,6 +10,8 @@ import { buildAgentSessionKey } from "./session-routing";
 interface ChatStore {
   sessions: Record<string, AgentChatSession>;
   unreadCounts: Record<string, number>;
+  /** Agent IDs currently being processed (agent is thinking) */
+  thinkingAgents: Set<string>;
 
   getChatSession: (opts:
     | { mode: "task"; taskId: string }
@@ -27,6 +29,7 @@ interface ChatStore {
   }) => Promise<void>;
 
   receiveMessage: (sessionKey: string, message: ChatMessage) => void;
+  setThinking: (gatewaySessionKey: string, thinking: boolean) => void;
   closeSession: (sessionKey: string) => void;
   markRead: (sessionKey: string) => void;
 
@@ -63,6 +66,7 @@ function saveSessions(sessions: Record<string, AgentChatSession>) {
 export const useChatStore = create<ChatStore>((set, get) => ({
   sessions: {},
   unreadCounts: {},
+  thinkingAgents: new Set<string>(),
 
   _hydrateFromStorage: () => {
     set({ sessions: loadSessions() });
@@ -150,10 +154,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     get()._persistToStorage();
   },
 
-  receiveMessage: (sessionKey, message) => {
+  setThinking: (gatewaySessionKey, thinking) => {
+    // gatewaySessionKey: "agent:<agentId>:<scope>"
+    const agentId = gatewaySessionKey.split(":")[1] ?? gatewaySessionKey;
     set((s) => {
-      const session = s.sessions[sessionKey];
-      if (!session) return s;
+      const next = new Set(s.thinkingAgents);
+      if (thinking) next.add(agentId);
+      else next.delete(agentId);
+      return { thinkingAgents: next };
+    });
+  },
+
+  receiveMessage: (gatewaySessionKey, message) => {
+    // gatewaySessionKey format: "agent:<agentId>:<scope>"
+    // Map to chat session key by finding a session whose agentId matches
+    const agentIdFromGw = gatewaySessionKey.split(":")[1] ?? "";
+    set((s) => {
+      // Find matching chat session — prefer exact gateway key match, then agentId match
+      const sessionKey = Object.keys(s.sessions).find((k) => {
+        const session = s.sessions[k];
+        return session.agentId === agentIdFromGw ||
+          session.agentId.includes(agentIdFromGw) ||
+          agentIdFromGw.includes(session.agentId);
+      });
+      const session = sessionKey ? s.sessions[sessionKey] : undefined;
+      if (!session || !sessionKey) return s;
 
       const agentId = session.agentId;
       return {

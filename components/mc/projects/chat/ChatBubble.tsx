@@ -38,6 +38,33 @@ interface ChatBubbleProps {
   message: ChatMessage;
 }
 
+export function TypingIndicator({ agentName }: { agentName: string }) {
+  return (
+    <div className="flex flex-col items-start">
+      <span className="mb-1 mono text-[10px] text-foreground-muted uppercase" style={{ letterSpacing: "0.06em" }}>
+        {agentName}
+      </span>
+      <div className="flex items-center gap-1.5 rounded-lg bg-surface-muted border border-line rounded-bl-sm px-3 py-2.5">
+        <span className="flex gap-1">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-foreground-muted"
+              style={{ animation: `typing-dot 1.2s ease-in-out ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </span>
+        <style jsx>{`
+          @keyframes typing-dot {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.2); }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
 export function ChatBubble({ message }: ChatBubbleProps) {
   if (message.role === "system") {
     return (

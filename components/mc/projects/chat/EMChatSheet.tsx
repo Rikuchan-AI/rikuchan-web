@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { X, Crown } from "lucide-react";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble, TypingIndicator } from "./ChatBubble";
 import { ChatInput } from "./ChatInput";
 import { useChatStore } from "@/lib/mc/chat-store";
 import { buildLeadSystemPrompt, parseLeadActions, stripActionBlocks, executeLeadActions } from "@/lib/mc/em-chat";
@@ -22,6 +22,8 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
   const session = useChatStore((s) => s.getChatSession({ mode: "em", projectId }));
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
+  const thinkingAgents = useChatStore((s) => s.thinkingAgents);
+  const isThinking = leadAgent ? thinkingAgents.has(leadAgent.agentId) : false;
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -157,6 +159,7 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
               </div>
             );
           })}
+          {isThinking && leadAgent && <TypingIndicator agentName={leadAgent.agentName} />}
           <div ref={bottomRef} />
         </div>
 

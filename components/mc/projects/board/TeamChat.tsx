@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, MessageSquare } from "lucide-react";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useChatStore } from "@/lib/mc/chat-store";
-import { ChatBubble } from "@/components/mc/projects/chat/ChatBubble";
+import { ChatBubble, TypingIndicator } from "@/components/mc/projects/chat/ChatBubble";
 import { ChatInput } from "@/components/mc/projects/chat/ChatInput";
 import type { ChatMessage } from "@/lib/mc/types-chat";
 
@@ -22,6 +22,8 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
   );
   const sendMessage = useChatStore((s) => s.sendMessage);
   const markRead = useChatStore((s) => s.markRead);
+  const thinkingAgents = useChatStore((s) => s.thinkingAgents);
+  const isThinking = leadAgent ? thinkingAgents.has(leadAgent.agentId) : false;
 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -107,6 +109,7 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
           {messages.map((msg: ChatMessage) => (
             <ChatBubble key={msg.id} message={msg} />
           ))}
+          {isThinking && leadAgent && <TypingIndicator agentName={leadAgent.agentName} />}
           <div ref={bottomRef} />
         </div>
 
