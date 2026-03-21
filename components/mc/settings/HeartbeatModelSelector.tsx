@@ -38,7 +38,7 @@ export function HeartbeatModelSelector() {
       if (res.ok && res.groups) {
         setConfigFreeGroups(res.groups.map((g) => ({
           provider: g.provider,
-          models: g.models.map((m) => ({ id: m.id, label: m.name })),
+          models: g.models.map((m) => ({ id: `${g.provider}/${m.id}`, label: m.name })),
         })));
       } else {
         setConfigFreeGroups([]);

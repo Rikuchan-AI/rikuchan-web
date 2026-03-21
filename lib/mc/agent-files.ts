@@ -635,8 +635,12 @@ export function getFreeModelsFromConfig(): Promise<{ ok: boolean; groups?: Array
           return;
         }
 
+        // Exclude internal/auxiliary providers not meant for user selection
+        const EXCLUDED_PROVIDERS = ["rikuchan-heartbeat"];
+
         const groups: Array<{ provider: string; models: FreeModelEntry[] }> = [];
         for (const [providerKey, providerCfg] of Object.entries(providers)) {
+          if (EXCLUDED_PROVIDERS.includes(providerKey)) continue;
           const freeModels = (providerCfg.models ?? []).filter(
             (m) => m.cost != null && m.cost.input === 0 && m.cost.output === 0
           );
