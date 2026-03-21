@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
+import { EmptyState } from "@/components/shared/empty-state";
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -55,18 +56,12 @@ export default function ChatListPage() {
       </p>
 
       {conversations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
-            <MessageSquare size={20} className="text-foreground-muted" />
-          </div>
-          <p className="mt-4 text-sm text-foreground-muted">No conversations yet</p>
-          <button
-            onClick={handleNew}
-            className="mt-3 text-sm font-medium text-accent hover:text-accent-deep transition-colors"
-          >
-            Start your first conversation
-          </button>
-        </div>
+        <EmptyState
+          icon={<MessageSquare size={24} />}
+          title="No conversations yet"
+          description="Ask questions directly to the gateway. Conversations are saved locally."
+          primaryAction={{ label: "Start a conversation", onClick: handleNew }}
+        />
       ) : (
         <div className="space-y-2">
           {conversations.map((conv) => (

@@ -5,6 +5,7 @@ import { FolderPlus, Trash2, Pencil, Radio, ExternalLink, Check, X } from "lucid
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway } from "@/lib/mc/agent-files";
+import { EmptyState } from "@/components/shared/empty-state";
 import type { BoardGroup } from "@/lib/mc/types-project";
 
 function emptyGroup(): BoardGroup {
@@ -299,21 +300,12 @@ export default function GroupsPage() {
 
       {/* Groups list */}
       {groups.length === 0 && !draftGroup ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted">
-            <FolderPlus size={20} className="text-foreground-muted" />
-          </div>
-          <p className="mt-4 text-sm text-foreground-muted">No groups yet</p>
-          <p className="mt-1 text-xs text-foreground-muted/60">
-            Groups organize projects and can have their own gateway connection.
-          </p>
-          <button
-            onClick={() => setDraftGroup(emptyGroup())}
-            className="mt-3 text-sm font-medium text-accent hover:text-accent-deep transition-colors"
-          >
-            Create your first group
-          </button>
-        </div>
+        <EmptyState
+          icon={<FolderPlus size={24} />}
+          title="No groups yet"
+          description="Groups organize projects and can have their own gateway connection."
+          primaryAction={{ label: "Create your first group", onClick: () => setDraftGroup(emptyGroup()) }}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.map((group) => (

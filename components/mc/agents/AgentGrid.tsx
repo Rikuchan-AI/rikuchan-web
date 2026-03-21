@@ -1,8 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Users } from "lucide-react";
 import type { Agent } from "@/lib/mc/types";
 import { AgentCard } from "./AgentCard";
+import { EmptyState } from "@/components/shared/empty-state";
 
 interface AgentGridProps {
   agents: Agent[];
@@ -14,9 +16,12 @@ export function AgentGrid({ agents, limit }: AgentGridProps) {
 
   if (displayed.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-foreground-muted text-sm">No agents found</p>
-      </div>
+      <EmptyState
+        icon={<Users size={24} />}
+        title="No agents found"
+        description="Connect your gateway and agents will appear automatically."
+        primaryAction={{ label: "Configure Gateway", href: "/agents/gateway" }}
+      />
     );
   }
 

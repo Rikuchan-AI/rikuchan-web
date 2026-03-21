@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, FolderKanban } from "lucide-react";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { ProjectCard } from "@/components/mc/projects/ProjectCard";
+import { EmptyState } from "@/components/shared/empty-state";
 import type { ProjectStatus } from "@/lib/mc/types-project";
 
 type Filter = "all" | ProjectStatus;
@@ -123,25 +124,36 @@ export default function ProjectsPage() {
 
       {/* Project list */}
       {filteredProjects.length === 0 ? (
-        <div className="rounded-lg border border-line bg-surface p-12 text-center">
-          <p className="text-foreground-muted text-sm">
-            {projects.length === 0
-              ? !isConnected
-                ? "Connect to the gateway to create projects."
-                : !hasGroups
-                  ? "Create a group first, then add projects to it."
-                  : "No projects yet. Create your first project to get started."
-              : "No projects match your filters."}
-          </p>
-          {projects.length === 0 && isConnected && !hasGroups && (
-            <Link
-              href="/agents/groups"
-              className="mt-3 inline-block text-sm font-medium text-accent hover:text-accent-deep transition-colors"
-            >
-              Go to Groups
-            </Link>
-          )}
-        </div>
+        projects.length === 0 ? (
+          !isConnected ? (
+            <EmptyState
+              icon={<FolderKanban size={24} />}
+              title="No projects yet"
+              description="Connect to the gateway to create projects."
+              primaryAction={{ label: "Configure Gateway", href: "/agents/gateway" }}
+            />
+          ) : !hasGroups ? (
+            <EmptyState
+              icon={<FolderKanban size={24} />}
+              title="No projects yet"
+              description="Create a group first, then add projects to it."
+              primaryAction={{ label: "Create a Group", href: "/agents/groups" }}
+            />
+          ) : (
+            <EmptyState
+              icon={<FolderKanban size={24} />}
+              title="No projects yet"
+              description="Create your first project to get started."
+              primaryAction={{ label: "New Project", href: "/agents/projects/new" }}
+            />
+          )
+        ) : (
+          <EmptyState
+            icon={<Search size={24} />}
+            title="No matches"
+            description="No projects match your current filters."
+          />
+        )
       ) : (
         <div className="space-y-8">
           {groupedSections.map(({ group, projects: sectionProjects }) => (

@@ -3,8 +3,101 @@
 import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, X, ChevronRight } from "lucide-react";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+
+const segmentLabels: Record<string, string> = {
+  dashboard: "Overview",
+  analytics: "Analytics",
+  "api-keys": "API Keys",
+  billing: "Billing",
+  plans: "Plans",
+  settings: "Settings",
+  agents: "Agents",
+  projects: "Projects",
+  board: "Board",
+  groups: "Groups",
+  chat: "Chat",
+  sessions: "Sessions",
+  gateway: "Gateway",
+};
+
+/** Map specific full paths to override labels */
+function labelForSegment(segment: string, fullPath: string): string {
+  // /agents/settings has a special label
+  if (fullPath.startsWith("/agents") && segment === "settings") {
+    return "MC Settings";
+  }
+  return segmentLabels[segment] ?? segment;
+}
+
+function isIdSegment(segment: string): boolean {
+  // UUIDs, numeric IDs, or anything that doesn't appear in our known labels
+  return (
+    !segmentLabels[segment] &&
+    (segment.length > 8 || /^[0-9a-f-]+$/i.test(segment))
+  );
+}
+
+function Breadcrumbs() {
+  const pathname = usePathname();
+
+  // Remove leading slash and split
+  const segments = pathname.replace(/^\//, "").split("/").filter(Boolean);
+
+  if (segments.length === 0) return null;
+
+  // Build breadcrumb items from segments
+  const items: { label: string; href: string }[] = [];
+  let cumulativePath = "";
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    cumulativePath += `/${segment}`;
+
+    if (isIdSegment(segment)) {
+      // Dynamic segment — show "Project" as placeholder
+      items.push({ label: "Project", href: cumulativePath });
+    } else {
+      items.push({
+        label: labelForSegment(segment, cumulativePath),
+        href: cumulativePath,
+      });
+    }
+  }
+
+  return (
+    <nav className="flex items-center gap-1" aria-label="Breadcrumb">
+      {items.map((item, i) => {
+        const isLast = i === items.length - 1;
+        return (
+          <span key={item.href} className="flex items-center gap-1">
+            {i > 0 && (
+              <ChevronRight
+                size={8}
+                className="text-foreground-muted"
+                aria-hidden
+              />
+            )}
+            {isLast ? (
+              <span className="text-sm font-semibold text-foreground">
+                {item.label}
+              </span>
+            ) : (
+              <Link
+                href={item.href}
+                className="text-sm text-foreground-muted hover:text-foreground transition-colors"
+              >
+                {item.label}
+              </Link>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
@@ -27,7 +120,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <Menu size={18} />
             </button>
-            <h1 className="text-lg font-semibold tracking-[-0.03em] text-foreground">Dashboard</h1>
+            <Breadcrumbs />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link
@@ -35,12 +128,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               className="inline-flex h-9 items-center justify-center rounded-lg border border-line-strong bg-transparent px-4 text-sm font-medium text-foreground-soft hover:bg-surface-strong hover:text-foreground transition-colors"
             >
               Invite teammate
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-accent px-4 text-sm font-medium text-accent-foreground hover:bg-accent-deep transition-colors"
-            >
-              Back to site
             </Link>
             <UserButton
               appearance={{
