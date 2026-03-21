@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Check, Plus,
   Crown, Brain, Wrench, Cpu, Settings2,
+  ChevronDown, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -183,16 +184,20 @@ function StepIdentity({
             value={role}
             onChange={(e) => onChange("role", e.target.value)}
             placeholder="developer, devops, qa, designer..."
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-14 text-sm text-foreground focus:outline-none focus:border-accent/50"
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
+            style={{ WebkitAppearance: "none" }}
           />
+          <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted/40">
+            <ChevronDown size={14} />
+          </div>
           {role && (
             <button
               type="button"
               onClick={() => onChange("role", "")}
-              className="absolute right-7 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-base leading-none text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
+              className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
               aria-label="Clear role"
             >
-              ×
+              <X size={13} />
             </button>
           )}
         </div>
