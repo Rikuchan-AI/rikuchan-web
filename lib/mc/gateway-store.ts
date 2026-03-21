@@ -203,18 +203,33 @@ function healthAgentToAgent(
 ): Agent {
   const agentId = ha.agentId as string;
   const heartbeat = ha.heartbeat as Record<string, unknown> | undefined;
-  const sessions = ha.sessions as { count?: number; recent?: Array<{ updatedAt?: number | null }> } | undefined;
+  // sessions shape: { count, recent: [{ key, updatedAt, age }] }
+  const sessions = ha.sessions as {
+    count?: number;
+    recent?: Array<{ key?: string; updatedAt?: number | null; age?: number | null }>;
+  } | undefined;
 
-  let status = resolveAgentStatus(heartbeat);
-
-  // If agent has very recent session activity, consider it online
+  // Determine status from session activity (age is already in ms)
   const recentSession = sessions?.recent?.[0];
-  if (recentSession?.updatedAt && (Date.now() - toMs(recentSession.updatedAt)) < ONLINE_THRESHOLD_MS) {
-    if (status === "idle" || status === "offline") status = "online";
-  }
+  const sessionAge = recentSession?.age ?? null; // ms since last activity
 
-  const lastSuccessAtRaw = (heartbeat?.lastSuccessAt as number) ?? 0;
-  const lastSuccessAt = lastSuccessAtRaw > 0 ? toMs(lastSuccessAtRaw) : 0;
+  let status: Agent["status"] = "offline";
+  let lastActivityAt = Date.now();
+
+  if (sessionAge !== null) {
+    lastActivityAt = Date.now() - sessionAge;
+    if (sessionAge < ONLINE_THRESHOLD_MS) status = "online";
+    else if (sessionAge < IDLE_THRESHOLD_MS) status = "idle";
+    else status = "offline";
+  } else if (recentSession?.updatedAt) {
+    // fallback: use updatedAt if age not present
+    const updatedAtMs = toMs(recentSession.updatedAt);
+    const age = Date.now() - updatedAtMs;
+    lastActivityAt = updatedAtMs;
+    if (age < ONLINE_THRESHOLD_MS) status = "online";
+    else if (age < IDLE_THRESHOLD_MS) status = "idle";
+    else status = "offline";
+  }
 
   return {
     id: agentId,
@@ -225,11 +240,11 @@ function healthAgentToAgent(
     permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
     sessionCountToday: sessions?.count ?? 0,
     avgResponseMs: 0,
-    lastActivityAt: lastSuccessAt > 0 ? lastSuccessAt : Date.now(),
+    lastActivityAt,
     heartbeat: heartbeat ? {
-      lastSuccessAt,
-      failures: (heartbeat.consecutiveFailures as number) ?? 0,
-      model: "",
+      lastSuccessAt: 0,
+      failures: 0,
+      model: (heartbeat.model as string) ?? "",
     } : undefined,
     uptime: 0,
   };
@@ -408,12 +423,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
 
           // Extract health snapshot if available
           if (snapshot?.health) {
-            const h = snapshot.health as Record<string, unknown>;
-            const ha = h.agents as Array<Record<string, unknown>> | undefined;
-            console.log("[Gateway] health snapshot agents:", JSON.stringify(ha?.map((a) => ({ id: a.agentId, hb: a.heartbeat }))));
-            handleHealthPayload(h);
-          } else {
-            console.log("[Gateway] no health snapshot in hello-ok");
+            handleHealthPayload(snapshot.health as Record<string, unknown>);
           }
 
           // Request agents list for full details
