@@ -228,7 +228,7 @@ function sendChatMessage(sessionKey: string, message: string): Promise<{ ok: boo
       type: "req",
       id,
       method: "chat.send",
-      params: { sessionKey, message },
+      params: { sessionKey, message, idempotencyKey: id },
     }));
   });
 }
