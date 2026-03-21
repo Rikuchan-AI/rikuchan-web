@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults } from "@/lib/mc/agent-files";
 import { InfoTooltip } from "@/components/mc/ui/InfoTooltip";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import {
   generateIdentityMd,
   generateSoulMd,
@@ -944,35 +945,57 @@ const STD_FILES: { key: string; name: string; required?: boolean; tooltip: strin
   { key: "memoryMd",    name: "MEMORY.md",    tooltip: "Curated long-term memory: iron-law rules and permanent facts. Only loaded in main DM sessions for security." },
 ];
 
+// Files with inline editors (no dedicated step)
+const EDITABLE_FILE_KEYS = new Set(["toolsMd", "bootMd", "hookMd", "workingMd"]);
+
 const ADV_FILES: { key: string; name: string; tooltip: string }[] = [
-  { key: "bootMd",      name: "BOOT.md",      tooltip: "Startup hook — actions executed at the beginning of every session." },
-  { key: "bootstrapMd", name: "BOOTSTRAP.md", tooltip: "First-run onboarding. Automatically deleted after first use." },
-  { key: "workingMd",   name: "WORKING.md",   tooltip: "Persistent task state. Allows execution to resume after a gateway restart." },
+  { key: "bootMd",    name: "BOOT.md",    tooltip: "Startup hook — actions executed at the beginning of every session." },
+  { key: "hookMd",    name: "HOOK.md",    tooltip: "TypeScript hooks scanned by the gateway. Define custom event handlers (onMessage, onToolCall, etc.) that run alongside the agent." },
+  { key: "workingMd", name: "WORKING.md", tooltip: "Persistent task state. Allows execution to resume after a gateway restart." },
 ];
 
 function WorkspaceFilesSection({
   includeFiles,
   onToggle,
+  fileContents,
+  onFileContent,
 }: {
   includeFiles: Record<string, boolean>;
   onToggle: (key: string) => void;
+  fileContents: Record<string, string>;
+  onFileContent: (key: string, content: string) => void;
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const FileRow = ({ file, required }: { file: typeof STD_FILES[0]; required?: boolean }) => (
-    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-strong transition-colors">
-      <div className="flex items-center gap-2 min-w-0">
-        <code className="text-xs font-mono text-foreground font-medium">{file.name}</code>
-        {required && (
-          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-accent-soft text-accent border border-accent/20">Required</span>
+  const FileRow = ({ file, required }: { file: typeof STD_FILES[0]; required?: boolean }) => {
+    const editable = !required && EDITABLE_FILE_KEYS.has(file.key);
+    const on = includeFiles[file.key] ?? false;
+    return (
+      <div className="px-3 py-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <code className="text-xs font-mono text-foreground font-medium">{file.name}</code>
+            {required && (
+              <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-accent-soft text-accent border border-accent/20">Required</span>
+            )}
+            <InfoTooltip text={file.tooltip} />
+          </div>
+          {!required && (
+            <Toggle checked={on} onChange={() => onToggle(file.key)} />
+          )}
+        </div>
+        {editable && on && (
+          <textarea
+            value={fileContents[file.key] ?? ""}
+            onChange={(e) => onFileContent(file.key, e.target.value)}
+            placeholder={`# ${file.name}\n\n`}
+            rows={4}
+            className="mt-2 w-full rounded-md border border-line bg-surface px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-y"
+          />
         )}
-        <InfoTooltip text={file.tooltip} />
       </div>
-      {!required && (
-        <Toggle checked={includeFiles[file.key] ?? false} onChange={() => onToggle(file.key)} />
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-1">
@@ -1003,11 +1026,13 @@ function WorkspaceFilesSection({
   );
 }
 
-function StepDefaults({ state, onChange, includeFiles, onFileToggle }: {
+function StepDefaults({ state, onChange, includeFiles, onFileToggle, fileContents, onFileContent }: {
   state: DefaultsState;
   onChange: <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => void;
   includeFiles: Record<string, boolean>;
   onFileToggle: (key: string) => void;
+  fileContents: Record<string, string>;
+  onFileContent: (key: string, content: string) => void;
 }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     files: true, perAgent: true, behavior: true, streaming: false, context: false,
@@ -1033,7 +1058,12 @@ function StepDefaults({ state, onChange, includeFiles, onFileToggle }: {
       <div className="p-4 space-y-3">
         <SectionHeader label="Workspace Files" open={openSections.files} onToggle={() => toggle("files")} />
         {openSections.files && (
-          <WorkspaceFilesSection includeFiles={includeFiles} onToggle={onFileToggle} />
+          <WorkspaceFilesSection
+            includeFiles={includeFiles}
+            onToggle={onFileToggle}
+            fileContents={fileContents}
+            onFileContent={onFileContent}
+          />
         )}
       </div>
 
@@ -1064,246 +1094,6 @@ function StepDefaults({ state, onChange, includeFiles, onFileToggle }: {
         )}
       </div>
 
-      {/* Global defaults warning */}
-      <div className="px-4 py-2 bg-warning/5 border-b border-warning/15">
-        <p className="text-[11px] text-warning/80">
-          ⚠ All sections below are written to <code className="font-mono">agents.defaults</code> and apply to ALL agents. Leave fields empty to keep current values.
-        </p>
-      </div>
-
-      {/* ── Behavior ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Behavior" open={openSections.behavior} onToggle={() => toggle("behavior")} />
-        {openSections.behavior && (
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <FieldWithInfo label="Thinking" tooltip="How deeply the model reasons before answering. Higher levels = smarter but slower. 'Adaptive' lets the model decide automatically.">
-              <SelectInput value={state.thinkingDefault} onChange={(v) => onChange("thinkingDefault", v)} options={[
-                { value: "off", label: "Off" }, { value: "minimal", label: "Minimal" },
-                { value: "low", label: "Low" }, { value: "medium", label: "Medium" },
-                { value: "high", label: "High" }, { value: "xhigh", label: "Extra High" },
-                { value: "adaptive", label: "Adaptive" },
-              ]} />
-            </FieldWithInfo>
-            <FieldWithInfo label="Verbose" tooltip="How much detail the agent includes in its replies. 'Full' shows tool traces and reasoning steps.">
-              <SelectInput value={state.verboseDefault} onChange={(v) => onChange("verboseDefault", v)} options={[
-                { value: "off", label: "Off" }, { value: "on", label: "On" }, { value: "full", label: "Full" },
-              ]} />
-            </FieldWithInfo>
-            <FieldWithInfo label="Elevated" tooltip="Permission level for privileged actions like running commands or writing files. 'Ask' prompts the user each time.">
-              <SelectInput value={state.elevatedDefault} onChange={(v) => onChange("elevatedDefault", v)} options={[
-                { value: "off", label: "Off" }, { value: "on", label: "On" },
-                { value: "ask", label: "Ask" }, { value: "full", label: "Full" },
-              ]} />
-            </FieldWithInfo>
-            <FieldWithInfo label="Typing Mode" tooltip="Controls when a typing indicator (…) is shown to the user. 'Message' shows it while the agent is generating a reply.">
-              <SelectInput value={state.typingMode} onChange={(v) => onChange("typingMode", v)} options={[
-                { value: "never", label: "Never" }, { value: "instant", label: "Instant" },
-                { value: "thinking", label: "Thinking" }, { value: "message", label: "Message" },
-              ]} />
-            </FieldWithInfo>
-            <FieldWithInfo label="Typing Interval (s)" tooltip="How often (in seconds) the typing indicator is refreshed while the agent is generating. Lower = more frequent updates.">
-              <NumberInput value={state.typingIntervalSeconds} onChange={(v) => onChange("typingIntervalSeconds", v)} min={1} placeholder="Default" />
-            </FieldWithInfo>
-          </div>
-        )}
-      </div>
-
-      {/* ── Block Streaming ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Block Streaming" open={openSections.streaming} onToggle={() => toggle("streaming")} />
-        {openSections.streaming && (
-          <div className="space-y-4 pt-1">
-            <FieldWithInfo label="Block Streaming" tooltip="Buffers the agent's reply into a complete message before sending, instead of streaming word-by-word. Useful for channels that don't support live streaming.">
-              <SelectInput value={state.blockStreamingDefault} onChange={(v) => onChange("blockStreamingDefault", v)} options={[
-                { value: "off", label: "Off — stream live" }, { value: "on", label: "On — buffer full reply" },
-              ]} />
-            </FieldWithInfo>
-            {state.blockStreamingDefault === "on" && <>
-              <FieldWithInfo label="Break Point" tooltip="When to flush the buffered reply. 'text_end' flushes after each text block, 'message_end' waits for the entire message to finish.">
-                <SelectInput value={state.blockStreamingBreak} onChange={(v) => onChange("blockStreamingBreak", v)} options={[
-                  { value: "text_end", label: "Text End" }, { value: "message_end", label: "Message End" },
-                ]} />
-              </FieldWithInfo>
-              <FieldWithInfo label="Chunk Config (JSON)" tooltip="Advanced: soft-chunking config that splits long buffered replies into smaller parts. Accepts a JSON object. Leave empty to use defaults.">
-                <JsonTextarea value={state.blockStreamingChunk} onChange={(v) => onChange("blockStreamingChunk", v)} placeholder='{ "maxChars": 2000 }' />
-              </FieldWithInfo>
-              <FieldWithInfo label="Coalesce Config (JSON)" tooltip="Advanced: merges multiple quick consecutive message blocks into one before sending, reducing noise. Accepts a JSON object. Leave empty to use defaults.">
-                <JsonTextarea value={state.blockStreamingCoalesce} onChange={(v) => onChange("blockStreamingCoalesce", v)} placeholder='{ "idleMs": 300 }' />
-              </FieldWithInfo>
-            </>}
-          </div>
-        )}
-      </div>
-
-      {/* ── Context & Bootstrap ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Context & Bootstrap" open={openSections.context} onToggle={() => toggle("context")} />
-        {openSections.context && (
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <FieldWithInfo label="Context Tokens" tooltip="Caps the model's context window at this many tokens. Leave empty to use the model's maximum. Useful to reduce cost on smaller agents.">
-              <NumberInput value={state.contextTokens} onChange={(v) => onChange("contextTokens", v)} min={1000} placeholder="Model max" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Bootstrap Max Chars" tooltip="Maximum characters from each workspace file (SOUL.md, AGENTS.md, etc.) injected into the system prompt. Default: 20,000.">
-              <NumberInput value={state.bootstrapMaxChars} onChange={(v) => onChange("bootstrapMaxChars", v)} min={0} placeholder="20000" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Bootstrap Total Chars" tooltip="Total character budget across ALL workspace files injected into the system prompt combined. Default: 150,000.">
-              <NumberInput value={state.bootstrapTotalMaxChars} onChange={(v) => onChange("bootstrapTotalMaxChars", v)} min={0} placeholder="150000" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Truncation Warning" tooltip="If workspace files are cut short due to the character limit, this controls whether the agent is told about it in its prompt.">
-              <SelectInput value={state.bootstrapTruncWarning} onChange={(v) => onChange("bootstrapTruncWarning", v)} options={[
-                { value: "off", label: "Off" }, { value: "once", label: "Once (default)" }, { value: "always", label: "Always" },
-              ]} />
-            </FieldWithInfo>
-            <div className="col-span-2">
-              <FieldWithInfo label="Skip Bootstrap" tooltip="Prevents workspace files (SOUL.md, AGENTS.md, etc.) from being injected into the system prompt at all. Good for lightweight or single-task agents.">
-                <div className="flex items-center gap-2 mt-1">
-                  <Toggle checked={state.skipBootstrap} onChange={(v) => onChange("skipBootstrap", v)} />
-                  <span className="text-xs text-foreground-muted">{state.skipBootstrap ? "Bootstrap skipped" : "Bootstrap injected (default)"}</span>
-                </div>
-              </FieldWithInfo>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Performance ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Performance" open={openSections.performance} onToggle={() => toggle("performance")} />
-        {openSections.performance && (
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <FieldWithInfo label="Max Concurrent" tooltip="Maximum number of sessions this agent can handle at the same time. Default is 1. Increase for high-volume agents.">
-              <NumberInput value={state.maxConcurrent} onChange={(v) => onChange("maxConcurrent", v)} min={1} max={20} placeholder="1" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Timeout (seconds)" tooltip="Automatically stops a session after this many seconds. Leave empty for no timeout. Useful to prevent runaway sessions.">
-              <NumberInput value={state.timeoutSeconds} onChange={(v) => onChange("timeoutSeconds", v)} min={0} placeholder="No timeout" />
-            </FieldWithInfo>
-          </div>
-        )}
-      </div>
-
-      {/* ── Media ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Media & Files" open={openSections.media} onToggle={() => toggle("media")} />
-        {openSections.media && (
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <FieldWithInfo label="Image Max Dimension (px)" tooltip="Images larger than this (in pixels on either side) are automatically resized before being sent to the model. Default: 1200px.">
-              <NumberInput value={state.imageMaxDimension} onChange={(v) => onChange("imageMaxDimension", v)} min={64} placeholder="1200" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Media Max (MB)" tooltip="Maximum size in megabytes for any media file (image, video, audio) attached to a message. Larger files are rejected.">
-              <NumberInput value={state.mediaMaxMb} onChange={(v) => onChange("mediaMaxMb", v)} min={1} placeholder="Default" />
-            </FieldWithInfo>
-            <FieldWithInfo label="PDF Max Size (MB)" tooltip="Maximum size of a PDF file the agent can process. PDFs larger than this are rejected. Default: 10 MB.">
-              <NumberInput value={state.pdfMaxSizeMb} onChange={(v) => onChange("pdfMaxSizeMb", v)} min={1} placeholder="10" />
-            </FieldWithInfo>
-            <FieldWithInfo label="PDF Max Pages" tooltip="Maximum number of pages the agent reads from a PDF. Pages beyond this limit are ignored. Default: 20.">
-              <NumberInput value={state.pdfMaxPages} onChange={(v) => onChange("pdfMaxPages", v)} min={1} placeholder="20" />
-            </FieldWithInfo>
-            <FieldWithInfo label="Image Model (JSON)" tooltip="Override which model is used for vision/image tasks. Accepts a model ID string or JSON config object. Leave empty to use the primary model.">
-              {textInput("imageModel", '"claude-sonnet-4-6"', true)}
-            </FieldWithInfo>
-            <FieldWithInfo label="PDF Model (JSON)" tooltip="Override which model processes PDF files. Accepts a model ID string or JSON config object. Leave empty to use the primary model.">
-              {textInput("pdfModel", '"claude-sonnet-4-6"', true)}
-            </FieldWithInfo>
-          </div>
-        )}
-      </div>
-
-      {/* ── Envelope & Time ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Envelope & Time" open={openSections.envelope} onToggle={() => toggle("envelope")} />
-        {openSections.envelope && (
-          <div className="space-y-4 pt-1">
-            <div className="flex items-center gap-8">
-              <FieldWithInfo label="Envelope Timestamp" tooltip="Adds the current date and time to every message the gateway sends to the agent. Helps the agent know when messages arrive.">
-                <div className="flex items-center gap-2 mt-1">
-                  <Toggle checked={state.envelopeTimestamp !== "off"} onChange={(v) => onChange("envelopeTimestamp", v ? "on" : "off")} />
-                  <span className="text-xs text-foreground-muted">{state.envelopeTimestamp === "off" ? "Off" : "On (default)"}</span>
-                </div>
-              </FieldWithInfo>
-              <FieldWithInfo label="Envelope Elapsed" tooltip="Adds the time elapsed since the session started to every message. Useful for agents that track how long they've been running.">
-                <div className="flex items-center gap-2 mt-1">
-                  <Toggle checked={state.envelopeElapsed !== "off"} onChange={(v) => onChange("envelopeElapsed", v ? "on" : "off")} />
-                  <span className="text-xs text-foreground-muted">{state.envelopeElapsed === "off" ? "Off" : "On (default)"}</span>
-                </div>
-              </FieldWithInfo>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FieldWithInfo label="Envelope Timezone" tooltip="Which timezone is used for the timestamps in message envelopes. Options: utc, local, user, or any IANA timezone string like 'America/Sao_Paulo'.">
-                {textInput("envelopeTimezone", "utc, local, America/Sao_Paulo...")}
-              </FieldWithInfo>
-              <FieldWithInfo label="User Timezone" tooltip="The user's local timezone shown to the agent. Helps the agent format times correctly when talking to the user.">
-                {textInput("userTimezone", "e.g. America/Sao_Paulo")}
-              </FieldWithInfo>
-              <FieldWithInfo label="Time Format" tooltip="12h or 24h clock format used when the agent displays times. 'Auto' follows the user's system preferences.">
-                <SelectInput value={state.timeFormat} onChange={(v) => onChange("timeFormat", v)} options={[
-                  { value: "auto", label: "Auto" }, { value: "12", label: "12h" }, { value: "24", label: "24h" },
-                ]} />
-              </FieldWithInfo>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Workspace ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Workspace & Paths" open={openSections.workspace} onToggle={() => toggle("workspace")} />
-        {openSections.workspace && (
-          <div className="grid grid-cols-1 gap-4 pt-1">
-            <FieldWithInfo label="Workspace" tooltip="Default working directory exposed to the agent's file tools. Set this when running from wrappers so the agent always resolves paths from the right place.">
-              {textInput("workspace", "/data/workspace/my-agent", true)}
-            </FieldWithInfo>
-            <FieldWithInfo label="Repo Root" tooltip="Root of the code repository shown to the agent in its system prompt. Helps the agent understand where the project lives and resolve relative paths.">
-              {textInput("repoRoot", "/home/user/project", true)}
-            </FieldWithInfo>
-          </div>
-        )}
-      </div>
-
-      {/* ── Advanced (JSON) ── */}
-      <div className="p-4 space-y-3">
-        <SectionHeader label="Advanced (JSON)" open={openSections.advanced} onToggle={() => toggle("advanced")} />
-        {openSections.advanced && (
-          <div className="space-y-4 pt-1">
-            <p className="text-[11px] text-foreground-muted">These settings accept raw JSON objects. Leave empty to use defaults. Incorrect JSON is ignored on save.</p>
-
-            <FieldWithInfo label="Heartbeat (JSON)" tooltip="Periodic ping the agent sends to stay active and check for tasks. Config: interval (e.g. '30m'), prompt, active hours, and target session.">
-              <JsonTextarea value={state.heartbeatJson} onChange={(v) => onChange("heartbeatJson", v)} placeholder={'{ "every": "30m", "prompt": "Review your task board." }'} rows={4} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Human Delay (JSON)" tooltip="Fine-tune realistic typing delays. Controls min/max delay per character and per message block. Used to simulate human-like pacing.">
-              <JsonTextarea value={state.humanDelayJson} onChange={(v) => onChange("humanDelayJson", v)} placeholder={'{ "minMs": 200, "maxMs": 800 }'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Sandbox (JSON)" tooltip="Execution sandbox config. Controls whether commands run on the host, inside Docker, or with restricted permissions.">
-              <JsonTextarea value={state.sandboxJson} onChange={(v) => onChange("sandboxJson", v)} placeholder={'{ "type": "host" }'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Compaction (JSON)" tooltip="Controls how the agent's conversation history is compressed when it gets too long. Protects context quality while staying within token limits.">
-              <JsonTextarea value={state.compactionJson} onChange={(v) => onChange("compactionJson", v)} placeholder={'{ "mode": "safeguard" }'} rows={4} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Context Pruning (JSON)" tooltip="Automatically removes old or irrelevant tool results from the conversation to free up context space before it runs out.">
-              <JsonTextarea value={state.contextPruningJson} onChange={(v) => onChange("contextPruningJson", v)} placeholder={'{ "mode": "cache-ttl", "ttl": "30m" }'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Memory Search (JSON)" tooltip="Vector memory search config. Controls how the agent queries its long-term memory store when answering questions.">
-              <JsonTextarea value={state.memorySearchJson} onChange={(v) => onChange("memorySearchJson", v)} placeholder={'{ "enabled": true, "topK": 5 }'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="CLI Backends (JSON)" tooltip="Override which CLI backend the agent uses to run commands. Advanced: only change this if you're routing to a non-default execution backend.">
-              <JsonTextarea value={state.cliBackendsJson} onChange={(v) => onChange("cliBackendsJson", v)} placeholder={'[{ "id": "default" }]'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Embedded Pi (JSON)" tooltip="Configuration for the embedded Pi (project settings injection). Controls how project-level settings are trusted and applied to the agent.">
-              <JsonTextarea value={state.embeddedPiJson} onChange={(v) => onChange("embeddedPiJson", v)} placeholder={'{ "projectSettingsPolicy": "trusted" }'} />
-            </FieldWithInfo>
-
-            <FieldWithInfo label="Models Catalog (JSON)" tooltip="Define a custom set of models available to this agent, with optional aliases and fallbacks. Overrides the gateway's global model list.">
-              <JsonTextarea value={state.modelsJson} onChange={(v) => onChange("modelsJson", v)} placeholder={'[{ "id": "claude-sonnet-4-6", "label": "Sonnet" }]'} rows={4} />
-            </FieldWithInfo>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -1357,10 +1147,13 @@ export default function NewAgentPage() {
   const [includeFiles, setIncludeFiles] = useState<Record<string, boolean>>({
     soulMd: true, agentsMd: true, identityMd: true, userMd: true,
     heartbeatMd: true, toolsMd: false, memoryMd: false,
-    bootMd: false, bootstrapMd: true, workingMd: false,
+    bootMd: false, hookMd: false, workingMd: false,
   });
   const toggleFile = (key: string) =>
     setIncludeFiles((prev) => ({ ...prev, [key]: !prev[key] }));
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const handleFileContent = (key: string, content: string) =>
+    setFileContents((prev) => ({ ...prev, [key]: content }));
 
   const handleDefaultsChange = <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => {
     setDefaults((prev) => ({ ...prev, [field]: value }));
@@ -1423,11 +1216,12 @@ export default function NewAgentPage() {
       ...(includeFiles.agentsMd    ? [{ name: "AGENTS.md",    content: resolvedAgentsMd }] : []),
       ...(includeFiles.heartbeatMd ? [{ name: "HEARTBEAT.md", content: heartbeatMd }] : []),
       ...(includeFiles.userMd      ? [{ name: "USER.md",      content: userMd }] : []),
-      ...(includeFiles.bootstrapMd ? [{ name: "BOOTSTRAP.md", content: bootstrapMd }] : []),
+      { name: "BOOTSTRAP.md", content: bootstrapMd }, // always included, auto-deleted after first run
+      ...(includeFiles.hookMd ? [{ name: "HOOK.md", content: fileContents.hookMd || `// HOOK.md — Custom gateway hooks\n// See: https://openclaw.dev/docs/hooks\n\nexport default {};\n` }] : []),
       ...(includeFiles.memoryMd && memoryMd ? [{ name: "MEMORY.md", content: memoryMd }] : []),
-      ...(includeFiles.toolsMd  ? [{ name: "TOOLS.md",   content: `# Tools\n\n<!-- Document available tools, SSH hosts, usage conventions and custom restrictions. -->\n` }] : []),
-      ...(includeFiles.bootMd   ? [{ name: "BOOT.md",    content: `# Boot\n\n<!-- Actions to execute at the start of each session. -->\n` }] : []),
-      ...(includeFiles.workingMd ? [{ name: "WORKING.md", content: `# Working\n\n<!-- Current task state — updated by the agent to persist work across restarts. -->\n` }] : []),
+      ...(includeFiles.toolsMd   ? [{ name: "TOOLS.md",   content: fileContents.toolsMd   || `# Tools\n\n<!-- Document available tools, SSH hosts, usage conventions and custom restrictions. -->\n` }] : []),
+      ...(includeFiles.bootMd    ? [{ name: "BOOT.md",    content: fileContents.bootMd    || `# Boot\n\n<!-- Actions to execute at the start of each session. -->\n` }] : []),
+      ...(includeFiles.workingMd ? [{ name: "WORKING.md", content: fileContents.workingMd || `# Working\n\n<!-- Current task state — updated by the agent to persist work across restarts. -->\n` }] : []),
     ];
 
     for (const file of filesToWrite) {
@@ -1577,6 +1371,8 @@ export default function NewAgentPage() {
             onChange={handleDefaultsChange}
             includeFiles={includeFiles}
             onFileToggle={toggleFile}
+            fileContents={fileContents}
+            onFileContent={handleFileContent}
           />
         )}
 
