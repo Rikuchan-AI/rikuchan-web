@@ -183,13 +183,13 @@ function StepIdentity({
             value={role}
             onChange={(e) => onChange("role", e.target.value)}
             placeholder="developer, devops, qa, designer..."
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:border-accent/50"
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-14 text-sm text-foreground focus:outline-none focus:border-accent/50"
           />
           {role && (
             <button
               type="button"
               onClick={() => onChange("role", "")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted/50 hover:text-foreground-muted transition-colors"
+              className="absolute right-7 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-base leading-none text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
               aria-label="Clear role"
             >
               ×
