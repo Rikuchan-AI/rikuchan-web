@@ -1,6 +1,35 @@
 // ─── Project Types ──────────────────────────────────────────────────────────
 
 export type ProjectStatus = "active" | "paused" | "archived";
+export type OperationMode = "manual" | "supervised" | "autonomous";
+
+export type GroupColor =
+  | "emerald"
+  | "blue"
+  | "purple"
+  | "amber"
+  | "coral"
+  | "pink"
+  | "teal"
+  | "gray";
+
+export const GROUP_COLORS: { value: GroupColor; label: string; tw: string }[] = [
+  { value: "emerald", label: "Emerald", tw: "bg-emerald-500" },
+  { value: "blue",    label: "Blue",    tw: "bg-blue-500" },
+  { value: "purple",  label: "Purple",  tw: "bg-purple-500" },
+  { value: "amber",   label: "Amber",   tw: "bg-amber-500" },
+  { value: "coral",   label: "Coral",   tw: "bg-orange-500" },
+  { value: "pink",    label: "Pink",    tw: "bg-pink-500" },
+  { value: "teal",    label: "Teal",    tw: "bg-teal-500" },
+  { value: "gray",    label: "Gray",    tw: "bg-zinc-500" },
+];
+
+export function colorFromName(name: string): GroupColor {
+  const colors: GroupColor[] = ["emerald", "blue", "purple", "amber", "coral", "pink", "teal", "gray"];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
 
 export interface BoardGroupGatewayConfig {
   url: string;
@@ -11,10 +40,48 @@ export interface BoardGroup {
   id: string;
   name: string;
   description?: string;
+  icon?: string;   // emoji or lucide icon name
+  color?: GroupColor;
   gateway?: BoardGroupGatewayConfig;
   agentId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ProjectModelConfig {
+  preferred: string;
+  forced: boolean;
+  fallback?: string;
+}
+
+export interface ProjectHeartbeatConfig {
+  intervalSeconds: number;
+  degradedThreshold: number;
+  offlineThreshold: number;
+  autoReassign: boolean;
+}
+
+export interface SpawnPermission {
+  sourceAgentId: string;
+  targetAgentId: string;
+  maxConcurrent: number;
+  requireApproval: boolean;
+}
+
+export interface ProjectNotificationConfig {
+  taskBlocked: boolean;
+  agentOffline: boolean;
+  sprintComplete: boolean;
+  approvalPending: boolean;
+  channels: ("telegram" | "dashboard")[];
+}
+
+export interface TokenBudgetConfig {
+  monthlyLimit: number;         // USD
+  alertAt80: boolean;
+  alertAt90: boolean;
+  autoPauseAt100: boolean;
+  currentMonthSpend?: number;   // populated by cost tracking
 }
 
 export interface Project {
@@ -25,6 +92,15 @@ export interface Project {
   groupId?: string;
   workspacePath: string;
   leadAgentModel: string;
+  tokenBudget?: TokenBudgetConfig;
+  // Sprint 1 additions
+  operationMode?: OperationMode;
+  autoDelegation?: boolean;
+  modelConfig?: ProjectModelConfig;
+  heartbeatConfig?: ProjectHeartbeatConfig;
+  spawnPermissions?: SpawnPermission[];
+  notificationConfig?: ProjectNotificationConfig;
+  tags?: string[];
   createdAt: number;
   updatedAt: number;
   roster: RosterMember[];
@@ -42,6 +118,14 @@ export type RosterRole =
   | "documenter"
   | "custom";
 
+export interface RosterContextFile {
+  id: string;
+  name: string;
+  content: string;
+  mimeType?: string;
+  addedAt: number;
+}
+
 export interface RosterMember {
   agentId: string;
   agentName: string;
@@ -51,6 +135,9 @@ export interface RosterMember {
   /** IDs of roster agents this agent can spawn. undefined = all roster agents. */
   spawnTargets?: string[];
   heartbeatConfig?: RosterHeartbeatConfig;
+  /** Project-specific context injected into agent's prompt */
+  contextOverlay?: string;
+  contextFiles?: RosterContextFile[];
   addedAt: number;
 }
 
