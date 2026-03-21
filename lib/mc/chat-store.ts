@@ -172,6 +172,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // gatewaySessionKey format: "agent:<agentId>:<scope>"
     // Map to chat session key by finding a session whose agentId matches
     const agentIdFromGw = gatewaySessionKey.split(":")[1] ?? "";
+    const sessions = useChatStore.getState().sessions;
+    console.log(`[Chat] receiveMessage gwKey=${gatewaySessionKey} agentIdFromGw=${agentIdFromGw} sessions=${Object.keys(sessions).join(",")}`);
     set((s) => {
       // Find matching chat session — prefer exact gateway key match, then agentId match
       const sessionKey = Object.keys(s.sessions).find((k) => {
@@ -181,6 +183,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           agentIdFromGw.includes(session.agentId);
       });
       const session = sessionKey ? s.sessions[sessionKey] : undefined;
+      console.log(`[Chat] matched sessionKey=${sessionKey} session.agentId=${session?.agentId}`);
       if (!session || !sessionKey) return s;
 
       const agentId = session.agentId;
