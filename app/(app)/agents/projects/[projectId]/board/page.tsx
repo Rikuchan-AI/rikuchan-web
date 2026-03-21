@@ -10,9 +10,6 @@ import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/p
 import { RikuPageLoader } from "@/components/shared/riku-loader";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
-import { syncHeartbeatToGateway } from "@/lib/mc/heartbeat-integration";
-import { buildAgentSessionKey } from "@/lib/mc/session-routing";
-import type { RosterHeartbeatConfig } from "@/lib/mc/types-project";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
 import { canTransition, type OperationMode } from "@/lib/mc/pipeline-governance";
@@ -170,6 +167,8 @@ export default function BoardPage() {
 
   const gwAgents = useGatewayStore((s) => s.agents);
   const gwConnected = useGatewayStore((s) => s.status === "connected");
+  const gwStatus = useGatewayStore((s) => s.status);
+  const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
   const leadGwId = leadAgent?.gatewayAgentId ?? leadAgent?.agentId;
@@ -179,19 +178,6 @@ export default function BoardPage() {
   );
   // Only evaluate online status after agents have been loaded from gateway
   const leadAgentOnline = agentsLoaded && (leadGwAgent?.status === "online" || leadGwAgent?.status === "idle");
-
-  // Auto-restore heartbeat for active projects whose lead is offline
-  // (e.g. after gateway restart or first load after activation)
-  useEffect(() => {
-    if (!leadAgent || !project || !gwConnected || project.status !== "active" || leadAgentOnline) return;
-    const gwId = leadAgent.gatewayAgentId ?? leadAgent.agentId;
-    const hbConfig: RosterHeartbeatConfig = leadAgent.heartbeatConfig
-      ? { enabled: true, intervalSeconds: leadAgent.heartbeatConfig.intervalSeconds, focus: ["board-review", "agent-health", "task-progress"] }
-      : { enabled: true, intervalSeconds: 60, focus: ["board-review", "agent-health", "task-progress"] };
-    const sessionKey = buildAgentSessionKey(gwId, project);
-    syncHeartbeatToGateway(gwId, hbConfig, sessionKey).catch(() => { /* non-fatal */ });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gwConnected, project?.status, leadAgentOnline]);
 
   const STALE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -297,8 +283,32 @@ export default function BoardPage() {
     );
   }
 
+  // Banner state: show when gateway disconnects/reconnects
+  const showGatewayBanner = gwStatus !== "connected";
+  const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
+
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
+      {/* Gateway reconnect / applying config banner */}
+      {showGatewayBanner && (
+        <div className={`mb-3 flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-sm ${
+          gatewayBannerIsExpected
+            ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
+            : "border-red-500/20 bg-red-500/5 text-red-400"
+        }`}>
+          <span className={`h-2 w-2 shrink-0 rounded-full animate-pulse ${
+            gatewayBannerIsExpected ? "bg-amber-400" : "bg-red-400"
+          }`} />
+          <span className="font-medium">
+            {gatewayBannerIsExpected
+              ? "Applying configurations — gateway restarting..."
+              : gwStatus === "connecting"
+                ? "Reconnecting to gateway..."
+                : "Gateway offline — check connection"}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <BoardHeader
         project={project}

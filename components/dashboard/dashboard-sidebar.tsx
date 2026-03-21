@@ -230,9 +230,32 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
       </div>
 
-      <div className="mt-auto flex items-center gap-2 rounded-md px-3 py-2">
-        <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
-        <span className="text-sm font-medium text-foreground-soft truncate">Rikuchan Starter</span>
+      <div className="mt-auto space-y-2">
+        {/* Gateway status pill */}
+        {MC_ENABLED && (
+          <div className={cn(
+            "flex items-center gap-2 rounded-md border px-3 py-2 transition-colors",
+            gatewayStatus === "connected"
+              ? "border-emerald-500/20 bg-emerald-500/5"
+              : "border-red-500/20 bg-red-500/5",
+          )}>
+            <span className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              gatewayStatus === "connected" ? "bg-emerald-400 animate-pulse" : "bg-red-400",
+            )} />
+            <span className={cn(
+              "mono text-[10px] font-semibold uppercase tracking-wider truncate",
+              gatewayStatus === "connected" ? "text-emerald-400" : "text-red-400",
+            )}>
+              {gatewayStatus === "connected" ? "Gateway online" : gatewayStatus === "connecting" ? "Connecting..." : "Gateway offline"}
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 rounded-md px-3 py-2">
+          <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+          <span className="text-sm font-medium text-foreground-soft truncate">Rikuchan Starter</span>
+        </div>
       </div>
     </div>
   );

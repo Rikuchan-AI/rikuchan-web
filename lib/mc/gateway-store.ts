@@ -57,7 +57,7 @@ interface GatewayStore {
   stateDir?: string;
   reconnectAttempts: number;
   reconnectAt?: number;
-  expectedRestartReason?: "heartbeat-model-update";
+  expectedRestartReason?: "heartbeat-model-update" | "config-patch";
 
   agents: Agent[];
   /** Agents permanently registered in OpenClaw (from agents.list). Use this for roster selection. */
@@ -88,7 +88,7 @@ interface GatewayStore {
   disconnect: () => void;
   sendCommand: (command: GatewayCommand) => void;
   sendRpc: (method: string, params?: unknown) => string;
-  expectGatewayRestart: (reason: "heartbeat-model-update") => void;
+  expectGatewayRestart: (reason: "heartbeat-model-update" | "config-patch") => void;
   clearExpectedGatewayRestart: () => void;
   setLeadBoardAgent: (model: string, provider: string) => Promise<void>;
   setAgentModel: (agentId: string, model: string) => void;

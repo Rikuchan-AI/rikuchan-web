@@ -233,6 +233,9 @@ export function syncHeartbeatToGateway(
             } catch { /* ignore */ }
           };
 
+          // config.patch on agents.list triggers SIGUSR1 restart — mark as expected
+          useGatewayStore.getState().expectGatewayRestart("config-patch");
+
           ws.addEventListener("message", patchHandler);
           ws.send(JSON.stringify({
             type: "req",
