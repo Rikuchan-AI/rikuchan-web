@@ -20,7 +20,7 @@ import {
   generateHeartbeatMd,
   generateBootstrapMd,
 } from "@/lib/mc/agent-files";
-import { MODEL_GROUPS } from "@/lib/mc/models";
+import { MODEL_GROUPS, gatewayModelsToGroups } from "@/lib/mc/models";
 import { SOUL_TEMPLATES, applyTemplateName } from "@/lib/mc/soul-templates";
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
@@ -850,6 +850,88 @@ function SectionHeader({ label, open, onToggle }: { label: string; open: boolean
   );
 }
 
+// ─── Shared Combobox ─────────────────────────────────────────────────────────
+
+function SimpleCombobox({
+  value, onChange, options, placeholder, mono = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; label: string; sub?: string }[];
+  placeholder?: string;
+  mono?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = value.trim()
+    ? options.filter((o) => o.id.includes(value.toLowerCase()) || o.label.toLowerCase().includes(value.toLowerCase()))
+    : options;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className={`w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50 ${mono ? "font-mono" : ""}`}
+        />
+        {value && (
+          <button type="button" onClick={() => { onChange(""); setOpen(true); }}
+            className="absolute right-9 flex items-center justify-center w-5 h-5 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors">
+            <X size={13} strokeWidth={2.5} />
+          </button>
+        )}
+        <button type="button" onClick={() => setOpen((v) => !v)}
+          className="absolute right-2 flex items-center justify-center w-6 h-6 rounded text-white/40 hover:text-white transition-colors">
+          <ChevronDown size={14} strokeWidth={2.5} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-line bg-surface shadow-xl max-h-52 overflow-y-auto py-1">
+          {filtered.map((o) => (
+            <button key={o.id} type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onChange(o.id); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-surface-strong ${value === o.id ? "text-accent font-medium" : "text-foreground-soft"}`}>
+              <span className={mono ? "font-mono" : ""}>{o.label}</span>
+              {o.sub && <span className="ml-2 text-[11px] text-foreground-muted">{o.sub}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubAgentCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const agents = useGatewayStore((s) => s.agents);
+  const options = [
+    { id: "*", label: "* — allow any" },
+    ...agents.map((a) => ({ id: a.id, label: a.name || a.id, sub: a.id })),
+  ];
+  return <SimpleCombobox value={value} onChange={onChange} options={options} placeholder="Select agents or type IDs..." mono />;
+}
+
+function ModelCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const options = MODEL_GROUPS.flatMap((g) =>
+    g.models.map((m) => ({ id: m.id, label: m.label, sub: g.provider }))
+  );
+  return <SimpleCombobox value={value} onChange={onChange} options={options} placeholder="Inherit global model..." mono />;
+}
+
 // ─── Workspace Files ─────────────────────────────────────────────────────────
 
 const STD_FILES: { key: string; name: string; required?: boolean; tooltip: string }[] = [
@@ -960,11 +1042,17 @@ function StepDefaults({ state, onChange, includeFiles, onFileToggle }: {
         <SectionHeader label="Per-Agent Overrides" open={openSections.perAgent} onToggle={() => toggle("perAgent")} />
         {openSections.perAgent && (
           <div className="space-y-4 pt-1">
-            <FieldWithInfo label="Allowed Sub-agents" tooltip="Comma-separated IDs of agents this agent is allowed to spawn as sub-agents. Use * to allow any, or leave empty for none.">
-              {textInput("allowSubagents", "agent-a, agent-b  (or * for any)")}
+            <FieldWithInfo label="Allowed Sub-agents" tooltip="Agents this agent is allowed to spawn as sub-agents. Use * to allow any, or leave empty for none.">
+              <SubAgentCombobox
+                value={state.allowSubagents}
+                onChange={(v) => onChange("allowSubagents", v)}
+              />
             </FieldWithInfo>
             <FieldWithInfo label="Sub-agent Model" tooltip="Default model used when this agent spawns a sub-agent. Leave empty to inherit the global model setting.">
-              {textInput("subagentModel", "e.g. claude-haiku-4-5-20251001", true)}
+              <ModelCombobox
+                value={state.subagentModel}
+                onChange={(v) => onChange("subagentModel", v)}
+              />
             </FieldWithInfo>
             <FieldWithInfo label="Human Delay" tooltip="Add realistic pauses between message blocks to make responses feel more natural to end users.">
               <div className="flex items-center gap-2">
