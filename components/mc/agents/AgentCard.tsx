@@ -136,7 +136,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
             {menuOpen && (
               <div className="absolute right-0 top-7 z-10 rounded-lg border border-line bg-surface shadow-xl min-w-[160px] py-1">
                 <Link
-                  href={`/sessions?agent=${agent.id}`}
+                  href={`/agents/sessions?agent=${agent.id}`}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
                   onClick={() => setMenuOpen(false)}
                 >
@@ -227,7 +227,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
           Chat
         </Link>
         <Link
-          href={`/sessions?agent=${agent.id}`}
+          href={`/agents/sessions?agent=${agent.id}`}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
         >
           <ExternalLink size={11} />

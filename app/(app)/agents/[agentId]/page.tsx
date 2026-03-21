@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import {
   Crown, Code, Wrench, Cpu, History, FileText,
   RefreshCw, AlertTriangle, Check, Clock, Download,
-  Copy, ChevronDown, ChevronRight, Upload, X, MoreHorizontal,
+  Copy, ChevronDown, ChevronRight, Upload, X, MoreHorizontal, Search,
 } from "lucide-react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
@@ -151,12 +151,21 @@ function FileEditor({
       )}
 
       {/* Editor */}
-      <textarea
-        value={state.content}
-        onChange={(e) => onContentChange(e.target.value)}
-        className="w-full rounded-md border border-line bg-surface-strong px-3 py-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-none min-h-[320px]"
-        spellCheck={false}
-      />
+      {state.syncStatus === "desync" && !state.content ? (
+        <div className="w-full rounded-md border border-line bg-surface-strong px-4 py-8 min-h-[320px] flex items-center justify-center">
+          <p className="text-xs text-foreground-muted text-center">
+            Arquivo não disponível — agente offline.<br />
+            <span className="text-foreground-muted/60">Inicie o agente para carregar o conteúdo.</span>
+          </p>
+        </div>
+      ) : (
+        <textarea
+          value={state.content}
+          onChange={(e) => onContentChange(e.target.value)}
+          className="w-full rounded-md border border-line bg-surface-strong px-3 py-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-none min-h-[320px]"
+          spellCheck={false}
+        />
+      )}
 
       {/* Save row */}
       <div className="flex items-center justify-between gap-3">
@@ -366,8 +375,14 @@ function TabModel({ agentId }: { agentId: string }) {
 
   const [selectedModel, setSelectedModel] = useState(agent?.model ?? "");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   if (!agent) return null;
+
+  const q = search.toLowerCase();
+  const filteredGroups = modelGroups
+    .map((g) => ({ ...g, models: q ? g.models.filter((m) => m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)) : g.models }))
+    .filter((g) => g.models.length > 0);
 
   const handleSave = async () => {
     setSaving(true);
@@ -379,7 +394,21 @@ function TabModel({ agentId }: { agentId: string }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-line overflow-hidden">
-        {modelGroups.map((group, gi) => (
+        <div className="flex items-center gap-2 px-3 py-2 bg-surface-muted border-b border-line">
+          <Search size={13} className="text-foreground-muted flex-shrink-0" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar modelo..."
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-foreground-muted focus:outline-none"
+          />
+          {search && <button type="button" onClick={() => setSearch("")} className="text-foreground-muted hover:text-foreground"><X size={13} /></button>}
+        </div>
+        {filteredGroups.length === 0 && (
+          <p className="px-4 py-6 text-sm text-foreground-muted text-center">Nenhum modelo encontrado.</p>
+        )}
+        {filteredGroups.map((group, gi) => (
           <div key={group.provider}>
             {gi > 0 && <div className="border-t border-line" />}
             <div className="px-4 py-2 bg-surface-muted">
@@ -473,6 +502,8 @@ function TabLogs({ agentId }: { agentId: string }) {
 export default function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const agents = useGatewayStore((s) => s.agents);
+  const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
+  const status = useGatewayStore((s) => s.status);
   const sessions = useGatewayStore((s) => s.sessions);
   const projects = useProjectsStore((s) => s.projects);
 
@@ -485,6 +516,14 @@ export default function AgentDetailPage() {
   const [activeTab, setActiveTab] = useState("identity");
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [fileStates, setFileStates] = useState<Record<string, AgentFileState>>({});
+  const [notFoundConfirmed, setNotFoundConfirmed] = useState(false);
+
+  // Give gateway a moment to push the new agent before showing "not found"
+  useEffect(() => {
+    if (agent) { setNotFoundConfirmed(false); return; }
+    const t = setTimeout(() => setNotFoundConfirmed(true), 3000);
+    return () => clearTimeout(t);
+  }, [agent]);
 
   // Load all agent files from gateway
   const loadFiles = useCallback(async () => {
@@ -500,7 +539,7 @@ export default function AgentDetailPage() {
           original: content,
           dirty: false,
           saving: false,
-          syncStatus: "synced",
+          syncStatus: file.missing ? "desync" : "synced",
           versions: [],
         };
       }
@@ -616,9 +655,18 @@ export default function AgentDetailPage() {
   };
 
   if (!agent) {
+    if (!notFoundConfirmed) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <RefreshCw size={18} className="text-foreground-muted animate-spin" />
+          <p className="text-foreground-muted text-sm">Carregando agente…</p>
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-foreground-muted text-sm">Agent not found: {agentId}</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertTriangle size={18} className="text-danger" />
+        <p className="text-foreground-muted text-sm">Agente não encontrado: <span className="font-mono text-foreground">{agentId}</span></p>
       </div>
     );
   }

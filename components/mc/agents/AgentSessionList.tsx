@@ -33,7 +33,7 @@ export function AgentSessionList({ sessions, maxItems = 5 }: AgentSessionListPro
         return (
           <Link
             key={session.id}
-            href={`/sessions/${session.id}`}
+            href={`/agents/sessions/${session.id}`}
             className="flex items-center justify-between rounded-lg border border-line bg-surface p-4 hover:bg-surface-strong transition-colors group"
           >
             <div className="min-w-0 flex-1">

@@ -25,7 +25,7 @@ export function SessionCard({ session, isSelected = false }: SessionCardProps) {
 
   return (
     <Link
-      href={`/sessions/${session.id}`}
+      href={`/agents/sessions/${session.id}`}
       className={`block rounded-lg border p-4 transition-all duration-200 ${
         isSelected
           ? "border-accent/40 bg-accent-soft"

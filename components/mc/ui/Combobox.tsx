@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, X } from "lucide-react";
 
 export interface ComboboxOption {
@@ -23,6 +24,7 @@ export function Combobox({
   mono?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLDivElement>(null);
 
   const filtered = value.trim()
@@ -42,21 +44,57 @@ export function Combobox({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // Reposition on scroll/resize
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  const handleOpen = () => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    });
+    setOpen(true);
+  };
+
   return (
     <div className="relative" ref={ref}>
       <div className="relative flex items-center">
         <input
           type="text"
           value={value}
-          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onChange={(e) => { onChange(e.target.value); handleOpen(); }}
+          onFocus={handleOpen}
           placeholder={placeholder}
           className={`w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50 ${mono ? "font-mono" : ""}`}
         />
         {value && (
           <button
             type="button"
-            onClick={() => { onChange(""); setOpen(true); }}
+            onClick={() => { onChange(""); handleOpen(); }}
             className="absolute right-9 flex items-center justify-center w-5 h-5 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
           >
             <X size={13} strokeWidth={2.5} />
@@ -64,7 +102,7 @@ export function Combobox({
         )}
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => (open ? setOpen(false) : handleOpen())}
           className="absolute right-2 flex items-center justify-center w-6 h-6 rounded text-white/40 hover:text-white transition-colors"
         >
           <ChevronDown
@@ -75,8 +113,11 @@ export function Combobox({
         </button>
       </div>
 
-      {open && filtered.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-line bg-surface shadow-xl max-h-52 overflow-y-auto py-1">
+      {open && filtered.length > 0 && typeof document !== "undefined" && createPortal(
+        <div
+          style={dropdownStyle}
+          className="rounded-lg border border-line bg-surface shadow-xl max-h-52 overflow-y-auto py-1"
+        >
           {filtered.map((o) => (
             <button
               key={o.id}
@@ -93,7 +134,8 @@ export function Combobox({
               )}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

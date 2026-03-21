@@ -583,20 +583,17 @@ function StepModel({
     <div className="space-y-6">
       <div>
         <FieldLabel>Preferred Model</FieldLabel>
-        <select
+        <Combobox
           value={model}
-          onChange={(e) => onChange("model", e.target.value)}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          <option value="">Gateway routing (auto)</option>
-          {modelGroups.map((group) => (
-            <optgroup key={group.provider} label={group.provider}>
-              {group.models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}{m.recommended ? " ★" : ""}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(v) => onChange("model", v)}
+          placeholder="Gateway routing (auto)"
+          options={[
+            ...modelGroups.flatMap((g) =>
+              g.models.map((m) => ({ id: m.id, label: m.label + (m.recommended ? " ★" : ""), sub: g.provider }))
+            ),
+          ]}
+          mono
+        />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
           <input
             type="checkbox"
@@ -618,16 +615,18 @@ function StepModel({
       {model && (
         <div>
           <FieldLabel>Fallback Model</FieldLabel>
-          <select
+          <Combobox
             value={modelFallback}
-            onChange={(e) => onChange("modelFallback", e.target.value)}
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-          >
-            <option value="">None</option>
-            {allModels.filter((m) => m.id !== model).map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
+            onChange={(v) => onChange("modelFallback", v)}
+            placeholder="None"
+            options={allModels
+              .filter((m) => m.id !== model)
+              .map((m) => {
+                const group = modelGroups.find((g) => g.models.some((gm) => gm.id === m.id));
+                return { id: m.id, label: m.label, sub: group?.provider };
+              })}
+            mono
+          />
         </div>
       )}
 
@@ -671,7 +670,10 @@ function StepModel({
           />
         </div>
         <div>
-          <FieldLabel>Sandbox</FieldLabel>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <label className="mono text-xs uppercase text-foreground-muted" style={{ letterSpacing: "0.18em" }}>Sandbox</label>
+            <InfoTooltip text="Host: agente executa ferramentas com acesso direto ao sistema. Docker: execução isolada em container, sem acesso ao host." />
+          </div>
           <select
             value={sandboxMode}
             onChange={(e) => onChange("sandboxMode", e.target.value)}
@@ -1026,13 +1028,14 @@ function WorkspaceFilesSection({
   );
 }
 
-function StepDefaults({ state, onChange, includeFiles, onFileToggle, fileContents, onFileContent }: {
+function StepDefaults({ state, onChange, includeFiles, onFileToggle, fileContents, onFileContent, enabledTools }: {
   state: DefaultsState;
   onChange: <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => void;
   includeFiles: Record<string, boolean>;
   onFileToggle: (key: string) => void;
   fileContents: Record<string, string>;
   onFileContent: (key: string, content: string) => void;
+  enabledTools: string[];
 }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     files: true, perAgent: true, behavior: true, streaming: false, context: false,
@@ -1072,17 +1075,26 @@ function StepDefaults({ state, onChange, includeFiles, onFileToggle, fileContent
         <SectionHeader label="Per-Agent Overrides" open={openSections.perAgent} onToggle={() => toggle("perAgent")} />
         {openSections.perAgent && (
           <div className="space-y-4 pt-1">
+            {!enabledTools.includes("spawn") && (
+              <p className="text-xs text-foreground-muted rounded-md bg-surface-muted border border-line px-3 py-2">
+                Habilite <span className="font-mono text-foreground">sessions_spawn</span> no Step 3 para configurar sub-agents.
+              </p>
+            )}
             <FieldWithInfo label="Allowed Sub-agents" tooltip="Agents this agent is allowed to spawn as sub-agents. Use * to allow any, or leave empty for none.">
-              <SubAgentCombobox
-                value={state.allowSubagents}
-                onChange={(v) => onChange("allowSubagents", v)}
-              />
+              <div className={!enabledTools.includes("spawn") ? "opacity-40 pointer-events-none" : ""}>
+                <SubAgentCombobox
+                  value={state.allowSubagents}
+                  onChange={(v) => onChange("allowSubagents", v)}
+                />
+              </div>
             </FieldWithInfo>
             <FieldWithInfo label="Sub-agent Model" tooltip="Default model used when this agent spawns a sub-agent. Leave empty to inherit the global model setting.">
-              <ModelCombobox
-                value={state.subagentModel}
-                onChange={(v) => onChange("subagentModel", v)}
-              />
+              <div className={!enabledTools.includes("spawn") ? "opacity-40 pointer-events-none" : ""}>
+                <ModelCombobox
+                  value={state.subagentModel}
+                  onChange={(v) => onChange("subagentModel", v)}
+                />
+              </div>
             </FieldWithInfo>
             <FieldWithInfo label="Human Delay" tooltip="Add realistic pauses between message blocks to make responses feel more natural to end users.">
               <div className="flex items-center gap-2">
@@ -1129,7 +1141,7 @@ export default function NewAgentPage() {
   });
 
   // Step 3 — Tools
-  const [enabledTools, setEnabledTools] = useState(["bash", "read", "edit"]);
+  const [enabledTools, setEnabledTools] = useState(["bash", "read", "edit", "spawn"]);
   const [heartbeatMd, setHeartbeatMd] = useState(generateHeartbeatMd());
   const [memoryMd, setMemoryMd] = useState("");
   const [userMd, setUserMd] = useState(generateUserMd());
@@ -1234,7 +1246,7 @@ export default function NewAgentPage() {
       const ids = defaults.allowSubagents.split(",").map((s) => s.trim()).filter(Boolean);
       perAgent.subagents = { allowAgents: ids, ...(defaults.subagentModel ? { model: defaults.subagentModel } : {}) };
     }
-    if (defaults.humanDelayEnabled) perAgent.humanDelay = { enabled: true };
+    if (defaults.humanDelayEnabled) perAgent.humanDelay = { mode: "natural" };
 
     const globalDefaults: Record<string, unknown> = {};
     // behavior
@@ -1373,6 +1385,7 @@ export default function NewAgentPage() {
             onFileToggle={toggleFile}
             fileContents={fileContents}
             onFileContent={handleFileContent}
+            enabledTools={enabledTools}
           />
         )}
 
