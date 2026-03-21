@@ -8,6 +8,7 @@ import {
   useProjectsStore,
   selectProjectById,
 } from "@/lib/mc/projects-store";
+import { useAuthContext } from "@/lib/mc/auth-provider";
 
 const PROJECT_TABS = [
   { id: "board",    label: "Board",    href: "board" },
@@ -25,19 +26,23 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const hydrate = useProjectsStore((s) => s.hydrate);
   const hydrateProject = useProjectsStore((s) => s.hydrateProject);
   const deleteProject = useProjectsStore((s) => s.deleteProject);
+  const { ready } = useAuthContext();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Wait for auth adapter to be initialized before hydrating
   useEffect(() => {
+    if (!ready) return;
     hydrate();
-  }, [hydrate]);
+  }, [hydrate, ready]);
 
   useEffect(() => {
-    if (projectId) hydrateProject(projectId);
-  }, [projectId, hydrateProject]);
+    if (!ready || !projectId) return;
+    hydrateProject(projectId);
+  }, [projectId, hydrateProject, ready]);
 
   // Close menu on outside click
   useEffect(() => {
