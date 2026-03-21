@@ -234,9 +234,28 @@ a {
   background-image: none !important;
 }
 
+/* --- Skeleton shimmer --- */
+
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
 /* --- Scrollbar --- */
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--background); }
 ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--foreground-muted); }
+
+/* --- Typography scale --- */
+
+.text-page-title { font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--foreground); }
+.text-section-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--foreground); }
+.text-card-title { font-family: var(--font-display); font-size: 15px; font-weight: 500; color: var(--foreground); }
+.text-metric { font-family: var(--font-display); font-size: 28px; font-weight: 600; }

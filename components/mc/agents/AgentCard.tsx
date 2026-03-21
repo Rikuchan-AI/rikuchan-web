@@ -11,6 +11,8 @@ import {
   Settings,
   Heart,
   AlertTriangle,
+  MessageSquare,
+  Activity,
 } from "lucide-react";
 import type { Agent } from "@/lib/mc/types";
 import { AgentStatusBadge } from "./AgentStatusBadge";
@@ -34,6 +36,8 @@ const statusGlow: Record<string, string | undefined> = {
   error:    undefined,
   offline:  undefined,
 };
+
+const pulsatingStatuses = new Set(["online", "thinking"]);
 
 export const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -61,7 +65,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
       initial="hidden"
       animate="visible"
       custom={index}
-      className="relative rounded-lg border border-line bg-surface p-5 transition-all duration-300"
+      className="relative rounded-lg bg-surface border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)] p-4 transition-all duration-300"
       style={{
         borderLeftColor: borderColor,
         borderLeftWidth: "3px",
@@ -70,42 +74,45 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
       }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <StatusDot status={agent.status} size={9} pulse />
-          <div>
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-block h-2 w-2 rounded-full shrink-0 ${pulsatingStatuses.has(agent.status) ? "animate-pulse" : ""}`}
+            style={{ backgroundColor: statusBorderColor[agent.status] ?? "#71717a" }}
+          />
+          <div className="min-w-0">
             <h3
-              className="text-base font-semibold tracking-[-0.03em] text-foreground leading-tight"
+              className="text-sm font-semibold tracking-[-0.03em] text-foreground leading-tight truncate"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {agent.name}
             </h3>
             <p
-              className="mono text-[0.65rem] uppercase text-foreground-muted mt-0.5"
+              className="mono text-[0.6rem] uppercase text-foreground-muted mt-0.5"
               style={{ letterSpacing: "0.18em" }}
             >
               {agent.role}
             </p>
             {agent.model && (
-              <p className="mono text-[0.6rem] text-foreground-muted mt-0.5 truncate max-w-[160px]" title={agent.model}>
+              <p className="mono text-[0.55rem] text-foreground-muted mt-0.5 truncate max-w-[160px]" title={agent.model}>
                 {agent.model}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <AgentStatusBadge status={agent.status} />
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="flex items-center justify-center w-7 h-7 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
+              className="flex items-center justify-center w-6 h-6 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
               aria-label="Agent actions menu"
             >
-              <MoreVertical size={14} />
+              <MoreVertical size={13} />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-8 z-10 rounded-lg border border-line bg-surface shadow-xl min-w-[160px] py-1">
+              <div className="absolute right-0 top-7 z-10 rounded-lg border border-line bg-surface shadow-xl min-w-[160px] py-1">
                 <Link
                   href={`/sessions?agent=${agent.id}`}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
@@ -138,18 +145,19 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
 
       {/* Current task */}
       {agent.currentTask && (
-        <div className="mb-3 rounded-md bg-surface-muted border border-line px-3 py-2">
-          <p className="text-xs text-foreground-soft leading-snug line-clamp-2">
+        <div className="mb-2 rounded-md bg-surface-muted border border-line px-2.5 py-1.5">
+          <p className="text-[11px] text-foreground-soft leading-snug line-clamp-2">
             {agent.currentTask}
           </p>
         </div>
       )}
 
-      {/* Metrics row */}
-      <div className="flex items-center gap-4 mb-3 text-xs text-foreground-muted">
-        <span>
+      {/* Inline metrics */}
+      <div className="flex items-center gap-3 mb-2 text-[11px] text-foreground-muted">
+        <span className="flex items-center gap-1">
+          <Activity size={10} className="text-foreground-muted" />
           <span className="text-foreground font-medium metric-number">{agent.sessionCountToday}</span>{" "}
-          sessions today
+          sessions
         </span>
         {agent.avgResponseMs > 0 && (
           <span>
@@ -163,35 +171,46 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between">
-        {/* Heartbeat */}
+      {/* Heartbeat + last activity */}
+      <div className="flex items-center justify-between mb-3 text-[10px] text-foreground-muted">
         {agent.heartbeat ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {agent.heartbeat.failures >= 3 ? (
-              <AlertTriangle size={12} className="text-warning" />
+              <AlertTriangle size={10} className="text-warning" />
             ) : (
-              <Heart size={12} className="text-danger animate-heartbeat" />
+              <Heart size={10} className="text-danger animate-heartbeat" />
             )}
-            <span className="text-xs text-foreground-muted">
-              {formatRelativeTime(agent.heartbeat.lastSuccessAt)}
-            </span>
+            <span>{formatRelativeTime(agent.heartbeat.lastSuccessAt)}</span>
           </div>
         ) : (
-          <span className="text-xs text-foreground-muted">No heartbeat</span>
+          <span>No heartbeat</span>
         )}
+        <span>{formatRelativeTime(agent.lastActivityAt)}</span>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-foreground-muted">
-            {formatRelativeTime(agent.lastActivityAt)}
-          </span>
-          <Link
-            href={`/agents/${agent.id}`}
-            className="text-xs text-accent hover:text-accent-deep font-medium transition-colors"
-          >
-            Details →
-          </Link>
-        </div>
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 border-t border-[rgba(255,255,255,0.06)] pt-2.5">
+        <Link
+          href={`/agents/${agent.id}`}
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
+        >
+          <MessageSquare size={11} />
+          Chat
+        </Link>
+        <Link
+          href={`/sessions?agent=${agent.id}`}
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
+        >
+          <ExternalLink size={11} />
+          Sessions
+        </Link>
+        <div className="flex-1" />
+        <Link
+          href={`/agents/${agent.id}`}
+          className="text-[11px] text-accent hover:text-accent-deep font-medium transition-colors"
+        >
+          Details →
+        </Link>
       </div>
     </motion.div>
   );

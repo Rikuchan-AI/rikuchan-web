@@ -32,6 +32,18 @@ function RagBadge({ gateway }: { gateway: GatewayMeta }) {
   );
 }
 
+function LatencyBadge({ latencyMs }: { latencyMs: number }) {
+  const rounded = Math.round(latencyMs);
+  const color =
+    rounded < 1000
+      ? "text-emerald-400"
+      : rounded <= 5000
+        ? "text-amber-400"
+        : "text-red-400";
+
+  return <span className={`mono text-[10px] ${color}`}>{rounded}ms</span>;
+}
+
 function GatewayInfo({ gateway }: { gateway: GatewayMeta }) {
   const parts: string[] = [];
   if (gateway.provider) parts.push(gateway.provider);
@@ -69,36 +81,48 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
   const isUser = message.role === "user";
   const gw = message.gateway;
 
-  return (
-    <div className={`group flex flex-col ${isUser ? "items-end" : "items-start"}`}>
-      {!isUser && (
-        <div className="mb-1 flex items-center gap-2">
-          <span className="mono text-[10px] uppercase tracking-[0.06em] text-foreground-muted">
-            assistant
-            {message.model && (
-              <span className="ml-1.5 normal-case tracking-normal text-foreground-muted/60">
-                {message.model}
-                {gw?.actualModel && gw.actualModel !== message.model && (
-                  <span className="text-foreground-muted/40">{" -> "}{gw.actualModel}</span>
-                )}
-              </span>
-            )}
-          </span>
-          {gw && <RagBadge gateway={gw} />}
-        </div>
-      )}
-      <div className="flex items-start gap-1">
-        {isUser && <CopyButton text={message.content} />}
-        <div
-          className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
-            isUser
-              ? "bg-accent text-accent-foreground rounded-br-sm"
-              : "rounded-bl-sm border border-line bg-surface-muted text-foreground"
-          }`}
-        >
-          {isUser ? (
+  if (isUser) {
+    return (
+      <div className="group flex flex-col items-end">
+        <div className="flex items-start gap-1">
+          <CopyButton text={message.content} />
+          <div className="max-w-[85%] rounded-lg rounded-br-sm bg-accent px-3 py-2.5 text-sm leading-relaxed text-accent-foreground">
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          ) : message.content ? (
+          </div>
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="mono text-[10px] text-foreground-muted">
+            {formatTime(message.timestamp)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex flex-col items-start">
+      <div className="max-w-[85%] overflow-hidden rounded-lg border border-[rgba(255,255,255,0.06)] bg-zinc-800/60">
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-[rgba(255,255,255,0.04)] bg-zinc-800/80 px-3 py-1.5">
+          {message.model && (
+            <span className="mono text-[10px] text-foreground-muted/60">
+              {message.model}
+              {gw?.actualModel && gw.actualModel !== message.model && (
+                <span className="text-foreground-muted/40">{" -> "}{gw.actualModel}</span>
+              )}
+            </span>
+          )}
+          {gw && <RagBadge gateway={gw} />}
+          {gw?.latencyMs && (
+            <span className="ml-auto">
+              <LatencyBadge latencyMs={gw.latencyMs} />
+            </span>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="px-3 py-2.5 text-sm leading-relaxed text-foreground">
+          {message.content ? (
             <div className="prose-sm prose-invert max-w-none [&_p]:mb-1 [&_p]:last:mb-0 [&_ul]:ml-3 [&_ul]:list-disc [&_ol]:ml-3 [&_ol]:list-decimal [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-surface [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-surface [&_pre]:p-2 [&_pre]:text-xs [&_strong]:font-semibold [&_a]:text-accent [&_a]:underline">
               <Markdown>{message.content}</Markdown>
             </div>
@@ -106,13 +130,21 @@ function MessageBubble({ message }: { message: DirectChatMessage }) {
             <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground-muted/50" />
           )}
         </div>
-        {!isUser && <CopyButton text={message.content} />}
-      </div>
-      <div className="mt-1 flex items-center gap-2">
-        <span className="mono text-[10px] text-foreground-muted">
-          {formatTime(message.timestamp)}
-        </span>
-        {!isUser && gw && <GatewayInfo gateway={gw} />}
+
+        {/* Footer */}
+        <div className="flex items-center gap-2 border-t border-[rgba(255,255,255,0.04)] px-3 py-1.5">
+          <span className="mono text-[9px] text-foreground-muted/50">
+            {formatTime(message.timestamp)}
+          </span>
+          {gw?.provider && (
+            <span className="mono text-[9px] text-foreground-muted/50">
+              {gw.provider}
+            </span>
+          )}
+          <span className="ml-auto">
+            <CopyButton text={message.content} />
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -170,22 +202,27 @@ function ModelSelector({
 
   return (
     <div className="relative shrink-0">
-      <select
-        value={currentModel}
-        onChange={(e) => onChange(e.target.value)}
-        className="mono appearance-none rounded-md border border-line bg-surface-strong py-1 pl-2 pr-6 text-[10px] text-foreground-muted transition-colors hover:border-accent/30 hover:text-foreground focus:border-accent/40 focus:outline-none"
-      >
-        {Object.entries(grouped).map(([provider, providerModels]) => (
-          <optgroup key={provider} label={provider}>
-            {providerModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <ChevronDown size={10} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+      <span className="mono mb-0.5 block text-[9px] uppercase tracking-[0.08em] text-foreground-muted/50">
+        Model
+      </span>
+      <div className="relative">
+        <select
+          value={currentModel}
+          onChange={(e) => onChange(e.target.value)}
+          className="mono appearance-none rounded-md border border-line bg-surface-strong py-1.5 pl-2.5 pr-7 text-xs text-foreground-muted transition-colors hover:border-accent/30 hover:text-foreground focus:border-accent/40 focus:outline-none"
+        >
+          {Object.entries(grouped).map(([provider, providerModels]) => (
+            <optgroup key={provider} label={provider}>
+              {providerModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted" />
+      </div>
     </div>
   );
 }

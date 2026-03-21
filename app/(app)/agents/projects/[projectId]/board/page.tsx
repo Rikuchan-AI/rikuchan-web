@@ -23,6 +23,22 @@ import { AgentHealthPanel } from "@/components/mc/projects/board/AgentHealthPane
 import { ApprovalQueue } from "@/components/mc/projects/board/ApprovalQueue";
 import { SprintPlanning } from "@/components/mc/projects/board/SprintPlanning";
 
+const COLUMN_COLORS: Record<string, string> = {
+  backlog: "border-t-zinc-500",
+  progress: "border-t-amber-400",
+  review: "border-t-blue-400",
+  blocked: "border-t-red-400",
+  done: "border-t-emerald-400",
+};
+
+const COLUMN_TEXT_COLORS: Record<string, string> = {
+  backlog: "text-zinc-500",
+  progress: "text-amber-400",
+  review: "text-blue-400",
+  blocked: "text-red-400",
+  done: "text-emerald-400",
+};
+
 // ─── New Task Form ───────────────────────────────────────────────────────────
 
 function NewTaskForm({
@@ -304,11 +320,11 @@ export default function BoardPage() {
               {TASK_COLUMNS.map((col) => {
                 const columnTasks = filteredTasks.filter((t) => t.status === col.id);
                 return (
-                  <div key={col.id} className="flex flex-col">
+                  <div key={col.id} className={`flex flex-col border-t-2 ${COLUMN_COLORS[col.id] ?? "border-t-zinc-600"} rounded-t-lg`}>
                     {/* Column header */}
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-3 flex items-center justify-between pt-2.5 px-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="mono text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                        <h3 className={`mono text-[10px] font-semibold uppercase tracking-wider ${COLUMN_TEXT_COLORS[col.id] ?? "text-foreground-muted"}`}>
                           {col.label}
                         </h3>
                         <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[9px] font-medium text-foreground-muted">
