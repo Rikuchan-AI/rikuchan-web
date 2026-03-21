@@ -193,14 +193,18 @@ export function syncHeartbeatToGateway(
           const currentConfig = msg.payload?.config as { agents?: { list?: Array<Record<string, unknown>> } } | undefined;
           const agentsList = currentConfig?.agents?.list ?? [];
 
-          const heartbeatPatch = {
-            enabled: config.enabled ?? true,
-            every: config.intervalSeconds,
-            ...(sessionKey ? { session: sessionKey } : {}),
-            ...(config.activeHours ? {
-              activeHours: { start: config.activeHours.start, end: config.activeHours.end },
-            } : {}),
-          };
+          // OpenClaw heartbeat schema: no "enabled" field.
+          // To disable: set every to null (removes it via merge-patch).
+          // To enable: set every as duration string e.g. "60s", "1m".
+          const heartbeatPatch = config.enabled === false
+            ? { every: null } // null removes the field → disables heartbeat
+            : {
+                every: `${config.intervalSeconds}s`,
+                ...(sessionKey ? { session: sessionKey } : {}),
+                ...(config.activeHours ? {
+                  activeHours: { start: config.activeHours.start, end: config.activeHours.end },
+                } : {}),
+              };
 
           const agentInList = agentsList.some((a) => (a.id as string) === agentId);
           console.log(`[HB] syncHeartbeatToGateway agentId=${agentId} found=${agentInList} listIds=${agentsList.map((a) => a.id).join(",")}`);
