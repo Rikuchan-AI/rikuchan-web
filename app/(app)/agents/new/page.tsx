@@ -77,24 +77,17 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 
 // ─── Step 1: Identity ────────────────────────────────────────────────────────
 
-const ROLE_SUGGESTIONS = [
-  // Engineering
-  "developer", "senior-developer", "tech-lead", "architect", "devops", "sre",
-  "qa", "security", "data-engineer", "ml-engineer", "ai-engineer",
-  // Product & Design
-  "product-manager", "gpm", "designer", "ux-researcher",
-  // Management
-  "engineering-manager", "em", "cto", "vp-engineering",
-  // Data & Analytics
-  "data-analyst", "bi-analyst", "data-scientist",
-  // Business
-  "marketing", "growth", "crm", "sales", "customer-success",
-  "legal", "compliance", "finance", "hr",
-  // Operations
-  "operations", "it", "infra", "information-systems",
-  // Other
-  "researcher", "documenter", "reviewer", "custom",
+const ROLE_CATEGORIES = [
+  { label: "Engineering", roles: ["developer", "senior-developer", "tech-lead", "architect", "devops", "sre", "qa", "security", "data-engineer", "ml-engineer", "ai-engineer"] },
+  { label: "Product & Design", roles: ["product-manager", "gpm", "designer", "ux-researcher"] },
+  { label: "Management", roles: ["engineering-manager", "em", "cto", "vp-engineering"] },
+  { label: "Data", roles: ["data-analyst", "bi-analyst", "data-scientist"] },
+  { label: "Business", roles: ["marketing", "growth", "crm", "sales", "customer-success", "legal", "compliance", "finance", "hr"] },
+  { label: "Operations", roles: ["operations", "it", "infra", "information-systems"] },
+  { label: "Other", roles: ["researcher", "documenter", "reviewer", "custom"] },
 ];
+
+const ROLE_SUGGESTIONS = ROLE_CATEGORIES.flatMap((c) => c.roles);
 
 const EMOJI_OPTIONS = [
   "🤖", "🦾", "🧠", "⚙️", "🔧", "🚀", "🛡", "🎯",
@@ -243,7 +236,27 @@ function StepIdentity({
       <div>
         <FieldLabel required>Role</FieldLabel>
         <RoleCombobox value={role} onChange={(v) => onChange("role", v)} />
-        <p className="mt-1 text-[10px] text-foreground-muted">Choose from suggestions or type a custom role</p>
+        <div className="mt-3 space-y-2">
+          {ROLE_CATEGORIES.map((cat) => (
+            <div key={cat.label} className="flex flex-wrap items-center gap-1.5">
+              <span className="mono text-[9px] uppercase tracking-widest text-foreground-muted/50 w-20 shrink-0">{cat.label}</span>
+              {cat.roles.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => onChange("role", r)}
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                    role === r
+                      ? "bg-accent-soft text-accent border border-accent/20"
+                      : "bg-surface-strong text-foreground-muted hover:text-foreground border border-transparent hover:border-line-strong"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div>
