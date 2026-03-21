@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import { Plus, MessageSquare } from "lucide-react";
+import { Plus, MessageSquare, Heart, Shield, Calendar } from "lucide-react";
 
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
@@ -15,9 +15,13 @@ import { TaskCard } from "@/components/mc/projects/TaskCard";
 import { TaskDrawer } from "@/components/mc/projects/board/TaskDrawer";
 import { BoardHeader } from "@/components/mc/projects/board/BoardHeader";
 import { AgentRosterPanel } from "@/components/mc/projects/board/AgentRosterPanel";
+import { CreateTaskModal } from "@/components/mc/projects/board/CreateTaskModal";
 import { EMChatSheet } from "@/components/mc/projects/chat/EMChatSheet";
 import { TeamChat } from "@/components/mc/projects/board/TeamChat";
 import { ActivityStream } from "@/components/mc/projects/board/ActivityStream";
+import { AgentHealthPanel } from "@/components/mc/projects/board/AgentHealthPanel";
+import { ApprovalQueue } from "@/components/mc/projects/board/ApprovalQueue";
+import { SprintPlanning } from "@/components/mc/projects/board/SprintPlanning";
 
 // ─── New Task Form ───────────────────────────────────────────────────────────
 
@@ -124,15 +128,51 @@ export default function BoardPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showEMChat, setShowEMChat] = useState(false);
   const [showTeamChat, setShowTeamChat] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [activityCollapsed, setActivityCollapsed] = useState(true);
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskColumn, setNewTaskColumn] = useState<TaskStatus | undefined>();
   const [operationMode, setOperationMode] = useState<OperationMode>("supervised");
   const [search, setSearch] = useState("");
   const [blockedOnly, setBlockedOnly] = useState(false);
+  const [showHealth, setShowHealth] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
+  const [showSprintPlanning, setShowSprintPlanning] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const leadAgent = project?.roster.find((m) => m.role === "lead");
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
+
+  const STALE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
+
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key) {
+        case "n":
+          setShowCreateModal(true);
+          break;
+        case "f":
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case "Escape":
+          if (selectedTaskId) setSelectedTaskId(null);
+          else if (showEMChat) setShowEMChat(false);
+          else if (showTeamChat) setShowTeamChat(false);
+          else if (showHealth) setShowHealth(false);
+          else if (showApprovals) setShowApprovals(false);
+          else if (showSprintPlanning) setShowSprintPlanning(false);
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedTaskId, showEMChat, showTeamChat, showHealth, showApprovals, showSprintPlanning]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -192,7 +232,7 @@ export default function BoardPage() {
             leadAgentOnline={true}
             operationMode={operationMode}
             onModeChange={setOperationMode}
-            onNewTask={() => { setNewTaskColumn(undefined); setShowNewTask(true); }}
+            onNewTask={() => setShowCreateModal(true)}
             onEMChat={() => setShowEMChat(true)}
             search={search}
             onSearchChange={setSearch}
@@ -208,13 +248,36 @@ export default function BoardPage() {
           <MessageSquare size={12} className="text-accent" />
           <span className="hidden xl:inline">Team Chat</span>
         </button>
+        <button
+          onClick={() => setShowHealth(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+          title="Agent Health"
+        >
+          <Heart size={14} />
+        </button>
+        <button
+          onClick={() => setShowApprovals(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+          title="Approval Queue"
+        >
+          <Shield size={14} />
+        </button>
+        <button
+          onClick={() => setShowSprintPlanning(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+          title="Sprint Planning"
+        >
+          <Calendar size={14} />
+        </button>
       </div>
 
-      {/* New task form */}
-      {showNewTask && !newTaskColumn && (
-        <div className="mt-3">
-          <NewTaskForm projectId={projectId} onClose={() => setShowNewTask(false)} />
-        </div>
+      {/* Create Task Modal (from header button) */}
+      {showCreateModal && (
+        <CreateTaskModal
+          projectId={projectId}
+          roster={project.roster}
+          onClose={() => setShowCreateModal(false)}
+        />
       )}
 
       {/* 3-panel layout */}
@@ -295,6 +358,11 @@ export default function BoardPage() {
                                     ref={dragProvided.innerRef}
                                     {...dragProvided.draggableProps}
                                     {...dragProvided.dragHandleProps}
+                                    className={
+                                      task.status !== "done" && task.updatedAt < Date.now() - STALE_THRESHOLD
+                                        ? "rounded-lg ring-1 ring-amber-400/30"
+                                        : undefined
+                                    }
                                   >
                                     <TaskCard
                                       task={task}
@@ -345,6 +413,25 @@ export default function BoardPage() {
       {/* Team Chat overlay */}
       {showTeamChat && (
         <TeamChat projectId={projectId} onClose={() => setShowTeamChat(false)} />
+      )}
+
+      {/* Agent Health overlay */}
+      {showHealth && project && (
+        <AgentHealthPanel
+          roster={project.roster}
+          tasks={tasks}
+          onClose={() => setShowHealth(false)}
+        />
+      )}
+
+      {/* Approval Queue overlay */}
+      {showApprovals && (
+        <ApprovalQueue onClose={() => setShowApprovals(false)} />
+      )}
+
+      {/* Sprint Planning overlay */}
+      {showSprintPlanning && (
+        <SprintPlanning projectId={projectId} onClose={() => setShowSprintPlanning(false)} />
       )}
     </div>
   );
