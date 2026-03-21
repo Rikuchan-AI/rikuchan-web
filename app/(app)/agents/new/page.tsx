@@ -176,14 +176,26 @@ function StepIdentity({
 
       <div>
         <FieldLabel required>Role</FieldLabel>
-        <input
-          type="text"
-          list="role-suggestions"
-          value={role}
-          onChange={(e) => onChange("role", e.target.value)}
-          placeholder="developer, devops, qa, designer..."
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            list="role-suggestions"
+            value={role}
+            onChange={(e) => onChange("role", e.target.value)}
+            placeholder="developer, devops, qa, designer..."
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:border-accent/50"
+          />
+          {role && (
+            <button
+              type="button"
+              onClick={() => onChange("role", "")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted/50 hover:text-foreground-muted transition-colors"
+              aria-label="Clear role"
+            >
+              ×
+            </button>
+          )}
+        </div>
         <datalist id="role-suggestions">
           {ROLE_SUGGESTIONS.map((r) => <option key={r} value={r} />)}
         </datalist>
