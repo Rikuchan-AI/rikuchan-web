@@ -238,6 +238,7 @@ export default function BoardPage() {
             onSearchChange={setSearch}
             blockedOnly={blockedOnly}
             onBlockedOnlyChange={setBlockedOnly}
+            searchInputRef={searchInputRef}
           />
         </div>
         <button

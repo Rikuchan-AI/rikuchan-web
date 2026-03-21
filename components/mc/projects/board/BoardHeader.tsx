@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { Crown, Plus, Search, Filter } from "lucide-react";
 import type { Project } from "@/lib/mc/types-project";
 import type { OperationMode } from "@/lib/mc/pipeline-governance";
@@ -16,6 +17,7 @@ interface BoardHeaderProps {
   onSearchChange: (value: string) => void;
   blockedOnly: boolean;
   onBlockedOnlyChange: (value: boolean) => void;
+  searchInputRef?: RefObject<HTMLInputElement | null>;
 }
 
 const MODE_CONFIG: Record<OperationMode, { label: string; color: string; activeColor: string }> = {
@@ -36,6 +38,7 @@ export function BoardHeader({
   onSearchChange,
   blockedOnly,
   onBlockedOnlyChange,
+  searchInputRef,
 }: BoardHeaderProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-line pb-4">
@@ -88,6 +91,7 @@ export function BoardHeader({
       <div className="relative">
         <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
         <input
+          ref={searchInputRef}
           type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
