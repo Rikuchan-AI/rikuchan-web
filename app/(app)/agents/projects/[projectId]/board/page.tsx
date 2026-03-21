@@ -7,6 +7,7 @@ import type { DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
 
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
+import { RikuPageLoader } from "@/components/shared/riku-loader";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
 import { syncHeartbeatToGateway } from "@/lib/mc/heartbeat-integration";
@@ -142,6 +143,7 @@ function NewTaskForm({
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProjectsStore(selectProjectById(projectId));
+  const hydrated = useProjectsStore((s) => s._hydrated);
   const tasks = useProjectTasks(projectId);
   const moveTask = useProjectsStore((s) => s.moveTask);
 
@@ -275,6 +277,10 @@ export default function BoardPage() {
     setLifecycleLoading(false);
     if (!result.ok) console.error("[Board] Resume failed:", result.error);
   };
+
+  if (!hydrated) {
+    return <RikuPageLoader message="LOADING BOARD..." />;
+  }
 
   if (!project) {
     return (
