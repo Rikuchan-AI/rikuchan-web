@@ -197,7 +197,7 @@ function StepIdentity({
               className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
               aria-label="Clear role"
             >
-              <X size={13} />
+              <X size={13} strokeWidth={2.5} />
             </button>
           )}
         </div>
@@ -1359,7 +1359,6 @@ export default function NewAgentPage() {
           disabled={step === 1}
           className="flex items-center gap-2 h-10 px-4 rounded-lg border border-line-strong text-sm font-medium text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <ArrowLeft size={14} />
           Back
         </button>
 
