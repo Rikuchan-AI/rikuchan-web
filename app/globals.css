@@ -87,6 +87,10 @@
   border-color: var(--line);
 }
 
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }

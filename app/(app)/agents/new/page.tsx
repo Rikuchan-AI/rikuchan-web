@@ -184,7 +184,7 @@ function StepIdentity({
             value={role}
             onChange={(e) => onChange("role", e.target.value)}
             placeholder="developer, devops, qa, designer..."
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-16 text-sm text-foreground focus:outline-none focus:border-accent/50"
           />
           {/* Covers the native datalist arrow + custom chevron with hover */}
           <div className="pointer-events-none absolute right-0 top-px bottom-px w-10 rounded-r-md bg-surface-strong flex items-center justify-end pr-3">
