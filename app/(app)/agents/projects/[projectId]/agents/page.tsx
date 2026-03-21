@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
-  Crown, FileText, Paperclip, X, ChevronDown,
-  ChevronRight, Plus, Upload, UserMinus,
+  Crown, FileText, X, ChevronDown,
+  ChevronRight, Plus, UserMinus,
 } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
@@ -12,6 +12,7 @@ import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
 import type { RosterMember, RosterContextFile, RosterRole } from "@/lib/mc/types-project";
 import { ROLE_DEFAULT_PERMISSIONS, ROLE_DEFAULT_HEARTBEAT } from "@/lib/mc/types-project";
+import { FileDropzone } from "@/components/shared/file-dropzone";
 
 // ─── Context overlay editor ────────────────────────────────────────────────────
 
@@ -25,32 +26,6 @@ function ContextEditor({
   const [overlay, setOverlay] = useState(member.contextOverlay ?? "");
   const [files, setFiles] = useState<RosterContextFile[]>(member.contextFiles ?? []);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const uploaded = e.target.files;
-    if (!uploaded) return;
-    Array.from(uploaded).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const content = ev.target?.result as string;
-        const newFile: RosterContextFile = {
-          id: `ctx-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-          name: file.name,
-          content,
-          mimeType: file.type,
-          addedAt: Date.now(),
-        };
-        setFiles((prev) => [...prev, newFile]);
-      };
-      reader.readAsText(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -80,54 +55,15 @@ function ContextEditor({
         </p>
       </div>
 
-      {/* Context files */}
       <div>
         <label className="mono text-[10px] uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
-          Context Files ({files.length})
+          Context Files {files.length > 0 && `(${files.length})`}
         </label>
-
-        {files.length > 0 && (
-          <div className="space-y-1 mb-2">
-            {files.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center justify-between rounded-md border border-line bg-surface-strong px-3 py-1.5"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Paperclip size={11} className="text-foreground-muted shrink-0" />
-                  <span className="text-xs text-foreground truncate">{f.name}</span>
-                  <span className="text-[10px] text-foreground-muted shrink-0">
-                    {(f.content.length / 1024).toFixed(1)}KB
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeFile(f.id)}
-                  className="text-foreground-muted hover:text-danger transition-colors ml-2 shrink-0"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".md,.txt,.json,.yaml,.yml,.ts,.js,.py,.go,.rb,.sh,.toml,.env.example,.csv"
-          onChange={handleFileUpload}
-          className="sr-only"
-          id={`file-upload-${member.agentId}`}
+        <FileDropzone
+          files={files}
+          onChange={setFiles}
+          id={`ctx-files-${member.agentId}`}
         />
-        <label
-          htmlFor={`file-upload-${member.agentId}`}
-          className="flex items-center gap-2 w-fit cursor-pointer h-8 px-3 rounded-lg border border-dashed border-line hover:border-accent/40 text-xs text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <Upload size={12} />
-          Upload files
-        </label>
         <p className="mt-1 text-[10px] text-foreground-muted">
           Markdown, code, specs, YAML — text files only. Summarized in the prompt.
         </p>
