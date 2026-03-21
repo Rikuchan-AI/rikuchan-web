@@ -34,7 +34,7 @@ export function ProjectCard({ project, group, index = 0 }: ProjectCardProps) {
       custom={index}
     >
       <Link
-        href={`/projects/${project.id}`}
+        href={`/agents/projects/${project.id}`}
         className="block rounded-lg border border-line bg-surface p-5 glow-card transition-all duration-300"
       >
         {/* Header: status badge + name */}
