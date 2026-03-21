@@ -98,6 +98,7 @@ interface GatewayStore {
   approveAction: (agentId: string) => void;
   addLog: (entry: LogEntry) => void;
   updateAgent: (agentId: string, updates: Partial<Agent>) => void;
+  removeAgent: (agentId: string) => void;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1024,6 +1025,12 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   updateAgent: (agentId: string, updates: Partial<Agent>) => {
     set((s) => ({
       agents: s.agents.map((a) => (a.id === agentId ? { ...a, ...updates } : a)),
+    }));
+  },
+
+  removeAgent: (agentId: string) => {
+    set((s) => ({
+      agents: s.agents.filter((a) => a.id !== agentId),
     }));
   },
 }));

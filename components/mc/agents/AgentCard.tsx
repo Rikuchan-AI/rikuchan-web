@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   MoreVertical,
@@ -13,11 +14,14 @@ import {
   AlertTriangle,
   MessageSquare,
   Activity,
+  Trash2,
 } from "lucide-react";
 import type { Agent } from "@/lib/mc/types";
 import { AgentStatusBadge } from "./AgentStatusBadge";
 import { StatusDot } from "@/components/mc/ui/StatusDot";
 import { formatRelativeTime } from "@/lib/mc/mc-utils";
+import { deleteAgentViaGateway } from "@/lib/mc/agent-files";
+import { useGatewayStore } from "@/lib/mc/gateway-store";
 
 const statusBorderColor: Record<string, string> = {
   online:   "#34d399",
@@ -55,6 +59,24 @@ interface AgentCardProps {
 
 export function AgentCard({ agent, index = 0 }: AgentCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const router = useRouter();
+  const removeAgent = useGatewayStore((s) => s.removeAgent);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteAgentViaGateway(agent.id);
+    setDeleting(false);
+    if (result.ok) {
+      removeAgent(agent.id);
+      router.refresh();
+    } else {
+      setDeleteError(result.error ?? "Failed to delete agent");
+    }
+  }
 
   const borderColor = statusBorderColor[agent.status] ?? "transparent";
   const glow = statusGlow[agent.status];
@@ -137,6 +159,13 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
                 >
                   <Settings size={13} /> Configurar
                 </Link>
+                <div className="my-1 border-t border-line" />
+                <button
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors w-full text-left"
+                  onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                >
+                  <Trash2 size={13} /> Deletar agente
+                </button>
               </div>
             )}
           </div>
@@ -212,6 +241,34 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
           Details →
         </Link>
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg bg-surface/95 backdrop-blur-sm border border-danger/30 p-4 gap-3">
+          <Trash2 size={20} className="text-danger" />
+          <p className="text-sm font-medium text-foreground text-center">Deletar <span className="text-danger">{agent.name}</span>?</p>
+          <p className="text-[11px] text-foreground-muted text-center">Essa ação é irreversível. Todos os arquivos e configurações do agente serão removidos.</p>
+          {deleteError && (
+            <p className="text-[11px] text-danger text-center">{deleteError}</p>
+          )}
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
+              disabled={deleting}
+              className="flex-1 rounded-md border border-line px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 rounded-md bg-danger/10 border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
+            >
+              {deleting ? "Deletando..." : "Confirmar"}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

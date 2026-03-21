@@ -9,26 +9,11 @@ import {
 } from "@/lib/mc/models";
 import { syncHeartbeatDefaultsToGateway } from "@/lib/mc/heartbeat-integration";
 import { toast } from "@/components/shared/toast";
-import { Star, Info } from "lucide-react";
-import type { ModelGroup } from "@/lib/mc/types";
-import type { FreeModelEntry } from "@/lib/mc/free-models";
+import { Star, Info, ChevronDown, Search } from "lucide-react";
+import { SkeletonList } from "@/components/shared/skeleton";
+import { getFreeModelsFromConfig } from "@/lib/mc/agent-files";
 
-function filterGatewayGroupsByFreeIds(groups: ModelGroup[], freeIds: Set<string>) {
-  return groups
-    .map((group) => ({
-      provider: group.provider,
-      models: group.models.filter((model) => freeIds.has(model.id)),
-    }))
-    .filter((group) => group.models.length > 0);
-}
-
-export function HeartbeatModelSelector({
-  freeModels,
-  freeModelsLoading,
-}: {
-  freeModels: FreeModelEntry[];
-  freeModelsLoading: boolean;
-}) {
+export function HeartbeatModelSelector() {
   const heartbeatConfig = useGatewayStore((s) => s.heartbeatConfig);
   const gatewayModels = useGatewayStore((s) => s.availableModels);
   const connectionStatus = useGatewayStore((s) => s.status);
@@ -42,23 +27,44 @@ export function HeartbeatModelSelector({
   const [interval, setIntervalMs] = useState(heartbeatConfig.intervalMs);
   const [timeout, setTimeoutMs] = useState(heartbeatConfig.timeoutMs);
   const [saving, setSaving] = useState(false);
-  const freeModelIds = useMemo(() => new Set(freeModels.map((model) => model.id)), [freeModels]);
-  const freeModelRefs = useMemo(() => new Map(freeModels.map((model) => [model.id, model.ref])), [freeModels]);
+  const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+  const [configFreeGroups, setConfigFreeGroups] = useState<Array<{ provider: string; models: { id: string; label: string; note?: string; recommended?: boolean; rateLimit?: string }[] }> | null>(null);
+
+  useEffect(() => {
+    if (connectionStatus !== "connected") { setConfigFreeGroups(null); return; }
+    setConfigFreeGroups(null);
+    getFreeModelsFromConfig().then((res) => {
+      if (res.ok && res.groups) {
+        setConfigFreeGroups(res.groups.map((g) => ({
+          provider: g.provider,
+          models: g.models.map((m) => ({ id: m.id, label: m.name })),
+        })));
+      } else {
+        setConfigFreeGroups([]);
+      }
+    });
+  }, [connectionStatus]);
 
   const modelGroups = useMemo(() => {
-    if (gatewayModels.length === 0) {
-      return getHeartbeatModelGroups(gatewayModels);
-    }
-    if (freeModelsLoading) {
-      return [];
-    }
-    return filterGatewayGroupsByFreeIds(gatewayModels, freeModelIds);
-  }, [freeModelIds, freeModelsLoading, gatewayModels]);
+    // null = still loading, don't show fallback yet
+    if (configFreeGroups === null) return [];
+    if (configFreeGroups.length > 0) return configFreeGroups;
+    // config returned empty (no free models defined) → fallback to hardcoded
+    return getHeartbeatModelGroups([]);
+  }, [configFreeGroups]);
+
+  const filteredModelGroups = useMemo(() => {
+    if (!search.trim()) return modelGroups;
+    const q = search.toLowerCase();
+    return modelGroups
+      .map((g) => ({ ...g, models: g.models.filter((m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)) }))
+      .filter((g) => g.models.length > 0);
+  }, [modelGroups, search]);
   const availableModelIds = useMemo(
     () => modelGroups.flatMap((group) => group.models.map((model) => model.id)),
     [modelGroups]
   );
-  const isUsingRpcModels = gatewayModels.length > 0;
   const hasSelectableModels = availableModelIds.length > 0;
 
   useEffect(() => {
@@ -70,17 +76,10 @@ export function HeartbeatModelSelector({
   const handleSave = async () => {
     setSaving(true);
 
-    const selectedRef = freeModelRefs.get(selected);
     if (connectionStatus === "connected") {
-      if (!selectedRef) {
-        setSaving(false);
-        toast("error", `Modelo ${selected} não pôde ser resolvido no openclaw.json`);
-        return;
-      }
-
       expectGatewayRestart("heartbeat-model-update");
       const result = await syncHeartbeatDefaultsToGateway({
-        modelRef: selectedRef,
+        modelRef: selected,
         intervalMs: interval,
       });
 
@@ -171,7 +170,27 @@ export function HeartbeatModelSelector({
 
         {/* Model list */}
         <div className="rounded-lg border border-line overflow-hidden mb-4">
-          {hasSelectableModels ? modelGroups.map((group, gi) => (
+          {/* Search + collapse header */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-surface-muted border-b border-line">
+            <Search size={13} className="text-foreground-muted flex-shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setCollapsed(false); }}
+              placeholder="Buscar modelo..."
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-foreground-muted focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setCollapsed((v) => !v)}
+              className="flex items-center justify-center w-5 h-5 text-foreground-muted hover:text-foreground transition-colors"
+            >
+              <ChevronDown size={13} className={`transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+            </button>
+          </div>
+          {!collapsed && (configFreeGroups === null ? (
+            <div className="px-4 py-3"><SkeletonList count={4} /></div>
+          ) : hasSelectableModels ? filteredModelGroups.map((group, gi) => (
             <div key={group.provider}>
               {gi > 0 && <div className="border-t border-line" />}
               <div className="px-4 py-2 bg-surface-muted">
@@ -225,13 +244,11 @@ export function HeartbeatModelSelector({
             </div>
           )) : (
             <div className="px-4 py-5 text-sm text-foreground-muted">
-              {isUsingRpcModels
-                ? freeModelIds === null
-                  ? "Carregando catálogo de modelos free do OpenClaw…"
-                  : "O gateway respondeu ao models.list, mas nenhum dos modelos retornados está marcado como free no openclaw.json."
+              {gatewayModels.length > 0
+                ? "Nenhum modelo com custo 0 encontrado no gateway."
                 : "Nenhum modelo disponível para heartbeat."}
             </div>
-          )}
+          ))}
         </div>
 
         {/* Info banner */}

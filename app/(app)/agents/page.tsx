@@ -10,6 +10,7 @@ import { LivePulse } from "@/components/mc/ui/LivePulse";
 
 export default function AgentsPage() {
   const agents = useGatewayStore((s) => s.agents);
+  const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   const status = useGatewayStore((s) => s.status);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
   const configUrl = useGatewayStore((s) => s.config.url);
@@ -73,7 +74,7 @@ export default function AgentsPage() {
         </div>
       )}
 
-      <AgentGrid agents={agents} />
+      <AgentGrid agents={agents} loading={isConnected && !agentsLoaded} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 export function formatRelativeTime(timestamp: number): string {
+  if (!timestamp || timestamp < 1000000000000) return "nunca";
   const diff = Date.now() - timestamp;
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);

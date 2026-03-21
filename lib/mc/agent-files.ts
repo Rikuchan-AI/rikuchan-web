@@ -545,3 +545,119 @@ export function patchAgentDefaults(params: {
     ws.send(JSON.stringify({ type: "req", id: getId, method: "config.get", params: {} }));
   });
 }
+
+// ─── Delete agent ────────────────────────────────────────────────────────────
+
+export function deleteAgentViaGateway(agentId: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const store = useGatewayStore.getState();
+    const ws = store._ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      resolve({ ok: false, error: "Gateway not connected" });
+      return;
+    }
+
+    const id = `delete-agent-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
+    const timeout = setTimeout(() => {
+      unregisterExternalRpcResponseId(id);
+      resolve({ ok: false, error: "Request timed out" });
+    }, 10000);
+
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "res" && msg.id === id) {
+          ws.removeEventListener("message", handler);
+          clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
+          if (msg.ok) {
+            resolve({ ok: true });
+          } else {
+            const err = msg.error as { message?: string } | undefined;
+            resolve({ ok: false, error: err?.message ?? "Unknown error" });
+          }
+        }
+      } catch { /* ignore */ }
+    };
+
+    ws.addEventListener("message", handler);
+    ws.send(JSON.stringify({ type: "req", id, method: "agents.delete", params: { agentId } }));
+  });
+}
+
+// ─── Get free models from config ─────────────────────────────────────────────
+
+export type FreeModelEntry = {
+  provider: string;
+  id: string;
+  name: string;
+  contextWindow?: number;
+  maxTokens?: number;
+};
+
+export function getFreeModelsFromConfig(): Promise<{ ok: boolean; groups?: Array<{ provider: string; models: FreeModelEntry[] }>; error?: string }> {
+  return new Promise((resolve) => {
+    const store = useGatewayStore.getState();
+    const ws = store._ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      resolve({ ok: false, error: "Gateway not connected" });
+      return;
+    }
+
+    const id = `config-get-free-models-${Date.now()}`;
+    const timeout = setTimeout(() => resolve({ ok: false, error: "Request timed out" }), 10000);
+
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== "res" || msg.id !== id) return;
+        ws.removeEventListener("message", handler);
+        clearTimeout(timeout);
+
+        if (!msg.ok) {
+          resolve({ ok: false, error: "Failed to get config" });
+          return;
+        }
+
+        type ProviderModels = {
+          models?: Array<{
+            id: string;
+            name?: string;
+            contextWindow?: number;
+            maxTokens?: number;
+            cost?: { input?: number; output?: number };
+          }>;
+        };
+        const providers = msg.payload?.config?.models?.providers as Record<string, ProviderModels> | undefined;
+        if (!providers) {
+          resolve({ ok: true, groups: [] });
+          return;
+        }
+
+        const groups: Array<{ provider: string; models: FreeModelEntry[] }> = [];
+        for (const [providerKey, providerCfg] of Object.entries(providers)) {
+          const freeModels = (providerCfg.models ?? []).filter(
+            (m) => m.cost != null && m.cost.input === 0 && m.cost.output === 0
+          );
+          if (freeModels.length > 0) {
+            groups.push({
+              provider: providerKey,
+              models: freeModels.map((m) => ({
+                provider: providerKey,
+                id: m.id,
+                name: m.name ?? m.id,
+                contextWindow: m.contextWindow,
+                maxTokens: m.maxTokens,
+              })),
+            });
+          }
+        }
+        resolve({ ok: true, groups });
+      } catch { /* ignore */ }
+    };
+
+    ws.addEventListener("message", handler);
+    ws.send(JSON.stringify({ type: "req", id, method: "config.get", params: {} }));
+  });
+}

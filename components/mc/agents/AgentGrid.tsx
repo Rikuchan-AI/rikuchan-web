@@ -5,14 +5,20 @@ import { Users } from "lucide-react";
 import type { Agent } from "@/lib/mc/types";
 import { AgentCard } from "./AgentCard";
 import { EmptyState } from "@/components/shared/empty-state";
+import { SkeletonGrid } from "@/components/shared/skeleton";
 
 interface AgentGridProps {
   agents: Agent[];
   limit?: number;
+  loading?: boolean;
 }
 
-export function AgentGrid({ agents, limit }: AgentGridProps) {
+export function AgentGrid({ agents, limit, loading }: AgentGridProps) {
   const displayed = limit ? agents.slice(0, limit) : agents;
+
+  if (loading && displayed.length === 0) {
+    return <SkeletonGrid count={6} />;
+  }
 
   if (displayed.length === 0) {
     return (

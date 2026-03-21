@@ -54,7 +54,7 @@ export function gatewayModelsToGroups(
       contextWindow: m.contextWindow,
       inputCost: m.cost?.input,
       outputCost: m.cost?.output,
-      freeTier: m.freeTier ?? ((m.cost?.input ?? 0) === 0 && (m.cost?.output ?? 0) === 0),
+      freeTier: m.freeTier ?? (m.cost != null && m.cost.input === 0 && m.cost.output === 0),
     });
   }
   return Array.from(groups.entries()).map(([provider, models]) => ({ provider, models }));
