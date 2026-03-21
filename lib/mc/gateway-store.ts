@@ -590,6 +590,51 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
             break;
           }
 
+          case "chat": {
+            if (payload) {
+              const chatSessionKey = payload.sessionKey as string | undefined;
+              const state = payload.state as string | undefined;
+              const message = payload.message as { role?: string; content?: unknown } | undefined;
+              const runId = payload.runId as string | undefined;
+
+              if (chatSessionKey && runId) {
+                if (state === "final" && message?.role === "assistant") {
+                  // Extract text content from message
+                  let text = "";
+                  if (typeof message.content === "string") {
+                    text = message.content;
+                  } else if (Array.isArray(message.content)) {
+                    text = (message.content as Array<{ type?: string; text?: string }>)
+                      .filter((c) => c.type === "text")
+                      .map((c) => c.text ?? "")
+                      .join("");
+                  }
+
+                  if (text) {
+                    try {
+                      const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { receiveMessage: (k: string, m: import("./types-chat").ChatMessage) => void; setThinking: (k: string, v: boolean) => void } } };
+                      const chatStore = useChatStore.getState();
+                      chatStore.setThinking(chatSessionKey, false);
+                      chatStore.receiveMessage(chatSessionKey, {
+                        id: `agent-${runId}-${Date.now()}`,
+                        role: "agent",
+                        content: text,
+                        timestamp: Date.now(),
+                      });
+                    } catch { /* ignore */ }
+                  }
+                } else if (state === "final" || state === "error") {
+                  // Clear thinking state regardless
+                  try {
+                    const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
+                    useChatStore.getState().setThinking(chatSessionKey, false);
+                  } catch { /* ignore */ }
+                }
+              }
+            }
+            break;
+          }
+
           case "session_message": {
             if (payload) {
               const ps = getProjectsStore();

@@ -149,6 +149,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           idempotencyKey: `chat-${key}-${now}`,
         },
       }));
+
+      // Mark agent as thinking immediately after sending
+      get().setThinking(sessionKeyStr, true);
     }
 
     get()._persistToStorage();
