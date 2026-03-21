@@ -336,10 +336,15 @@ export async function activateProject(
     // Non-fatal: session can be opened by the next heartbeat
   }
 
-  // ── Step 5: Persist activation state ─────────────────────────────────────
+  // ── Step 5: Persist activation state + gateway agent ID ─────────────────
+
+  const updatedRoster = project.roster.map((m) =>
+    m.agentId === lead.agentId ? { ...m, gatewayAgentId: effectiveAgentId } : m,
+  );
 
   await store.updateProject(projectId, {
     status: "active",
+    roster: updatedRoster,
   });
 
   onStep?.("done");
@@ -359,11 +364,13 @@ export async function pauseProject(projectId: string): Promise<ActivationResult>
   const lead = project?.roster.find((m) => m.role === "lead");
   if (!project || !lead) return { ok: false, error: "Project or lead not found" };
 
+  const leadGwId = lead.gatewayAgentId ?? lead.agentId;
+
   if (gwStore._ws?.readyState === WebSocket.OPEN) {
     const group = project.groupId
       ? store.groups.find((g) => g.id === project.groupId)
       : undefined;
-    const sessionKey = buildAgentSessionKey(lead.agentId, project, group?.agentId);
+    const sessionKey = buildAgentSessionKey(leadGwId, project, group?.agentId);
 
     await sendChatMessage(
       sessionKey,
@@ -372,7 +379,7 @@ export async function pauseProject(projectId: string): Promise<ActivationResult>
   }
 
   // Disable heartbeat — agent goes idle while project is paused
-  await syncHeartbeatToGateway(lead.agentId, LEAD_PAUSED_HEARTBEAT).catch(() => {
+  await syncHeartbeatToGateway(leadGwId, LEAD_PAUSED_HEARTBEAT).catch(() => {
     /* non-fatal */
   });
 
@@ -396,10 +403,11 @@ export async function resumeProject(projectId: string): Promise<ActivationResult
     return { ok: false, error: "Gateway not connected" };
   }
 
+  const leadGwId = lead.gatewayAgentId ?? lead.agentId;
   const group = project.groupId
     ? store.groups.find((g) => g.id === project.groupId)
     : undefined;
-  const sessionKey = buildAgentSessionKey(lead.agentId, project, group?.agentId);
+  const sessionKey = buildAgentSessionKey(leadGwId, project, group?.agentId);
 
   const tasks = store.tasks[projectId] ?? [];
   const inProgress = tasks.filter((t) => t.status === "progress");
@@ -424,7 +432,7 @@ Resume from where you left off. Address blocked tasks first, then continue with 
     ? { ...LEAD_ALWAYS_ON_HEARTBEAT, intervalSeconds: lead.heartbeatConfig.intervalSeconds }
     : LEAD_ALWAYS_ON_HEARTBEAT;
 
-  await syncHeartbeatToGateway(lead.agentId, hbConfig).catch(() => {
+  await syncHeartbeatToGateway(leadGwId, hbConfig).catch(() => {
     /* non-fatal */
   });
 

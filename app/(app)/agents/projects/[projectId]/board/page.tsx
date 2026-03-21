@@ -9,6 +9,8 @@ import { Plus } from "lucide-react";
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
+import { syncHeartbeatToGateway } from "@/lib/mc/heartbeat-integration";
+import type { RosterHeartbeatConfig } from "@/lib/mc/types-project";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
 import { canTransition, type OperationMode } from "@/lib/mc/pipeline-governance";
@@ -164,8 +166,23 @@ export default function BoardPage() {
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
 
   const gwAgents = useGatewayStore((s) => s.agents);
-  const leadGwAgent = gwAgents.find((a) => a.id === leadAgent?.agentId);
+  const gwConnected = useGatewayStore((s) => s.status === "connected");
+  // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
+  const leadGwId = leadAgent?.gatewayAgentId ?? leadAgent?.agentId;
+  const leadGwAgent = gwAgents.find((a) => a.id === leadGwId);
   const leadAgentOnline = leadGwAgent?.status === "online" || leadGwAgent?.status === "idle";
+
+  // Auto-restore heartbeat for active projects whose lead is offline
+  // (e.g. after gateway restart or first load after activation)
+  useEffect(() => {
+    if (!leadAgent || !gwConnected || project?.status !== "active" || leadAgentOnline) return;
+    const gwId = leadAgent.gatewayAgentId ?? leadAgent.agentId;
+    const hbConfig: RosterHeartbeatConfig = leadAgent.heartbeatConfig
+      ? { enabled: true, intervalSeconds: leadAgent.heartbeatConfig.intervalSeconds, focus: ["board-review", "agent-health", "task-progress"] }
+      : { enabled: true, intervalSeconds: 60, focus: ["board-review", "agent-health", "task-progress"] };
+    syncHeartbeatToGateway(gwId, hbConfig).catch(() => { /* non-fatal */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gwConnected, project?.status, leadAgentOnline]);
 
   const STALE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
 

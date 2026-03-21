@@ -139,6 +139,8 @@ export interface RosterMember {
   contextOverlay?: string;
   contextFiles?: RosterContextFile[];
   addedAt: number;
+  /** Gateway-assigned agent ID after activation (may differ from agentId if gateway generated it) */
+  gatewayAgentId?: string;
 }
 
 export type HeartbeatFocus =
