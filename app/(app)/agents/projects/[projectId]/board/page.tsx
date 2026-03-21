@@ -427,12 +427,32 @@ export default function BoardPage() {
 
       {/* Approval Queue overlay */}
       {showApprovals && (
-        <ApprovalQueue onClose={() => setShowApprovals(false)} />
+        <ApprovalQueue
+          tasks={tasks}
+          operationMode={operationMode}
+          onApprove={async (taskId) => {
+            await moveTask(projectId, taskId, "done");
+            setShowApprovals(false);
+          }}
+          onReject={async (taskId) => {
+            await moveTask(projectId, taskId, "progress");
+          }}
+          onClose={() => setShowApprovals(false)}
+        />
       )}
 
       {/* Sprint Planning overlay */}
-      {showSprintPlanning && (
-        <SprintPlanning projectId={projectId} onClose={() => setShowSprintPlanning(false)} />
+      {showSprintPlanning && project && (
+        <SprintPlanning
+          projectId={projectId}
+          tasks={tasks}
+          roster={project.roster}
+          onCreateSprint={() => {
+            // Sprint data will be persisted when Supabase sprint table is ready
+            setShowSprintPlanning(false);
+          }}
+          onClose={() => setShowSprintPlanning(false)}
+        />
       )}
     </div>
   );

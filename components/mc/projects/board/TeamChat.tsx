@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { X, MessageSquare } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, MessageSquare, Send } from "lucide-react";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
+import { useChatStore } from "@/lib/mc/chat-store";
+import { ChatBubble } from "@/components/mc/projects/chat/ChatBubble";
+import type { ChatMessage } from "@/lib/mc/types-chat";
 
 interface TeamChatProps {
   projectId: string;
@@ -11,9 +14,20 @@ interface TeamChatProps {
 
 export function TeamChat({ projectId, onClose }: TeamChatProps) {
   const project = useProjectsStore(selectProjectById(projectId));
+  const leadAgent = project?.roster.find((m) => m.role === "lead");
+
+  const session = useChatStore((s) =>
+    leadAgent ? s.getChatSession({ mode: "direct", projectId, agentId: leadAgent.agentId }) : undefined,
+  );
+  const sendMessage = useChatStore((s) => s.sendMessage);
+  const markRead = useChatStore((s) => s.markRead);
+
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Escape key closes
+  const messages = session?.messages ?? [];
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -22,14 +36,36 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (session) markRead(session.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
+
+  const handleSend = async () => {
+    const content = input.trim();
+    if (!content || sending || !leadAgent || !project) return;
+    setSending(true);
+    setInput("");
+    await sendMessage({
+      mode: "direct",
+      content,
+      agentId: leadAgent.agentId,
+      agentName: leadAgent.agentName,
+      projectId,
+    });
+    setSending(false);
+  };
+
   if (!project) return null;
 
   return (
     <>
-      {/* Overlay */}
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Sheet */}
       <div
         role="dialog"
         aria-label="Team Chat"
@@ -55,26 +91,42 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
           </button>
         </div>
 
-        {/* Messages area — empty state */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-surface-strong">
-              <MessageSquare size={20} className="text-foreground-muted" />
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-surface-strong">
+                <MessageSquare size={20} className="text-foreground-muted" />
+              </div>
+              <p className="text-sm text-foreground-muted max-w-[260px]">
+                Chat with the team. Messages are sent to the lead agent.
+              </p>
             </div>
-            <p className="text-sm text-foreground-muted max-w-[260px]">
-              Project-wide chat for all agents and humans. Coming soon.
-            </p>
-          </div>
+          )}
+
+          {messages.map((msg: ChatMessage) => (
+            <ChatBubble key={msg.id} message={msg} />
+          ))}
           <div ref={bottomRef} />
         </div>
 
-        {/* Input — disabled placeholder */}
-        <div className="border-t border-line p-4">
+        {/* Input */}
+        <div className="border-t border-line p-4 flex gap-2">
           <input
-            disabled
-            className="w-full rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground-muted placeholder:text-foreground-muted cursor-not-allowed opacity-60"
-            placeholder="Team chat coming soon"
+            className="flex-1 rounded-lg border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent/40 focus:outline-none transition-colors"
+            placeholder={leadAgent ? `Message ${leadAgent.agentName}...` : "No lead agent assigned"}
+            disabled={!leadAgent}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || sending || !leadAgent}
+            className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send size={14} />
+          </button>
         </div>
       </div>
 
