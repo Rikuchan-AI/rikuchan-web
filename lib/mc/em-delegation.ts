@@ -21,9 +21,22 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
   store.updateTask(project.id, task.id, { delegationStatus: "delegating" });
 
   const roster = project.roster.filter((m) => m.role !== "lead");
+
+  // If no non-lead agents, try to assign to the lead itself (solo project)
   if (roster.length === 0) {
-    store.updateTask(project.id, task.id, { delegationStatus: "em-unavailable" });
-    return null;
+    const leadOnly = project.roster.find((m) => m.role === "lead");
+    if (!leadOnly) {
+      store.updateTask(project.id, task.id, { delegationStatus: "em-unavailable" });
+      return null;
+    }
+    const decision: EMDecision = {
+      assignedAgentId: leadOnly.agentId,
+      assignedAgentName: leadOnly.agentName,
+      reason: "Only agent in roster (lead executes directly)",
+    };
+    applyDelegation(project.id, task.id, decision);
+    startTaskExecution(task, leadOnly, project);
+    return decision;
   }
 
   // If only one non-lead agent, assign directly

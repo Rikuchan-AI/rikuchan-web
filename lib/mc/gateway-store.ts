@@ -60,6 +60,8 @@ interface GatewayStore {
   expectedRestartReason?: "heartbeat-model-update";
 
   agents: Agent[];
+  /** Agents permanently registered in OpenClaw (from agents.list). Use this for roster selection. */
+  registeredAgents: Agent[];
   sessions: Session[];
   logs: LogEntry[];
   activity: ActivityEvent[];
@@ -234,6 +236,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   latencyMs: 0,
   reconnectAttempts: 0,
   agents: [],
+  registeredAgents: [],
   sessions: [],
   logs: [],
   activity: [],
@@ -408,6 +411,23 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
             if (res.ok) {
               const p = res.payload as { agents?: Array<Record<string, unknown>>; defaultId?: string } | undefined;
               if (p?.agents) {
+                // Build registeredAgents from agents.list (permanent OpenClaw agents)
+                const registered: Agent[] = p.agents.map((a) => {
+                  const identity = a.identity as { name?: string } | undefined;
+                  return {
+                    id: a.id as string,
+                    name: identity?.name ?? a.name as string ?? a.id as string,
+                    role: (a.isDefault as boolean) ? "Lead Agent" : "Agent",
+                    status: "idle",
+                    capabilities: [],
+                    permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
+                    sessionCountToday: 0,
+                    avgResponseMs: 0,
+                    lastActivityAt: Date.now(),
+                    uptime: 0,
+                  };
+                });
+
                 // Merge identity info into existing agents from health
                 set((s) => {
                   const updatedAgents = s.agents.map((agent) => {
@@ -436,7 +456,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
                       });
                     }
                   }
-                  return { agents: updatedAgents };
+                  return { agents: updatedAgents, registeredAgents: registered };
                 });
                 pushLog(set, get, "INFO", `Loaded ${p.agents.length} agent(s)`);
                 set({ agentsLoaded: true });
@@ -1028,6 +1048,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       reconnectAt: undefined,
       expectedRestartReason: undefined,
       agents: [],
+      registeredAgents: [],
       sessions: [],
       availableModels: [],
       agentsLoaded: false,

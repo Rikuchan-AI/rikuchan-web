@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
   Crown, FileText, X, ChevronDown,
-  ChevronRight, Plus, UserMinus,
+  ChevronRight, Plus, UserMinus, Check,
 } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
@@ -215,13 +215,15 @@ const ROLE_OPTIONS: { value: RosterRole; label: string }[] = [
 export default function RosterPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProjectsStore(selectProjectById(projectId));
-  const agents = useGatewayStore((s) => s.agents);
+  const agents = useGatewayStore((s) => s.registeredAgents);
   const updateProject = useProjectsStore((s) => s.updateProject);
 
   const [addOpen, setAddOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedRole, setSelectedRole] = useState<RosterRole>("developer");
   const [adding, setAdding] = useState(false);
+  const [agentDropOpen, setAgentDropOpen] = useState(false);
+  const [roleDropOpen, setRoleDropOpen] = useState(false);
   const addPanelRef = useRef<HTMLDivElement>(null);
 
   const roster = project?.roster ?? [];
@@ -267,6 +269,8 @@ export default function RosterPage() {
     setAddOpen(false);
     setSelectedAgentId("");
     setSelectedRole("developer");
+    setAgentDropOpen(false);
+    setRoleDropOpen(false);
   };
 
   const handleRemoveMember = async (agentId: string) => {
@@ -304,35 +308,79 @@ export default function RosterPage() {
                 Add to Roster
               </p>
 
-              {availableAgents.length === 0 ? (
+              {agents.length === 0 ? (
+                <p className="text-xs text-foreground-muted py-2">No agents available in OpenClaw.</p>
+              ) : availableAgents.length === 0 ? (
                 <p className="text-xs text-foreground-muted py-2">All agents are already in the roster.</p>
               ) : (
                 <>
-                  <div className="space-y-2">
+                  {/* Agent picker */}
+                  <div className="space-y-1.5">
                     <label className="text-[11px] text-foreground-muted">Agent</label>
-                    <select
-                      value={selectedAgentId}
-                      onChange={(e) => setSelectedAgentId(e.target.value)}
-                      className="w-full rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-                    >
-                      <option value="">Select agent…</option>
-                      {availableAgents.map((a) => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => { setAgentDropOpen((v) => !v); setRoleDropOpen(false); }}
+                        className="w-full flex items-center justify-between rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground hover:border-accent/50 transition-colors"
+                      >
+                        <span className={selectedAgentId ? "text-foreground" : "text-foreground-muted"}>
+                          {selectedAgentId
+                            ? availableAgents.find((a) => a.id === selectedAgentId)?.name ?? selectedAgentId
+                            : "Select agent…"}
+                        </span>
+                        <ChevronDown size={11} className="text-foreground-muted" />
+                      </button>
+                      {agentDropOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-md border border-line bg-surface shadow-xl py-1 max-h-48 overflow-y-auto">
+                          {availableAgents.map((a) => (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => { setSelectedAgentId(a.id); setAgentDropOpen(false); }}
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-surface-strong transition-colors"
+                            >
+                              <span className="text-foreground">{a.name}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[10px] ${a.status === "online" ? "text-success" : "text-foreground-muted"}`}>
+                                  {a.status}
+                                </span>
+                                {selectedAgentId === a.id && <Check size={10} className="text-accent" />}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Role picker */}
+                  <div className="space-y-1.5">
                     <label className="text-[11px] text-foreground-muted">Role</label>
-                    <select
-                      value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value as RosterRole)}
-                      className="w-full rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-                    >
-                      {ROLE_OPTIONS.map((r) => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => { setRoleDropOpen((v) => !v); setAgentDropOpen(false); }}
+                        className="w-full flex items-center justify-between rounded-md border border-line bg-surface-strong px-2.5 py-1.5 text-xs text-foreground hover:border-accent/50 transition-colors"
+                      >
+                        <span>{ROLE_OPTIONS.find((r) => r.value === selectedRole)?.label ?? selectedRole}</span>
+                        <ChevronDown size={11} className="text-foreground-muted" />
+                      </button>
+                      {roleDropOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-md border border-line bg-surface shadow-xl py-1">
+                          {ROLE_OPTIONS.map((r) => (
+                            <button
+                              key={r.value}
+                              type="button"
+                              onClick={() => { setSelectedRole(r.value); setRoleDropOpen(false); }}
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-surface-strong transition-colors"
+                            >
+                              <span className="text-foreground">{r.label}</span>
+                              {selectedRole === r.value && <Check size={10} className="text-accent" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <button

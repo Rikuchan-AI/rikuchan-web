@@ -71,7 +71,7 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
       <div
         role="dialog"
         aria-label="Team Chat"
-        className="fixed right-0 top-0 bottom-0 z-50 w-[440px] max-w-full bg-surface border-l border-line flex flex-col"
+        className="fixed right-0 top-0 bottom-0 z-50 w-1/2 max-w-full bg-surface border-l border-line flex flex-col"
         style={{ animation: "slideInRight 0.2s ease-out" }}
       >
         {/* Header */}

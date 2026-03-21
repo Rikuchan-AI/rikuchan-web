@@ -432,17 +432,16 @@ export default function BoardPage() {
           </DragDropContext>
         </div>
 
-        {/* Right: Task Drawer */}
-        {selectedTask && (
-          <div className="hidden w-[440px] shrink-0 overflow-y-auto rounded-lg border border-line bg-surface lg:block">
-            <TaskDrawer
-              task={selectedTask}
-              projectId={projectId}
-              onClose={() => setSelectedTaskId(null)}
-            />
-          </div>
-        )}
       </div>
+
+      {/* Task Drawer — overlay, does not affect board layout */}
+      {selectedTask && (
+        <TaskDrawer
+          task={selectedTask}
+          projectId={projectId}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
 
       {/* Activity Stream */}
       <ActivityStream
