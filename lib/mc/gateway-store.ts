@@ -408,7 +408,12 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
 
           // Extract health snapshot if available
           if (snapshot?.health) {
-            handleHealthPayload(snapshot.health as Record<string, unknown>);
+            const h = snapshot.health as Record<string, unknown>;
+            const ha = h.agents as Array<Record<string, unknown>> | undefined;
+            console.log("[Gateway] health snapshot agents:", JSON.stringify(ha?.map((a) => ({ id: a.agentId, hb: a.heartbeat }))));
+            handleHealthPayload(h);
+          } else {
+            console.log("[Gateway] no health snapshot in hello-ok");
           }
 
           // Request agents list for full details
