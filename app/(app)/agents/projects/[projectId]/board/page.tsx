@@ -1,18 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import type { DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
-import { useProjectsStore, useProjectTasks } from "@/lib/mc/projects-store";
+
+import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
+import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
+import { canTransition, type OperationMode } from "@/lib/mc/pipeline-governance";
+
 import { TaskCard } from "@/components/mc/projects/TaskCard";
-import type { Task, TaskPriority } from "@/lib/mc/types-project";
+import { TaskDrawer } from "@/components/mc/projects/board/TaskDrawer";
+import { BoardHeader } from "@/components/mc/projects/board/BoardHeader";
+import { AgentRosterPanel } from "@/components/mc/projects/board/AgentRosterPanel";
+import { EMChatSheet } from "@/components/mc/projects/chat/EMChatSheet";
+
+// ─── New Task Form ───────────────────────────────────────────────────────────
 
 function NewTaskForm({
   projectId,
+  defaultStatus,
   onClose,
 }: {
   projectId: string;
+  defaultStatus?: TaskStatus;
   onClose: () => void;
 }) {
   const createTask = useProjectsStore((s) => s.createTask);
@@ -30,7 +43,7 @@ function NewTaskForm({
       projectId,
       title: title.trim(),
       description: description.trim(),
-      status: "backlog",
+      status: defaultStatus ?? "backlog",
       priority,
       assignedAgentId: null,
       createdBy: "user",
@@ -53,7 +66,10 @@ function NewTaskForm({
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Task title"
         className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:border-accent/40 focus:outline-none"
-        onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) handleSubmit(); if (e.key === "Escape") onClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && title.trim()) handleSubmit();
+          if (e.key === "Escape") onClose();
+        }}
       />
       <textarea
         value={description}
@@ -79,10 +95,7 @@ function NewTaskForm({
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors"
-          >
+          <button onClick={onClose} className="px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors">
             Cancel
           </button>
           <button
@@ -90,7 +103,7 @@ function NewTaskForm({
             disabled={saving || !title.trim()}
             className="rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep disabled:opacity-50 transition-colors"
           >
-            {saving ? "Creating..." : "Create Task"}
+            {saving ? "Creating..." : "Create"}
           </button>
         </div>
       </div>
@@ -98,65 +111,212 @@ function NewTaskForm({
   );
 }
 
+// ─── Board Page ──────────────────────────────────────────────────────────────
+
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const project = useProjectsStore(selectProjectById(projectId));
   const tasks = useProjectTasks(projectId);
+  const moveTask = useProjectsStore((s) => s.moveTask);
+
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showEMChat, setShowEMChat] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskColumn, setNewTaskColumn] = useState<TaskStatus | undefined>();
+  const [operationMode, setOperationMode] = useState<OperationMode>("supervised");
+  const [search, setSearch] = useState("");
+  const [blockedOnly, setBlockedOnly] = useState(false);
+
+  const leadAgent = project?.roster.find((m) => m.role === "lead");
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId);
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (blockedOnly && t.status !== "blocked") return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!t.title.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [tasks, search, blockedOnly]);
+
+  const handleDragEnd = useCallback(
+    async (result: DropResult) => {
+      const { draggableId, destination } = result;
+      if (!destination) return;
+
+      const task = tasks.find((t) => t.id === draggableId);
+      if (!task) return;
+
+      const toStatus = destination.droppableId as TaskStatus;
+      if (task.status === toStatus) return;
+
+      const transitionResult = canTransition(task.status, toStatus, operationMode, "human", task);
+      if (!transitionResult.allowed) {
+        // TODO: replace with toast
+        console.warn("[Board] Transition denied:", transitionResult.reason);
+        return;
+      }
+
+      await moveTask(projectId, draggableId, toStatus);
+    },
+    [tasks, operationMode, moveTask, projectId],
+  );
+
+  const handleNewTaskInColumn = (status: TaskStatus) => {
+    setNewTaskColumn(status);
+    setShowNewTask(true);
+  };
+
+  if (!project) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-sm text-foreground-muted">Project not found</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="mono text-xs text-foreground-muted" style={{ letterSpacing: "0.12em" }}>
-          {tasks.length} TASKS
-        </p>
-        <button
-          onClick={() => setShowNewTask(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep transition-colors"
-        >
-          <Plus size={12} />
-          New Task
-        </button>
-      </div>
+    <div className="flex h-[calc(100vh-140px)] flex-col">
+      {/* Header */}
+      <BoardHeader
+        project={project}
+        leadAgentName={leadAgent?.agentName}
+        leadAgentOnline={true}
+        operationMode={operationMode}
+        onModeChange={setOperationMode}
+        onNewTask={() => { setNewTaskColumn(undefined); setShowNewTask(true); }}
+        onEMChat={() => setShowEMChat(true)}
+        search={search}
+        onSearchChange={setSearch}
+        blockedOnly={blockedOnly}
+        onBlockedOnlyChange={setBlockedOnly}
+      />
 
-      {showNewTask && (
-        <NewTaskForm projectId={projectId} onClose={() => setShowNewTask(false)} />
+      {/* New task form */}
+      {showNewTask && !newTaskColumn && (
+        <div className="mt-3">
+          <NewTaskForm projectId={projectId} onClose={() => setShowNewTask(false)} />
+        </div>
       )}
 
-      {/* Kanban columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {TASK_COLUMNS.map((col) => {
-          const columnTasks = tasks.filter((t) => t.status === col.id);
-          return (
-            <div key={col.id} className="space-y-3">
-              {/* Column header */}
-              <div className="flex items-center justify-between">
-                <h3
-                  className="mono text-xs uppercase text-foreground-muted font-semibold"
-                  style={{ letterSpacing: "0.12em" }}
-                >
-                  {col.label}
-                </h3>
-                <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[0.6rem] text-foreground-muted font-medium">
-                  {columnTasks.length}
-                </span>
-              </div>
+      {/* 3-panel layout */}
+      <div className="mt-4 flex flex-1 gap-3 overflow-hidden">
+        {/* Left: Agent Roster */}
+        <div className="hidden w-56 shrink-0 overflow-y-auto rounded-lg border border-line bg-surface lg:block">
+          <AgentRosterPanel
+            roster={project.roster}
+            tasks={tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              assignedAgentId: t.assignedAgentId,
+              status: t.status,
+            }))}
+            onSelectTask={setSelectedTaskId}
+          />
+        </div>
 
-              {/* Tasks */}
-              <div className="space-y-2 min-h-[100px]">
-                {columnTasks.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-line p-4 text-center">
-                    <p className="text-xs text-foreground-muted">No tasks</p>
+        {/* Center: Kanban Board */}
+        <div className="flex-1 overflow-x-auto">
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid h-full auto-cols-fr grid-flow-col gap-3" style={{ minWidth: "900px" }}>
+              {TASK_COLUMNS.map((col) => {
+                const columnTasks = filteredTasks.filter((t) => t.status === col.id);
+                return (
+                  <div key={col.id} className="flex flex-col">
+                    {/* Column header */}
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="mono text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                          {col.label}
+                        </h3>
+                        <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[9px] font-medium text-foreground-muted">
+                          {columnTasks.length}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleNewTaskInColumn(col.id)}
+                        className="flex h-5 w-5 items-center justify-center rounded text-foreground-muted/40 hover:bg-surface-strong hover:text-foreground-muted transition-colors"
+                      >
+                        <Plus size={10} />
+                      </button>
+                    </div>
+
+                    {/* In-column new task */}
+                    {showNewTask && newTaskColumn === col.id && (
+                      <div className="mb-2">
+                        <NewTaskForm
+                          projectId={projectId}
+                          defaultStatus={col.id}
+                          onClose={() => setShowNewTask(false)}
+                        />
+                      </div>
+                    )}
+
+                    {/* Droppable column */}
+                    <Droppable droppableId={col.id}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`flex-1 space-y-2 overflow-y-auto rounded-lg p-1.5 transition-colors ${
+                            snapshot.isDraggingOver
+                              ? "bg-accent/5 ring-1 ring-accent/20"
+                              : ""
+                          }`}
+                          style={{ minHeight: "100px" }}
+                        >
+                          {columnTasks.length === 0 && !snapshot.isDraggingOver ? (
+                            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-line">
+                              <p className="text-[10px] text-foreground-muted">No tasks</p>
+                            </div>
+                          ) : (
+                            columnTasks.map((task, index) => (
+                              <Draggable key={task.id} draggableId={task.id} index={index}>
+                                {(dragProvided, dragSnapshot) => (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    {...dragProvided.dragHandleProps}
+                                  >
+                                    <TaskCard
+                                      task={task}
+                                      isDragging={dragSnapshot.isDragging}
+                                      onClick={() => setSelectedTaskId(task.id)}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
                   </div>
-                ) : (
-                  columnTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} />
-                  ))
-                )}
-              </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </DragDropContext>
+        </div>
+
+        {/* Right: Task Drawer */}
+        {selectedTask && (
+          <div className="hidden w-[440px] shrink-0 overflow-y-auto rounded-lg border border-line bg-surface lg:block">
+            <TaskDrawer
+              task={selectedTask}
+              projectId={projectId}
+              onClose={() => setSelectedTaskId(null)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* EM Chat overlay */}
+      {showEMChat && project && (
+        <EMChatSheet projectId={projectId} onClose={() => setShowEMChat(false)} />
+      )}
     </div>
   );
 }
