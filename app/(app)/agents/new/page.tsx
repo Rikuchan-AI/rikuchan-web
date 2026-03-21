@@ -850,12 +850,85 @@ function SectionHeader({ label, open, onToggle }: { label: string; open: boolean
   );
 }
 
-function StepDefaults({ state, onChange }: {
+// ─── Workspace Files ─────────────────────────────────────────────────────────
+
+const STD_FILES: { key: string; name: string; required?: boolean; tooltip: string }[] = [
+  { key: "soulMd",      name: "SOUL.md",      required: true,  tooltip: "Character sheet: personality, tone, values, behavioral constraints. The only required file — injected first into context. Keep under 500 lines / 2000 words." },
+  { key: "agentsMd",    name: "AGENTS.md",    tooltip: "Operational procedures: boot sequence, workflows, checklists. Usually the largest file." },
+  { key: "identityMd",  name: "IDENTITY.md",  tooltip: "Routing metadata: name, ID, emoji, role label, personality theme. Short by design." },
+  { key: "userMd",      name: "USER.md",      tooltip: "Context about the human: preferences, style, timezone. Only loaded in main DM sessions — never in group chats." },
+  { key: "heartbeatMd", name: "HEARTBEAT.md", tooltip: "Periodic tasks with cron schedule or natural language. Checklist executed each thinking cycle." },
+  { key: "toolsMd",     name: "TOOLS.md",     tooltip: "Notes on available tools, SSH hosts, usage conventions and custom restrictions." },
+  { key: "memoryMd",    name: "MEMORY.md",    tooltip: "Curated long-term memory: iron-law rules and permanent facts. Only loaded in main DM sessions for security." },
+];
+
+const ADV_FILES: { key: string; name: string; tooltip: string }[] = [
+  { key: "bootMd",      name: "BOOT.md",      tooltip: "Startup hook — actions executed at the beginning of every session." },
+  { key: "bootstrapMd", name: "BOOTSTRAP.md", tooltip: "First-run onboarding. Automatically deleted after first use." },
+  { key: "workingMd",   name: "WORKING.md",   tooltip: "Persistent task state. Allows execution to resume after a gateway restart." },
+];
+
+function WorkspaceFilesSection({
+  includeFiles,
+  onToggle,
+}: {
+  includeFiles: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const FileRow = ({ file, required }: { file: typeof STD_FILES[0]; required?: boolean }) => (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-strong transition-colors">
+      <div className="flex items-center gap-2 min-w-0">
+        <code className="text-xs font-mono text-foreground font-medium">{file.name}</code>
+        {required && (
+          <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-accent-soft text-accent border border-accent/20">Required</span>
+        )}
+        <InfoTooltip text={file.tooltip} />
+      </div>
+      {!required && (
+        <Toggle checked={includeFiles[file.key] ?? false} onChange={() => onToggle(file.key)} />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] text-foreground-muted mb-2">Standard files — created in the agent workspace on creation.</p>
+      <div className="divide-y divide-line rounded-lg border border-line overflow-hidden">
+        {STD_FILES.map((f) => (
+          <FileRow key={f.key} file={f} required={f.required} />
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="flex items-center gap-1.5 pt-2 text-[11px] text-foreground-muted hover:text-foreground transition-colors"
+      >
+        <ChevronDown size={12} strokeWidth={2.5} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+        Advanced files
+      </button>
+
+      {showAdvanced && (
+        <div className="divide-y divide-line rounded-lg border border-line overflow-hidden">
+          {ADV_FILES.map((f) => (
+            <FileRow key={f.key} file={f} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StepDefaults({ state, onChange, includeFiles, onFileToggle }: {
   state: DefaultsState;
   onChange: <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => void;
+  includeFiles: Record<string, boolean>;
+  onFileToggle: (key: string) => void;
 }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    perAgent: true, behavior: true, streaming: false, context: false,
+    files: true, perAgent: true, behavior: true, streaming: false, context: false,
     performance: false, media: false, envelope: false, workspace: false, advanced: false,
   });
 
@@ -873,6 +946,14 @@ function StepDefaults({ state, onChange }: {
 
   return (
     <div className="space-y-0 divide-y divide-line rounded-xl border border-line bg-surface overflow-hidden">
+
+      {/* ── Workspace Files ── */}
+      <div className="p-4 space-y-3">
+        <SectionHeader label="Workspace Files" open={openSections.files} onToggle={() => toggle("files")} />
+        {openSections.files && (
+          <WorkspaceFilesSection includeFiles={includeFiles} onToggle={onFileToggle} />
+        )}
+      </div>
 
       {/* ── Per-Agent ── */}
       <div className="p-4 space-y-3">
@@ -1185,6 +1266,13 @@ export default function NewAgentPage() {
 
   // Step 5 — Defaults
   const [defaults, setDefaults] = useState<DefaultsState>(EMPTY_DEFAULTS);
+  const [includeFiles, setIncludeFiles] = useState<Record<string, boolean>>({
+    soulMd: true, agentsMd: true, identityMd: true, userMd: true,
+    heartbeatMd: true, toolsMd: false, memoryMd: false,
+    bootMd: false, bootstrapMd: true, workingMd: false,
+  });
+  const toggleFile = (key: string) =>
+    setIncludeFiles((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const handleDefaultsChange = <K extends keyof DefaultsState>(field: K, value: DefaultsState[K]) => {
     setDefaults((prev) => ({ ...prev, [field]: value }));
@@ -1242,13 +1330,16 @@ export default function NewAgentPage() {
     const bootstrapMd = generateBootstrapMd(displayName || name);
 
     const filesToWrite = [
-      { name: "IDENTITY.md",  content: identityMd },
-      { name: "SOUL.md",      content: resolvedSoulMd },
-      { name: "AGENTS.md",    content: resolvedAgentsMd },
-      { name: "HEARTBEAT.md", content: heartbeatMd },
-      { name: "USER.md",      content: userMd },
-      { name: "BOOTSTRAP.md", content: bootstrapMd },
-      ...(memoryMd ? [{ name: "MEMORY.md", content: memoryMd }] : []),
+      { name: "SOUL.md", content: resolvedSoulMd }, // always required
+      ...(includeFiles.identityMd  ? [{ name: "IDENTITY.md",  content: identityMd }] : []),
+      ...(includeFiles.agentsMd    ? [{ name: "AGENTS.md",    content: resolvedAgentsMd }] : []),
+      ...(includeFiles.heartbeatMd ? [{ name: "HEARTBEAT.md", content: heartbeatMd }] : []),
+      ...(includeFiles.userMd      ? [{ name: "USER.md",      content: userMd }] : []),
+      ...(includeFiles.bootstrapMd ? [{ name: "BOOTSTRAP.md", content: bootstrapMd }] : []),
+      ...(includeFiles.memoryMd && memoryMd ? [{ name: "MEMORY.md", content: memoryMd }] : []),
+      ...(includeFiles.toolsMd  ? [{ name: "TOOLS.md",   content: `# Tools\n\n<!-- Document available tools, SSH hosts, usage conventions and custom restrictions. -->\n` }] : []),
+      ...(includeFiles.bootMd   ? [{ name: "BOOT.md",    content: `# Boot\n\n<!-- Actions to execute at the start of each session. -->\n` }] : []),
+      ...(includeFiles.workingMd ? [{ name: "WORKING.md", content: `# Working\n\n<!-- Current task state — updated by the agent to persist work across restarts. -->\n` }] : []),
     ];
 
     for (const file of filesToWrite) {
@@ -1393,7 +1484,12 @@ export default function NewAgentPage() {
           />
         )}
         {step === 5 && (
-          <StepDefaults state={defaults} onChange={handleDefaultsChange} />
+          <StepDefaults
+            state={defaults}
+            onChange={handleDefaultsChange}
+            includeFiles={includeFiles}
+            onFileToggle={toggleFile}
+          />
         )}
 
         {error && (
