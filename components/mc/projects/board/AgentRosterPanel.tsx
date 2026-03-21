@@ -37,11 +37,15 @@ function AgentCard({
 
   const statusDot = isWorking
     ? "bg-emerald-400 animate-pulse"
-    : isOnline
-      ? "bg-emerald-400"
+    : status === "idle"
+      ? "bg-zinc-400"
       : status === "degraded"
         ? "bg-amber-400"
-        : "bg-foreground-muted";
+        : status === "error" || status === "offline"
+          ? "bg-red-400"
+          : isOnline
+            ? "bg-emerald-400"
+            : "bg-red-400";
 
   const initials = member.agentName
     .split(/\s+/)
@@ -58,7 +62,7 @@ function AgentCard({
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-strong text-[10px] font-semibold text-foreground-soft">
             {initials}
           </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface ${statusDot}`} />
+          <span className={`absolute -bottom-0.5 -right-0.5 h-[8px] w-[8px] rounded-full border-2 border-surface ${statusDot}`} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold text-foreground">{member.agentName}</p>

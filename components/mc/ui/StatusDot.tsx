@@ -3,12 +3,12 @@
 import type { AgentStatus } from "@/lib/mc/types";
 
 const statusColors: Record<AgentStatus, string> = {
-  online:   "#34d399",
-  idle:     "#fbbf24",
+  online:   "#34d399",  /* emerald-400 */
+  idle:     "#a1a1aa",  /* zinc-400 */
   thinking: "#a78bfa",
-  degraded: "#fb923c",
-  error:    "#f87171",
-  offline:  "#52525b",
+  degraded: "#fbbf24",  /* amber-400 */
+  error:    "#f87171",  /* red-400 */
+  offline:  "#f87171",  /* red-400 */
 };
 
 const statusLabels: Record<AgentStatus, string> = {
@@ -44,7 +44,7 @@ export function StatusDot({ status, size = 8, pulse = false }: StatusDotProps) {
         />
       )}
       <span
-        className="relative rounded-full block"
+        className={`relative rounded-full block${isPulsing ? " animate-pulse" : ""}`}
         style={{ width: size, height: size, backgroundColor: color }}
       />
     </span>

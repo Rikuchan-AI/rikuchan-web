@@ -3,12 +3,12 @@
 import type { AgentStatus } from "@/lib/mc/types";
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
-  online:   { label: "Online",    className: "bg-success-soft text-success border border-success/15" },
-  idle:     { label: "Idle",      className: "bg-warm-soft text-warm border border-warm/15" },
+  online:   { label: "Online",    className: "bg-emerald-400/10 text-emerald-400 border border-emerald-400/15" },
+  idle:     { label: "Idle",      className: "bg-zinc-400/10 text-zinc-400 border border-zinc-400/15" },
   thinking: { label: "Thinking",  className: "bg-[rgba(167,139,250,0.10)] text-[#a78bfa] border border-[rgba(167,139,250,0.15)]" },
-  degraded: { label: "Degraded",  className: "bg-[rgba(251,146,60,0.10)] text-[#fb923c] border border-[rgba(251,146,60,0.15)]" },
-  error:    { label: "Error",     className: "bg-danger-soft text-danger border border-danger/15" },
-  offline:  { label: "Offline",   className: "bg-surface-strong text-foreground-muted border border-line-strong" },
+  degraded: { label: "Degraded",  className: "bg-amber-400/10 text-amber-400 border border-amber-400/15" },
+  error:    { label: "Error",     className: "bg-red-400/10 text-red-400 border border-red-400/15" },
+  offline:  { label: "Offline",   className: "bg-red-400/10 text-red-400 border border-red-400/15" },
 };
 
 interface AgentStatusBadgeProps {
