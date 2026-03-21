@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import { Plus } from "lucide-react";
+import { Plus, MessageSquare } from "lucide-react";
 
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
@@ -16,6 +16,8 @@ import { TaskDrawer } from "@/components/mc/projects/board/TaskDrawer";
 import { BoardHeader } from "@/components/mc/projects/board/BoardHeader";
 import { AgentRosterPanel } from "@/components/mc/projects/board/AgentRosterPanel";
 import { EMChatSheet } from "@/components/mc/projects/chat/EMChatSheet";
+import { TeamChat } from "@/components/mc/projects/board/TeamChat";
+import { ActivityStream } from "@/components/mc/projects/board/ActivityStream";
 
 // ─── New Task Form ───────────────────────────────────────────────────────────
 
@@ -121,6 +123,8 @@ export default function BoardPage() {
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showEMChat, setShowEMChat] = useState(false);
+  const [showTeamChat, setShowTeamChat] = useState(false);
+  const [activityCollapsed, setActivityCollapsed] = useState(true);
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskColumn, setNewTaskColumn] = useState<TaskStatus | undefined>();
   const [operationMode, setOperationMode] = useState<OperationMode>("supervised");
@@ -180,19 +184,31 @@ export default function BoardPage() {
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
       {/* Header */}
-      <BoardHeader
-        project={project}
-        leadAgentName={leadAgent?.agentName}
-        leadAgentOnline={true}
-        operationMode={operationMode}
-        onModeChange={setOperationMode}
-        onNewTask={() => { setNewTaskColumn(undefined); setShowNewTask(true); }}
-        onEMChat={() => setShowEMChat(true)}
-        search={search}
-        onSearchChange={setSearch}
-        blockedOnly={blockedOnly}
-        onBlockedOnlyChange={setBlockedOnly}
-      />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <BoardHeader
+            project={project}
+            leadAgentName={leadAgent?.agentName}
+            leadAgentOnline={true}
+            operationMode={operationMode}
+            onModeChange={setOperationMode}
+            onNewTask={() => { setNewTaskColumn(undefined); setShowNewTask(true); }}
+            onEMChat={() => setShowEMChat(true)}
+            search={search}
+            onSearchChange={setSearch}
+            blockedOnly={blockedOnly}
+            onBlockedOnlyChange={setBlockedOnly}
+          />
+        </div>
+        <button
+          onClick={() => setShowTeamChat(true)}
+          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
+          title="Team Chat"
+        >
+          <MessageSquare size={12} className="text-accent" />
+          <span className="hidden xl:inline">Team Chat</span>
+        </button>
+      </div>
 
       {/* New task form */}
       {showNewTask && !newTaskColumn && (
@@ -313,9 +329,22 @@ export default function BoardPage() {
         )}
       </div>
 
+      {/* Activity Stream */}
+      <ActivityStream
+        projectId={projectId}
+        tasks={tasks}
+        isCollapsed={activityCollapsed}
+        onToggle={() => setActivityCollapsed((v) => !v)}
+      />
+
       {/* EM Chat overlay */}
       {showEMChat && project && (
         <EMChatSheet projectId={projectId} onClose={() => setShowEMChat(false)} />
+      )}
+
+      {/* Team Chat overlay */}
+      {showTeamChat && (
+        <TeamChat projectId={projectId} onClose={() => setShowTeamChat(false)} />
       )}
     </div>
   );
