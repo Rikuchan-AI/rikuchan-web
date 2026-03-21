@@ -188,7 +188,7 @@ function StepIdentity({
           />
           {/* Covers the native datalist arrow */}
           <div className="pointer-events-none absolute right-0 top-px bottom-px w-10 rounded-r-md bg-surface-strong flex items-center justify-end pr-3">
-            <ChevronDown size={14} className="text-white" />
+            <ChevronDown size={14} strokeWidth={2.5} className="text-white" />
           </div>
           {role && (
             <button
