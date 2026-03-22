@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
+import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 
@@ -19,12 +20,27 @@ export default function ChatListPage() {
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);
   const hydrate = useDirectChatStore((s) => s._hydrate);
+  const agents = useGatewayStore((s) => s.agents);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoCreated = useRef(false);
 
   useEffect(() => {
     hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-create conversation when arriving from agent card with ?agent=
+  useEffect(() => {
+    if (autoCreated.current) return;
+    const agentParam = searchParams.get("agent");
+    if (!agentParam) return;
+    autoCreated.current = true;
+    const agent = agents.find((a) => a.id === agentParam);
+    const model = agent?.model;
+    const id = createConversation(model, agentParam, agent?.name);
+    router.replace(`/agents/chat/${id}`);
+  }, [searchParams, agents, createConversation, router]);
 
   const handleNew = () => {
     const id = createConversation();
@@ -75,6 +91,14 @@ export default function ChatListPage() {
                   {conv.title}
                 </p>
                 <div className="mt-1 flex items-center gap-2">
+                  {conv.agentName && (
+                    <>
+                      <span className="rounded bg-accent/10 border border-accent/20 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                        {conv.agentName}
+                      </span>
+                      <span className="text-foreground-muted">·</span>
+                    </>
+                  )}
                   <span className="mono text-[10px] text-foreground-muted">
                     {conv.model}
                   </span>

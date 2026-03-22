@@ -25,6 +25,8 @@ export interface DirectConversation {
   title: string;
   messages: DirectChatMessage[];
   model: string;
+  agentId?: string;
+  agentName?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -35,7 +37,7 @@ interface DirectChatStore {
   sending: boolean;
   streamingMessageId: string | null;
 
-  createConversation: (model?: string) => string;
+  createConversation: (model?: string, agentId?: string, agentName?: string) => string;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
   setConversationModel: (id: string, model: string) => void;
@@ -276,14 +278,16 @@ export const useDirectChatStore = create<DirectChatStore>((set, get) => ({
     save(get().conversations);
   },
 
-  createConversation: (model) => {
+  createConversation: (model, agentId, agentName) => {
     const id = mkId();
     const now = Date.now();
     const conv: DirectConversation = {
       id,
-      title: "New conversation",
+      title: agentName ? `Chat with ${agentName}` : "New conversation",
       messages: [],
       model: model ?? DEFAULT_MODEL,
+      agentId,
+      agentName,
       createdAt: now,
       updatedAt: now,
     };
