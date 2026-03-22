@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Markdown from "react-markdown";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
+import { Mascot } from "@/components/shared/mascot";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
 import { AgentSessionList } from "@/components/mc/agents/AgentSessionList";
@@ -267,9 +268,11 @@ function TabIdentity({
           />
         </div>
       ) : (
-        <div className="flex items-center gap-2 py-8 justify-center text-foreground-muted text-xs">
-          <RefreshCw size={12} className="animate-spin" />
-          Carregando arquivos do agente...
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div className="animate-pulse">
+            <Mascot size="md" glow />
+          </div>
+          <p className="text-foreground-muted text-xs">Carregando arquivos do agente...</p>
         </div>
       )}
 
@@ -713,8 +716,10 @@ export default function AgentDetailPage() {
   if (!agent) {
     if (!notFoundConfirmed) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <RefreshCw size={18} className="text-foreground-muted animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="animate-pulse">
+            <Mascot size="lg" glow />
+          </div>
           <p className="text-foreground-muted text-sm">Carregando agente…</p>
         </div>
       );
