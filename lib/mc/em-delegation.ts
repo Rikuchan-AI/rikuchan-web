@@ -86,18 +86,30 @@ async function _doEMDelegation(
       return decision;
     }
 
-    // Agent offline — assign but keep in backlog, don't start execution
+    // Agent offline — lead spawns the agent
+    const leadAgent = project.roster.find((m) => m.role === "lead");
+    if (leadAgent && isAgentOnline(leadAgent.agentId)) {
+      const decision: EMDecision = {
+        assignedAgentId: agent.agentId,
+        assignedAgentName: agent.agentName,
+        reason: `${agent.agentName} is offline — lead spawning agent`,
+      };
+      applyDelegation(project.id, task.id, decision);
+      spawnAgentViaLead(task, agent, leadAgent, project);
+      return decision;
+    }
+
+    // Both offline — queue
     store.updateTask(project.id, task.id, {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
-      emDecisionReason: `${agent.agentName} is offline — task will start when agent comes online`,
+      emDecisionReason: `${agent.agentName} and lead are both offline — task queued`,
       delegationStatus: "delegated",
-      // Keep in backlog, don't move to progress
     });
     return {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
-      reason: `${agent.agentName} is offline — waiting for agent`,
+      reason: `Both agents offline — task queued`,
     };
   }
 
@@ -308,6 +320,94 @@ function parseEMResponse(text: string, roster: RosterMember[]): EMDecision | nul
     console.warn("[Lead] Failed to parse response:", err);
     return null;
   }
+}
+
+/**
+ * Ask the lead to spawn an offline agent via sessions_spawn.
+ * Sends a chat.send to the lead's session with spawn instructions.
+ */
+function spawnAgentViaLead(
+  task: Task,
+  targetAgent: RosterMember,
+  leadAgent: RosterMember,
+  project: Project,
+): void {
+  const gwStore = useGatewayStore.getState();
+  const ws = gwStore._ws;
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    appendTaskLog(project.id, task.id, "system", "Cannot spawn agent — gateway not connected");
+    return;
+  }
+
+  const execGroup = project.groupId
+    ? useProjectsStore.getState().groups.find((g) => g.id === project.groupId)
+    : undefined;
+  const sessionKey = buildAgentSessionKey(leadAgent.agentId, project, execGroup?.agentId);
+
+  // Build context from task
+  const contextParts: string[] = [];
+  if (task.contextNote) contextParts.push(task.contextNote);
+  if (task.contextFiles) {
+    for (const cf of task.contextFiles) {
+      const truncated = cf.content.length > 4000 ? cf.content.slice(0, 4000) + "\n... (truncated)" : cf.content;
+      contextParts.push(`--- ${cf.name} ---\n${truncated}`);
+    }
+  }
+  const contextSection = contextParts.length > 0 ? `\n\nContext:\n${contextParts.join("\n\n")}` : "";
+
+  const spawnPrompt = `Spawn agent "${targetAgent.agentName}" (agentId: ${targetAgent.agentId}) to execute this task.
+
+Use the sessions_spawn tool with:
+- agentId: "${targetAgent.agentId}"
+- message: the task details below
+
+Task:
+- Title: ${task.title}
+- Description: ${task.description || "No description"}
+- Priority: ${task.priority}${contextSection}
+
+After spawning, the agent will handle the task independently.`;
+
+  const reqId = `spawn-${task.id}-${Date.now()}`;
+  registerExternalRpcResponseId(reqId);
+  appendTaskLog(project.id, task.id, "system", `Lead spawning ${targetAgent.agentName}...`);
+
+  const timeout = setTimeout(() => {
+    ws.removeEventListener("message", handler);
+    unregisterExternalRpcResponseId(reqId);
+    appendTaskLog(project.id, task.id, "system", `Spawn request timed out`);
+  }, 30_000);
+
+  const handler = (event: MessageEvent) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "res" && msg.id === reqId) {
+        ws.removeEventListener("message", handler);
+        clearTimeout(timeout);
+        unregisterExternalRpcResponseId(reqId);
+        if (msg.ok) {
+          appendTaskLog(project.id, task.id, "system", `Lead accepted spawn request for ${targetAgent.agentName}`);
+        } else {
+          const err = msg.error as { message?: string } | undefined;
+          appendTaskLog(project.id, task.id, "system", `Spawn failed: ${err?.message ?? "unknown"}`);
+          useProjectsStore.getState().updateTask(project.id, task.id, { delegationStatus: "em-unavailable" });
+        }
+      }
+    } catch { /* ignore */ }
+  };
+
+  ws.addEventListener("message", handler);
+  ws.send(JSON.stringify({
+    type: "req",
+    id: reqId,
+    method: "chat.send",
+    params: {
+      sessionKey,
+      message: spawnPrompt,
+      idempotencyKey: `spawn-${task.id}`,
+    },
+  }));
 }
 
 const MAX_RETRIES = 3;
