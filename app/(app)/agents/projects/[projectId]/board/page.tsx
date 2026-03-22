@@ -177,7 +177,7 @@ export default function BoardPage() {
     (leadGwId && (a.id.includes(leadGwId) || leadGwId.includes(a.id)))
   );
   // Only evaluate online status after agents have been loaded from gateway
-  const leadAgentOnline = agentsLoaded && (leadGwAgent?.status === "online" || leadGwAgent?.status === "idle");
+  const leadAgentOnline = agentsLoaded && (leadGwAgent?.status === "online" || leadGwAgent?.status === "idle" || leadGwAgent?.status === "thinking");
 
   const STALE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -284,7 +284,8 @@ export default function BoardPage() {
   }
 
   // Banner state: show when gateway disconnects/reconnects
-  const showGatewayBanner = gwStatus !== "connected";
+  const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
+  const showGatewayBanner = gwStatus !== "connected" && gwConnectedAt !== undefined;
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
   return (
