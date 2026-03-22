@@ -733,6 +733,7 @@ export default function NewProjectPage() {
   // Step state
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Step 1
   const [name, setName] = useState("");
@@ -810,8 +811,18 @@ export default function NewProjectPage() {
       memoryDocCount: 0,
     };
 
-    await createProject(project);
-    router.push(`/agents/projects/${project.id}`);
+    try {
+      await createProject(project);
+      router.push(`/agents/projects/${project.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Plan limit exceeded")) {
+        setError("You've reached the project limit for your current plan. Upgrade your plan to create more projects.");
+      } else {
+        setError(msg || "Failed to create project");
+      }
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -921,15 +932,28 @@ export default function NewProjectPage() {
               <ArrowRight size={14} />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={submitting}
-              className="flex items-center gap-2 h-10 px-5 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? "Creating..." : "Create Project"}
-              <Plus size={14} />
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              {error && (
+                <div className="flex items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger max-w-sm">
+                  <AlertTriangle size={12} className="shrink-0" />
+                  <span>{error}</span>
+                  {error.includes("plan") && (
+                    <Link href="/dashboard/plans" className="text-accent hover:text-accent-deep font-medium shrink-0 ml-1">
+                      Upgrade
+                    </Link>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={submitting}
+                className="flex items-center gap-2 h-10 px-5 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Creating..." : "Create Project"}
+                <Plus size={14} />
+              </button>
+            </div>
           )}
         </div>
       </div>
