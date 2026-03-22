@@ -191,7 +191,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     try {
       await getStorageAdapter().createTask(projectId, task);
     } catch (err) {
-      console.error("[Projects] Failed to persist task:", err);
+      console.error("[Projects] Failed to persist task:", err instanceof Error ? err.message : err);
+      // Surface error to user
+      if (typeof window !== "undefined") {
+        console.error("[Projects] Task created in-memory only — will be lost on page reload. Check API/auth config.");
+      }
     }
     get().sendProjectCommand({ type: "task_create", projectId, task });
 
