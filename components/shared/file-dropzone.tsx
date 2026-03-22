@@ -1,10 +1,22 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Upload, Paperclip, X } from "lucide-react";
+import { Upload, Paperclip, X, Archive } from "lucide-react";
+import JSZip from "jszip";
 import type { RosterContextFile } from "@/lib/mc/types-project";
 
-const ACCEPTED = ".md,.txt,.json,.yaml,.yml,.ts,.tsx,.js,.jsx,.py,.go,.rb,.sh,.toml,.csv,.env.example";
+const ACCEPTED = ".md,.txt,.json,.yaml,.yml,.ts,.tsx,.js,.jsx,.py,.go,.rb,.sh,.toml,.csv,.env.example,.zip";
+
+const TEXT_EXTENSIONS = new Set([
+  ".md", ".txt", ".json", ".yaml", ".yml", ".ts", ".tsx", ".js", ".jsx",
+  ".py", ".go", ".rb", ".sh", ".toml", ".csv", ".xml", ".html", ".css",
+  ".sql", ".env", ".cfg", ".ini", ".conf", ".log", ".rst", ".adoc",
+]);
+
+function isTextFile(name: string): boolean {
+  const ext = name.lastIndexOf(".") >= 0 ? name.slice(name.lastIndexOf(".")).toLowerCase() : "";
+  return TEXT_EXTENSIONS.has(ext);
+}
 
 interface FileDropzoneProps {
   files: RosterContextFile[];
@@ -15,37 +27,92 @@ interface FileDropzoneProps {
 export function FileDropzone({ files, onChange, id = "file-dropzone" }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+
+  const addEntries = useCallback(
+    (entries: RosterContextFile[]) => {
+      onChange([...files, ...entries]);
+    },
+    [files, onChange],
+  );
+
+  const extractZip = useCallback(
+    async (file: File) => {
+      setExtracting(true);
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const entries: RosterContextFile[] = [];
+        const now = Date.now();
+        let idx = 0;
+
+        for (const [zipPath, entry] of Object.entries(zip.files)) {
+          if (entry.dir) continue;
+          const fileName = zipPath.split("/").pop() ?? zipPath;
+          if (!isTextFile(fileName)) continue;
+          const content = await entry.async("text");
+          entries.push({
+            id: `zip-${now}-${idx}-${Math.random().toString(16).slice(2, 6)}`,
+            name: fileName,
+            content,
+            mimeType: "text/plain",
+            addedAt: now,
+          });
+          idx++;
+        }
+
+        if (entries.length > 0) {
+          addEntries(entries);
+        }
+      } catch {
+        // ZIP extraction failed — ignore silently
+      }
+      setExtracting(false);
+    },
+    [addEntries],
+  );
 
   const readFiles = useCallback(
     (fileList: FileList) => {
       const fileArray = Array.from(fileList);
       if (fileArray.length === 0) return;
 
-      const now = Date.now();
-      let completed = 0;
-      const newEntries: RosterContextFile[] = new Array(fileArray.length);
+      // Separate ZIP files from regular text files
+      const zipFiles = fileArray.filter((f) => f.name.toLowerCase().endsWith(".zip"));
+      const textFiles = fileArray.filter((f) => !f.name.toLowerCase().endsWith(".zip"));
 
-      fileArray.forEach((file, i) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          newEntries[i] = {
-            id: `ctx-${now}-${i}-${Math.random().toString(16).slice(2, 6)}`,
-            name: file.name,
-            content: ev.target?.result as string,
-            mimeType: file.type || "text/plain",
-            addedAt: now,
+      // Extract ZIPs
+      for (const zf of zipFiles) {
+        extractZip(zf);
+      }
+
+      // Read text files
+      if (textFiles.length > 0) {
+        const now = Date.now();
+        let completed = 0;
+        const newEntries: RosterContextFile[] = new Array(textFiles.length);
+
+        textFiles.forEach((file, i) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            newEntries[i] = {
+              id: `ctx-${now}-${i}-${Math.random().toString(16).slice(2, 6)}`,
+              name: file.name,
+              content: ev.target?.result as string,
+              mimeType: file.type || "text/plain",
+              addedAt: now,
+            };
+            completed += 1;
+            if (completed === textFiles.length) {
+              addEntries(newEntries);
+            }
           };
-          completed += 1;
-          if (completed === fileArray.length) {
-            onChange([...files, ...newEntries]);
-          }
-        };
-        reader.readAsText(file);
-      });
+          reader.readAsText(file);
+        });
+      }
 
       if (inputRef.current) inputRef.current.value = "";
     },
-    [files, onChange],
+    [addEntries, extractZip],
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,7 +188,7 @@ export function FileDropzone({ files, onChange, id = "file-dropzone" }: FileDrop
           {" or drag & drop"}
         </p>
         <p className="text-[10px] text-foreground-muted/60">
-          .md · .txt · .json · .yaml · .ts · .py · .sh · .toml · .csv
+          {extracting ? "Extracting ZIP..." : ".md · .txt · .json · .yaml · .ts · .py · .sh · .zip"}
         </p>
       </div>
 

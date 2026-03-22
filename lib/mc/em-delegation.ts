@@ -335,13 +335,28 @@ export function startTaskExecution(
     ? `\n\nRelevant files:\n${task.attachments.map((a) => `- ${a.path}${a.label ? ` (${a.label})` : ""}`).join("\n")}`
     : "";
 
+  // Include context files inline (from uploads/ZIPs)
+  const contextParts: string[] = [];
+  if (task.contextNote) {
+    contextParts.push(`Context note:\n${task.contextNote}`);
+  }
+  if (task.contextFiles && task.contextFiles.length > 0) {
+    for (const cf of task.contextFiles) {
+      const truncated = cf.content.length > 8000 ? cf.content.slice(0, 8000) + "\n... (truncated)" : cf.content;
+      contextParts.push(`--- ${cf.name} ---\n${truncated}`);
+    }
+  }
+  const contextSection = contextParts.length > 0
+    ? `\n\nContext provided by the user:\n${contextParts.join("\n\n")}`
+    : "";
+
   const prompt = `You are ${agent.agentName} (${agent.role}) in project "${project.name}".
 
 Execute this task:
 - Title: ${task.title}
 - Description: ${task.description}
 - Priority: ${task.priority}
-- Workspace: ${workspace}${filesSection}
+- Workspace: ${workspace}${filesSection}${contextSection}
 
 Start working on it now. Report progress as you go.
 If you cannot complete the task due to missing data or access issues, respond with BLOCKED: followed by the reason.`;
