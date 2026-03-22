@@ -168,6 +168,7 @@ export default function BoardPage() {
   const gwAgents = useGatewayStore((s) => s.agents);
   const gwConnected = useGatewayStore((s) => s.status === "connected");
   const gwStatus = useGatewayStore((s) => s.status);
+  const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
   const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
@@ -284,7 +285,6 @@ export default function BoardPage() {
   }
 
   // Banner state: show when gateway disconnects/reconnects
-  const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
   const showGatewayBanner = gwStatus !== "connected" && gwConnectedAt !== undefined;
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
