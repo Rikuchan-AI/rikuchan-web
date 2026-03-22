@@ -534,7 +534,6 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
                   freeTier?: boolean;
                 }>;
               } | undefined;
-              console.log("[Gateway] models.list response:", JSON.stringify(p).slice(0, 500));
               if (p?.models && p.models.length > 0) {
                 const groups = gatewayModelsToGroups(p.models);
                 set({ availableModels: groups, modelsLoaded: true });
