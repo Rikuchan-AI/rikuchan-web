@@ -333,6 +333,7 @@ function SectionModel({ projectId }: { projectId: string }) {
 function SectionHeartbeat({ projectId }: { projectId: string }) {
   const project = useProjectsStore(selectProjectById(projectId));
   const updateProject = useProjectsStore((s) => s.updateProject);
+  const gwAgents = useGatewayStore((s) => s.agents);
 
   const defaultConfig: ProjectHeartbeatConfig = {
     intervalSeconds: 30,
@@ -345,6 +346,7 @@ function SectionHeartbeat({ projectId }: { projectId: string }) {
     project?.heartbeatConfig ?? defaultConfig,
   );
   const [saving, setSaving] = useState(false);
+  const [syncingAgent, setSyncingAgent] = useState<string | null>(null);
 
   if (!project) return null;
 
@@ -354,8 +356,49 @@ function SectionHeartbeat({ projectId }: { projectId: string }) {
     setSaving(false);
   };
 
+  const handleSyncHeartbeat = async (agentId: string, intervalSeconds: number) => {
+    setSyncingAgent(agentId);
+    const { patchAgentDefaults } = await import("@/lib/mc/agent-files");
+    const intervalStr = intervalSeconds >= 60
+      ? `${Math.round(intervalSeconds / 60)}m`
+      : `${intervalSeconds}s`;
+    await patchAgentDefaults({
+      agentId,
+      perAgent: {
+        heartbeat: {
+          every: intervalStr,
+          model: "rikuchan-heartbeat/glm-4.7-flash",
+        },
+      },
+      globalDefaults: {},
+    });
+    setSyncingAgent(null);
+  };
+
+  const handleUpdateAgentHeartbeat = async (agentId: string, intervalSeconds: number, enabled: boolean) => {
+    const newRoster = project.roster.map((m) => {
+      if (m.agentId !== agentId) return m;
+      return {
+        ...m,
+        heartbeatConfig: {
+          ...m.heartbeatConfig!,
+          intervalSeconds,
+          enabled,
+        },
+      };
+    });
+    await updateProject(projectId, { roster: newRoster });
+
+    // Also sync to openclaw
+    if (enabled) {
+      await handleSyncHeartbeat(agentId, intervalSeconds);
+    }
+  };
+
   return (
     <>
+      {/* Project-level thresholds */}
+      <p className="mono text-[10px] uppercase text-foreground-muted tracking-wider">Project Thresholds</p>
       <div className="grid grid-cols-3 gap-4">
         {[
           { key: "intervalSeconds" as const, label: "Interval (s)", min: 10, max: 300 },
@@ -390,6 +433,53 @@ function SectionHeartbeat({ projectId }: { projectId: string }) {
       </label>
 
       <SaveButton saving={saving} onClick={handleSave} />
+
+      {/* Per-agent heartbeat config */}
+      <div className="border-t border-line pt-4 mt-2">
+        <p className="mono text-[10px] uppercase text-foreground-muted tracking-wider mb-3">Agent Heartbeat (OpenClaw)</p>
+        <p className="text-xs text-foreground-muted mb-3">
+          Configure heartbeat interval per agent in OpenClaw. Changes are applied immediately to the gateway.
+        </p>
+        <div className="space-y-2">
+          {project.roster.map((member) => {
+            const gwAgent = gwAgents.find((a) => a.id === member.agentId);
+            const hbCfg = member.heartbeatConfig;
+            const isOnline = gwAgent && ["online", "idle", "thinking"].includes(gwAgent.status);
+            return (
+              <div key={member.agentId} className="flex items-center justify-between rounded-md border border-line bg-surface-strong px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${isOnline ? "bg-success" : "bg-danger"}`} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{member.agentName}</p>
+                    <p className="text-[10px] text-foreground-muted">{member.role} · {hbCfg?.enabled ? `${hbCfg.intervalSeconds}s` : "disabled"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    value={hbCfg?.intervalSeconds ?? 300}
+                    onChange={(e) => handleUpdateAgentHeartbeat(member.agentId, Number(e.target.value), true)}
+                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-foreground focus:outline-none focus:border-accent/50"
+                  >
+                    <option value={30}>30s</option>
+                    <option value={60}>1m</option>
+                    <option value={120}>2m</option>
+                    <option value={300}>5m</option>
+                    <option value={600}>10m</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleSyncHeartbeat(member.agentId, hbCfg?.intervalSeconds ?? 300)}
+                    disabled={syncingAgent === member.agentId}
+                    className="h-7 px-2.5 rounded-md border border-line bg-surface text-[10px] text-foreground-muted hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-50"
+                  >
+                    {syncingAgent === member.agentId ? "Syncing..." : "Sync to OpenClaw"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 }
