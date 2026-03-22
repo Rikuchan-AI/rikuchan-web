@@ -1,5 +1,5 @@
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { Button } from "@/components/shared/button";
+import { GettingStartedChecklist } from "@/components/onboarding/getting-started-checklist";
 import { getDashboardOverview, getWorkspace } from "@/lib/gateway";
 
 export default async function DashboardOverviewPage() {
@@ -31,27 +31,7 @@ export default async function DashboardOverviewPage() {
         ))}
       </section>
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-lg border border-line bg-surface p-6">
-          <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Recommended next steps</p>
-          <h2 className="mt-4 text-[1.7rem] font-semibold text-foreground">Get the workspace ready for first value</h2>
-          <div className="mt-6 space-y-3">
-            {[
-              "Create your first API key",
-              "Connect a provider or keep the shared starter path",
-              "Add a first knowledge source",
-              "Send a first request and confirm the flow",
-            ].map((step) => (
-              <div key={step} className="flex gap-3 rounded-lg border border-line bg-surface-muted p-4 text-sm text-foreground-soft">
-                <span className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-accent" />
-                <span>{step}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button href="/dashboard/api-keys" size="lg">Create API key</Button>
-            <Button href="/dashboard/settings" variant="secondary" size="lg">Open settings</Button>
-          </div>
-        </div>
+        <GettingStartedChecklist />
         <div className="rounded-lg border border-line bg-surface p-6">
           <p className="mono text-xs uppercase tracking-[0.18em] text-foreground-muted">Operational status</p>
           <div className="mt-6 space-y-3">
@@ -59,7 +39,6 @@ export default async function DashboardOverviewPage() {
               ["Provider access", providerLabel],
               ["Knowledge sources", knowledgeLabel],
               ["Workspace plan", workspace.plan.charAt(0).toUpperCase() + workspace.plan.slice(1)],
-              ["Team access", "Owner only"],
             ].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between rounded-md border border-line bg-surface-muted p-4">
                 <span className="text-sm text-foreground-soft">{label}</span>

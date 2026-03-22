@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-03-22
+
+### Multi-Tenancy + Back Office (ADR-005)
+
+Full multi-tenant transformation. See [ADR-005](adr/005-multi-tenancy-clerk-organizations-supabase-rls.md)
+for architecture decisions and [MULTI_TENANCY.md](MULTI_TENANCY.md) for technical reference.
+
+**7 Supabase migrations applied:**
+1. `add_tenant_id_to_mc_tables` — tenant_id on 9 mc_* tables
+2. `create_platform_tables` — tenants, tenant_plans, tenant_gateways, feature_flags, tenant_usage, backoffice_audit
+3. `create_app_tenant_id_function_and_rls_policies` — app_tenant_id() + RLS on all tables
+4. `add_tenant_id_to_rag_tables` — tenant_id on rag_chunks, collections, rag_requests, rag_ingest_requests
+5. `update_match_chunks_to_use_tenant_id` — CTE-level filtering for vector search performance
+6. `add_tenant_id_to_gateway_tables` — tenant_id on api_keys, provider_credentials, gateway_requests, etc.
+
+**~20 TypeScript files created/modified, ~5 Python files modified across 3 repos.**
+
+---
+
 ## 2026-03-20
 
 ### UI/UX — Mission Control Dashboard Fixes (ADR-003)

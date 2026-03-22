@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { clerkAppearance } from "@/lib/clerk";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronRight } from "lucide-react";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const segmentLabels: Record<string, string> = {
   dashboard: "Overview",
@@ -99,6 +101,20 @@ function Breadcrumbs() {
   );
 }
 
+function RoleBadge() {
+  const { role, isPersonal } = usePermissions();
+  if (isPersonal) return null;
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${
+      role === "admin"
+        ? "bg-accent/10 text-accent border-accent/20"
+        : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+    }`}>
+      {role}
+    </span>
+  );
+}
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -123,6 +139,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Breadcrumbs />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <RoleBadge />
+            <OrganizationSwitcher
+              appearance={clerkAppearance}
+              afterSelectOrganizationUrl="/dashboard"
+              afterSelectPersonalUrl="/dashboard"
+              hidePersonal={false}
+            />
             <UserButton
               appearance={{
                 elements: {

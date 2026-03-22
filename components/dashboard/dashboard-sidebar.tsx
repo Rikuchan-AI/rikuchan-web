@@ -19,11 +19,15 @@ import {
   SlidersHorizontal,
   Sparkles,
   Users,
+  UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LogoLockup } from "@/components/shared/logo-lockup";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useTenantPlan } from "@/hooks/use-tenant-plan";
 import { cn } from "@/lib/utils";
+import type { Permission } from "@/lib/mc/permissions";
 
 const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
 
@@ -33,15 +37,17 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  requiredPermission?: Permission;
 }
 
 const platformLinks: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { label: "API keys", href: "/dashboard/api-keys", icon: Key },
-  { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
-  { label: "Plans", href: "/dashboard/plans", icon: Sparkles },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { label: "API keys", href: "/dashboard/api-keys", icon: Key, requiredPermission: "api_keys.view" },
+  { label: "Billing", href: "/dashboard/billing", icon: CreditCard, requiredPermission: "billing.manage" },
+  { label: "Plans", href: "/dashboard/plans", icon: Sparkles, requiredPermission: "billing.manage" },
+  { label: "Members", href: "/dashboard/settings/members", icon: UsersRound, requiredPermission: "members.view" },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings, requiredPermission: "settings.workspace" },
 ];
 
 const mcLinks: NavItem[] = [
@@ -49,8 +55,8 @@ const mcLinks: NavItem[] = [
   { label: "Projects", href: "/agents/projects", icon: FolderKanban },
   { label: "Groups", href: "/agents/groups", icon: Layers },
   { label: "Sessions", href: "/agents/sessions", icon: Activity },
-  { label: "Gateway", href: "/agents/gateway", icon: Globe },
-  { label: "MC Settings", href: "/agents/settings", icon: SlidersHorizontal },
+  { label: "Gateway", href: "/agents/gateway", icon: Globe, requiredPermission: "gateway.configure" },
+  { label: "MC Settings", href: "/agents/settings", icon: SlidersHorizontal, requiredPermission: "settings.mc" },
 ];
 
 const chatLinks: NavItem[] = [
@@ -173,16 +179,22 @@ function GatewayDot({ connected }: { connected: boolean }) {
 export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const [collapsed, toggle] = useCollapsedState();
+  const { can } = usePermissions();
 
   const agentCount = useGatewayStore((s) => s.agents.filter((a) => a.status === "online").length);
   const sessionCount = useGatewayStore((s) => s.sessions.filter((s) => s.status === "active").length);
   const gatewayStatus = useGatewayStore((s) => s.status);
+  const { planName } = useTenantPlan();
 
   const mcBadges: Record<string, React.ReactNode> = {
     "/agents": agentCount > 0 ? <CountBadge count={agentCount} /> : undefined,
     "/agents/sessions": sessionCount > 0 ? <CountBadge count={sessionCount} /> : undefined,
     "/agents/gateway": <GatewayDot connected={gatewayStatus === "connected"} />,
   };
+
+  // Filter links by permission — hidden, not grayed out
+  const visibleMcLinks = mcLinks.filter((link) => !link.requiredPermission || can(link.requiredPermission));
+  const visiblePlatformLinks = platformLinks.filter((link) => !link.requiredPermission || can(link.requiredPermission));
 
   return (
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
@@ -209,7 +221,7 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="mt-6 space-y-1">
           <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
           {!collapsed.mc &&
-            mcLinks.map((link) => (
+            visibleMcLinks.map((link) => (
               <NavLink
                 key={link.href}
                 {...link}
@@ -225,14 +237,14 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className={cn(MC_ENABLED ? "mt-6" : "mt-8", "space-y-1")}>
         <SectionHeader label="Platform" collapsed={collapsed.platform} onToggle={() => toggle("platform")} />
         {!collapsed.platform &&
-          platformLinks.map((link) => (
+          visiblePlatformLinks.map((link) => (
             <NavLink key={link.href} {...link} pathname={pathname} onNavigate={onNavigate} />
           ))}
       </div>
 
       <div className="mt-auto space-y-2">
-        {/* Gateway status pill */}
-        {MC_ENABLED && (
+        {/* Gateway status pill — only for users who can see gateway */}
+        {MC_ENABLED && can("gateway.configure") && (
           <div className={cn(
             "flex items-center gap-2 rounded-md border px-3 py-2 transition-colors",
             gatewayStatus === "connected"
@@ -254,7 +266,7 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
         <div className="flex items-center gap-2 rounded-md px-3 py-2">
           <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
-          <span className="text-sm font-medium text-foreground-soft truncate">Rikuchan Starter</span>
+          <span className="text-sm font-medium text-foreground-soft truncate">{planName}</span>
         </div>
       </div>
     </div>
