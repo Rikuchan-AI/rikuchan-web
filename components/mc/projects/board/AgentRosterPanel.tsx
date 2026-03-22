@@ -34,8 +34,8 @@ function AgentCard({
   loading?: boolean;
 }) {
   const status = agentStatus?.status ?? "offline";
-  const isOnline = status === "online" || status === "idle";
-  const isWorking = status === "online";
+  const isOnline = status === "online" || status === "idle" || status === "thinking";
+  const isWorking = status === "online" || status === "thinking";
 
   const statusDot = loading
     ? "bg-foreground-muted/40 animate-pulse"
