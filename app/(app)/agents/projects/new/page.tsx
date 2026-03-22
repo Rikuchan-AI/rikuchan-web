@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, AlertTriangle, Crown, Plus, Star } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import Link from "next/link";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -148,18 +149,12 @@ function StepBasics({
             </Link>
           </div>
         ) : (
-          <select
+          <Combobox
             value={groupId}
-            onChange={(e) => onGroupIdChange(e.target.value)}
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 transition-colors appearance-none"
-          >
-            <option value="">Select a group...</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.icon ? `${g.icon} ` : ""}{g.name}
-              </option>
-            ))}
-          </select>
+            onChange={onGroupIdChange}
+            placeholder="Select a group..."
+            options={groups.map((g) => ({ id: g.id, label: `${g.icon ? g.icon + " " : ""}${g.name}` }))}
+          />
         )}
       </div>
 
@@ -416,15 +411,11 @@ function StepRoster({
                   <div className="flex items-center gap-2 shrink-0">
                     <AgentStatusBadge status={agent.status} />
                     {inRoster && (
-                      <select
+                      <Combobox
                         value={member?.role ?? "developer"}
-                        onChange={(e) => updateRole(agent.id, e.target.value as RosterRole)}
-                        className="rounded-md border border-line bg-surface-strong px-2 py-1 text-xs text-foreground focus:outline-none focus:border-accent/50"
-                      >
-                        {ROSTER_ROLES.map((r) => (
-                          <option key={r.value} value={r.value}>{r.label}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => updateRole(agent.id, v as RosterRole)}
+                        options={ROSTER_ROLES.map((r) => ({ id: r.value, label: r.label }))}
+                      />
                     )}
                   </div>
                 </div>
@@ -466,7 +457,7 @@ function StepConfig({
 }) {
   const gatewayModels = useGatewayStore((s) => s.availableModels);
   const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
-  const allModels = modelGroups.flatMap((g) => g.models);
+  const allModels = modelGroups.flatMap((g) => g.models.map((m) => ({ ...m, provider: g.provider })));
 
   const MODES: { value: OperationMode; label: string; description: string }[] = [
     {
@@ -535,22 +526,14 @@ function StepConfig({
       {/* Model */}
       <div>
         <FieldLabel>Default Model</FieldLabel>
-        <select
+        <Combobox
           value={modelConfig.preferred}
-          onChange={(e) => onModelChange({ ...modelConfig, preferred: e.target.value })}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          <option value="">Gateway routing (auto)</option>
-          {modelGroups.map((group) => (
-            <optgroup key={group.provider} label={group.provider}>
-              {group.models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}{m.recommended ? " ★" : ""}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(v) => onModelChange({ ...modelConfig, preferred: v })}
+          placeholder="Gateway routing (auto)"
+          options={modelGroups.flatMap((g) =>
+            g.models.map((m) => ({ id: m.id, label: m.label + (m.recommended ? " ★" : ""), sub: g.provider }))
+          )}
+        />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
           <input
             type="checkbox"
@@ -565,18 +548,14 @@ function StepConfig({
         {modelConfig.preferred && (
           <div className="mt-3">
             <FieldLabel>Fallback Model</FieldLabel>
-            <select
+            <Combobox
               value={modelConfig.fallback ?? ""}
-              onChange={(e) => onModelChange({ ...modelConfig, fallback: e.target.value || undefined })}
-              className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-            >
-              <option value="">None</option>
-              {allModels
+              onChange={(v) => onModelChange({ ...modelConfig, fallback: v || undefined })}
+              placeholder="None"
+              options={allModels
                 .filter((m) => m.id !== modelConfig.preferred)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-            </select>
+                .map((m) => ({ id: m.id, label: m.label, sub: m.provider }))}
+            />
           </div>
         )}
       </div>
