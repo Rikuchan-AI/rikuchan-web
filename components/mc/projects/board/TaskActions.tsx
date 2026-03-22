@@ -79,14 +79,12 @@ export function TaskActions({ task, onReassign, onMarkBlocked, onCancel, onMarkD
           >
             Cancel Task
           </button>
-          {task.assignedAgentId && (
-            <button
-              onClick={onReassign}
-              className="rounded-lg border border-line-strong bg-transparent px-4 h-9 text-sm font-medium text-foreground hover:bg-surface-strong transition-colors flex-1"
-            >
-              Reassign
-            </button>
-          )}
+          <button
+            onClick={onReassign}
+            className="rounded-lg border border-line-strong bg-transparent px-4 h-9 text-sm font-medium text-foreground hover:bg-surface-strong transition-colors flex-1"
+          >
+            {task.assignedAgentId ? "Reassign" : "Assign Agent"}
+          </button>
         </>
       )}
 

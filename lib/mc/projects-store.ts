@@ -213,7 +213,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       );
       return { tasks: { ...s.tasks, [projectId]: tasks } };
     });
-    await getStorageAdapter().updateTask(projectId, taskId, { status: newStatus });
+    try {
+      await getStorageAdapter().updateTask(projectId, taskId, { status: newStatus });
+    } catch (err) {
+      console.error("[Projects] Failed to persist task move:", err instanceof Error ? err.message : err);
+    }
     get().sendProjectCommand({ type: "task_move", taskId, newStatus, projectId });
   },
 
