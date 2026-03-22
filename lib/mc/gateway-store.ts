@@ -231,6 +231,13 @@ function healthAgentToAgent(
     else status = "offline";
   }
 
+  // Extract model from heartbeat config
+  const heartbeatModel = heartbeat ? (heartbeat.model as string) ?? "" : "";
+
+  // Calculate uptime from earliest active session
+  const uptimeMs = sessionAge !== null ? sessionAge : 0;
+  const uptimeSeconds = Math.floor(uptimeMs / 1000);
+
   return {
     id: agentId,
     name: identity?.name ?? ha.name as string ?? agentId,
@@ -242,11 +249,12 @@ function healthAgentToAgent(
     avgResponseMs: 0,
     lastActivityAt,
     heartbeat: heartbeat ? {
-      lastSuccessAt: 0,
-      failures: 0,
-      model: (heartbeat.model as string) ?? "",
+      lastSuccessAt: toMs(heartbeat.lastSuccessAt as number ?? 0),
+      failures: (heartbeat.consecutiveFailures as number) ?? 0,
+      model: heartbeatModel,
     } : undefined,
-    uptime: 0,
+    model: heartbeatModel || undefined,
+    uptime: status !== "offline" ? uptimeSeconds : 0,
   };
 }
 
@@ -554,6 +562,42 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
             }
           });
           ws.send(JSON.stringify({ type: "req", id: sessionsReqId, method: "sessions.list", params: {} }));
+
+          // Request config to enrich agents with model/role info
+          const configReqId = mkReqId();
+          rpcCallbacks.set(configReqId, (res) => {
+            if (res.ok) {
+              const config = (res.payload as { config?: Record<string, unknown> })?.config;
+              const agentsConfig = config?.agents as {
+                defaults?: { model?: string | { primary?: string } };
+                list?: Array<{
+                  id: string;
+                  name?: string;
+                  heartbeat?: { model?: string; every?: string };
+                  isDefault?: boolean;
+                }>;
+              } | undefined;
+              if (agentsConfig) {
+                const defaultModel = typeof agentsConfig.defaults?.model === "string"
+                  ? agentsConfig.defaults.model
+                  : (agentsConfig.defaults?.model as { primary?: string })?.primary ?? "";
+                const agentsList = agentsConfig.list ?? [];
+
+                set((s) => {
+                  const enriched = s.agents.map((agent) => {
+                    const cfg = agentsList.find((a) => a.id === agent.id);
+                    const model = cfg?.heartbeat?.model ?? defaultModel;
+                    return {
+                      ...agent,
+                      model: model || agent.model,
+                    };
+                  });
+                  return { agents: enriched };
+                });
+              }
+            }
+          });
+          ws.send(JSON.stringify({ type: "req", id: configReqId, method: "config.get", params: {} }));
 
           // Set up tick monitoring
           if (policy?.tickIntervalMs) {

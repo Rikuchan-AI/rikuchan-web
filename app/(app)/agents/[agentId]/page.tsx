@@ -221,7 +221,11 @@ function TabIdentity({
         {[
           { label: "Role",      value: agent?.role },
           { label: "Model",     value: agent?.model ?? "—" },
-          { label: "Uptime",    value: agent?.uptime ? `${Math.floor(agent.uptime / 3600)}h` : "—" },
+          { label: "Uptime",    value: agent?.uptime
+            ? agent.uptime >= 3600 ? `${Math.floor(agent.uptime / 3600)}h ${Math.floor((agent.uptime % 3600) / 60)}m`
+            : agent.uptime >= 60 ? `${Math.floor(agent.uptime / 60)}m`
+            : `${agent.uptime}s`
+            : "—" },
         ].map(({ label, value }) => (
           <div key={label} className="rounded-lg border border-line bg-surface p-4">
             <p className="mono text-[0.65rem] uppercase text-foreground-muted mb-1" style={{ letterSpacing: "0.18em" }}>{label}</p>
