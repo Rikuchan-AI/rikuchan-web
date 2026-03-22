@@ -172,8 +172,8 @@ function pushActivity(
 }
 
 /** Map OpenClaw health agent data to our Agent type */
-const ONLINE_THRESHOLD_MS  = 5 * 60 * 1000;   // 5 min — recently active
-const IDLE_THRESHOLD_MS    = 30 * 60 * 1000;  // 30 min — still responsive but not active
+const ONLINE_THRESHOLD_MS  = 10 * 60 * 1000;  // 10 min — recently active (heartbeat every 60s + buffer)
+const IDLE_THRESHOLD_MS    = 60 * 60 * 1000;  // 60 min — still responsive but not active
 
 function toMs(ts: number): number {
   // If timestamp looks like seconds (< year 2100 in seconds = 4102444800), convert to ms
@@ -782,7 +782,12 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
           const updated = agents.map((ha) => {
             const existing = s.agents.find((a) => a.id === ha.agentId);
             const mapped = healthAgentToAgent(ha);
-            return existing ? { ...existing, ...mapped, name: existing.name || mapped.name } : mapped;
+            if (!existing) return mapped;
+            // Don't flicker: keep "online" if mapped says "idle" (borderline timing)
+            const status = existing.status === "online" && mapped.status === "idle"
+              ? "online"
+              : mapped.status;
+            return { ...existing, ...mapped, name: existing.name || mapped.name, status };
           });
           return { agents: updated };
         });
