@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, MoreHorizontal, Trash2 } from "lucide-react";
+import { Mascot } from "@/components/shared/mascot";
 import {
   useProjectsStore,
   selectProjectById,
@@ -82,7 +83,12 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
             className="text-xl font-semibold tracking-[-0.03em] text-foreground"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {project?.name ?? "Loading..."}
+            {project?.name ?? (
+              <span className="flex items-center gap-2">
+                <span className="animate-pulse"><Mascot size="sm" glow /></span>
+                Carregando...
+              </span>
+            )}
           </h2>
           {project?.description && (
             <p className="text-sm text-foreground-soft mt-1">{project.description}</p>

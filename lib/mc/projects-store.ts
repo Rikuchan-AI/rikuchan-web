@@ -86,8 +86,41 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   hydrate: async () => {
     if (get()._hydrated) return;
     const adapter = getStorageAdapter();
-    const groups = await adapter.listGroups();
-    const projects = await adapter.listProjects();
+    let groups = await adapter.listGroups();
+    let projects = await adapter.listProjects();
+
+    // Migration: if Supabase is empty but localStorage has data, migrate
+    if (groups.length === 0 && projects.length === 0 && typeof window !== "undefined") {
+      try {
+        const { LocalStorageAdapter } = await import("./storage/local-storage");
+        const local = new LocalStorageAdapter();
+        const localGroups = await local.listGroups();
+        const localProjects = await local.listProjects();
+        if (localGroups.length > 0 || localProjects.length > 0) {
+          console.log(`[Projects] Migrating ${localGroups.length} groups + ${localProjects.length} projects from localStorage to Supabase`);
+          for (const g of localGroups) {
+            try { await adapter.createGroup(g); } catch { /* skip duplicates */ }
+          }
+          for (const p of localProjects) {
+            try { await adapter.createProject(p); } catch { /* skip duplicates */ }
+          }
+          // Also migrate tasks for each project
+          for (const p of localProjects) {
+            const localTasks = await local.listTasks(p.id);
+            for (const t of localTasks) {
+              try { await adapter.createTask(p.id, t); } catch { /* skip */ }
+            }
+          }
+          // Re-read from Supabase after migration
+          groups = await adapter.listGroups();
+          projects = await adapter.listProjects();
+          console.log(`[Projects] Migration complete: ${groups.length} groups, ${projects.length} projects`);
+        }
+      } catch (err) {
+        console.warn("[Projects] Migration failed:", err);
+      }
+    }
+
     set({ groups, projects, _hydrated: true });
   },
 
