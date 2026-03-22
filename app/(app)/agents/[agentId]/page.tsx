@@ -174,7 +174,7 @@ function FileEditor({
           </p>
         </div>
       ) : preview ? (
-        <div className="w-full rounded-md border border-line bg-surface-strong px-4 py-4 min-h-[320px] overflow-y-auto prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground-soft prose-li:text-foreground-soft prose-strong:text-foreground prose-code:text-accent prose-code:bg-surface prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[11px] prose-pre:bg-surface prose-pre:border prose-pre:border-line prose-hr:border-line">
+        <div className="w-full rounded-md border border-line bg-surface-strong px-4 py-4 min-h-[320px] overflow-y-auto text-sm text-foreground-soft max-w-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:mb-2 [&_p]:last:mb-0 [&_ul]:ml-4 [&_ul]:list-disc [&_ul]:mb-2 [&_ol]:ml-4 [&_ol]:list-decimal [&_ol]:mb-2 [&_li]:mb-0.5 [&_li]:text-foreground-soft [&_strong]:font-semibold [&_strong]:text-foreground [&_em]:italic [&_code]:bg-surface [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_code]:font-mono [&_code]:text-accent [&_pre]:bg-surface [&_pre]:rounded-md [&_pre]:border [&_pre]:border-line [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_hr]:border-line [&_hr]:my-3 [&_a]:text-accent [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-accent/30 [&_blockquote]:pl-3 [&_blockquote]:text-foreground-muted [&_blockquote]:italic [&_blockquote]:my-2">
           <Markdown>{state.content || "*Empty file*"}</Markdown>
         </div>
       ) : (
