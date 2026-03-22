@@ -20,6 +20,21 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
   // Mark task as delegating
   store.updateTask(project.id, task.id, { delegationStatus: "delegating" });
 
+  try {
+    return await _doEMDelegation(task, project, store, gwStore);
+  } catch (err) {
+    console.error("[Lead] Delegation error:", err);
+    store.updateTask(project.id, task.id, { delegationStatus: "em-unavailable" });
+    return null;
+  }
+}
+
+async function _doEMDelegation(
+  task: Task,
+  project: Project,
+  store: ReturnType<typeof useProjectsStore.getState>,
+  gwStore: ReturnType<typeof useGatewayStore.getState>,
+): Promise<EMDecision | null> {
   const roster = project.roster.filter((m) => m.role !== "lead");
 
   // Check which agents are online
