@@ -427,6 +427,22 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
           persistConfig(newConfig);
           set({ config: newConfig });
 
+          // Start keep-alive ping every 25s to prevent idle disconnect
+          const pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              const pingId = mkReqId();
+              const pingStart = Date.now();
+              rpcCallbacks.set(pingId, (res) => {
+                set({ latencyMs: Date.now() - pingStart });
+                if (res.ok && res.payload) {
+                  handleHealthPayload(res.payload as Record<string, unknown>);
+                }
+              });
+              ws.send(JSON.stringify({ type: "req", id: pingId, method: "health", params: {} }));
+            }
+          }, 25_000);
+          set({ _pingInterval: pingInterval });
+
           pushLog(set, get, "INFO", `Connected to gateway v${server?.version ?? "?"} (${server?.connId ?? "?"})`);
 
           // Extract health snapshot if available
