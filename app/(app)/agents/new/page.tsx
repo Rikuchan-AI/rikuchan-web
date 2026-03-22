@@ -1518,6 +1518,10 @@ export default function NewAgentPage() {
 
     // Write defaults to gateway config
     const perAgent: Record<string, unknown> = {};
+
+    // Always configure heartbeat for new agents (60s default)
+    perAgent.heartbeat = { every: "60s", model: "rikuchan-heartbeat/glm-4.7-flash" };
+
     if (defaults.allowSubagents.trim()) {
       const ids = defaults.allowSubagents.split(",").map((s) => s.trim()).filter(Boolean);
       perAgent.subagents = { allowAgents: ids, ...(defaults.subagentModel ? { model: defaults.subagentModel } : {}) };

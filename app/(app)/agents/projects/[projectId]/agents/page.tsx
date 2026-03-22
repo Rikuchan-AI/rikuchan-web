@@ -256,15 +256,35 @@ export default function RosterPage() {
     const agent = agents.find((a) => a.id === selectedAgentId);
     if (!agent) return;
     setAdding(true);
+    const heartbeatCfg = ROLE_DEFAULT_HEARTBEAT[selectedRole];
     const newMember: RosterMember = {
       agentId: agent.id,
       agentName: agent.name,
       role: selectedRole,
       permissions: ROLE_DEFAULT_PERMISSIONS[selectedRole],
-      heartbeatConfig: ROLE_DEFAULT_HEARTBEAT[selectedRole],
+      heartbeatConfig: heartbeatCfg,
       addedAt: Date.now(),
     };
     await updateProject(projectId, { roster: [...project.roster, newMember] });
+
+    // Configure heartbeat in openclaw for this agent
+    if (heartbeatCfg.enabled) {
+      const { patchAgentDefaults } = await import("@/lib/mc/agent-files");
+      const intervalStr = heartbeatCfg.intervalSeconds >= 60
+        ? `${Math.round(heartbeatCfg.intervalSeconds / 60)}m`
+        : `${heartbeatCfg.intervalSeconds}s`;
+      await patchAgentDefaults({
+        agentId: agent.id,
+        perAgent: {
+          heartbeat: {
+            every: intervalStr,
+            model: "rikuchan-heartbeat/glm-4.7-flash",
+          },
+        },
+        globalDefaults: {},
+      });
+    }
+
     setAdding(false);
     setAddOpen(false);
     setSelectedAgentId("");
