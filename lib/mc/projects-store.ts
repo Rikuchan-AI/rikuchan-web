@@ -189,13 +189,12 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       tasks: { ...s.tasks, [projectId]: [task, ...(s.tasks[projectId] ?? [])] },
     }));
     try {
-      await getStorageAdapter().createTask(projectId, task);
+      const adapter = getStorageAdapter();
+      console.log("[Projects] createTask using adapter:", adapter.constructor.name, "projectId:", projectId, "taskId:", task.id);
+      await adapter.createTask(projectId, task);
+      console.log("[Projects] Task persisted OK:", task.id);
     } catch (err) {
-      console.error("[Projects] Failed to persist task:", err instanceof Error ? err.message : err);
-      // Surface error to user
-      if (typeof window !== "undefined") {
-        console.error("[Projects] Task created in-memory only — will be lost on page reload. Check API/auth config.");
-      }
+      console.error("[Projects] FAILED to persist task:", err instanceof Error ? err.message : err);
     }
     get().sendProjectCommand({ type: "task_create", projectId, task });
 
