@@ -1290,112 +1290,142 @@ export default function NewAgentPage() {
   const zipInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
 
+  const [importResult, setImportResult] = useState<string | null>(null);
+
   const handleZipImport = async (file: File) => {
     setImporting(true);
+    setImportResult(null);
+    setError(null);
     try {
       const zip = await JSZip.loadAsync(file);
       const mdFiles: Record<string, string> = {};
 
       // Find .md files — support nested dirs (agent/, or flat)
-      for (const [path, entry] of Object.entries(zip.files)) {
+      for (const [zipPath, entry] of Object.entries(zip.files)) {
         if (entry.dir) continue;
-        const fileName = path.split("/").pop() ?? "";
+        const fileName = zipPath.split("/").pop() ?? "";
         if (!fileName.endsWith(".md")) continue;
         const content = await entry.async("text");
-        mdFiles[fileName.toUpperCase()] = content;
-        // Also keep original case for non-standard files
         mdFiles[fileName] = content;
       }
 
-      // Parse IDENTITY.md to extract name/emoji/vibe
-      const identityContent = mdFiles["IDENTITY.MD"] ?? mdFiles["IDENTITY.md"] ?? "";
+      const found: string[] = [];
+
+      // Helper: case-insensitive file lookup
+      const getMd = (name: string): string | undefined => {
+        const upper = name.toUpperCase();
+        for (const [k, v] of Object.entries(mdFiles)) {
+          if (k.toUpperCase() === upper) return v;
+        }
+        return undefined;
+      };
+
+      // Parse IDENTITY.md for name/emoji/vibe
+      const identityContent = getMd("IDENTITY.md");
       if (identityContent) {
-        const nameMatch = identityContent.match(/\*\*Name:\*\*\s*(.+)/i);
-        const emojiMatch = identityContent.match(/\*\*Emoji:\*\*\s*(.+)/i);
-        const vibeMatch = identityContent.match(/\*\*Vibe:\*\*\s*(.+)/i);
-        const creatureMatch = identityContent.match(/\*\*Creature:\*\*\s*(.+)/i);
-        if (nameMatch) {
-          const parsed = nameMatch[1].trim();
-          if (parsed && !parsed.startsWith("(")) {
-            setDisplayName(parsed);
-            setName(parsed.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
-          }
-        }
-        if (emojiMatch) {
-          const parsed = emojiMatch[1].trim();
-          if (parsed && !parsed.startsWith("(")) setEmoji(parsed);
-        }
-        if (vibeMatch) {
-          const parsed = vibeMatch[1].trim();
-          if (parsed && !parsed.startsWith("(")) setTheme(parsed);
-        }
-        if (creatureMatch) {
-          const parsed = creatureMatch[1].trim();
-          if (parsed && !parsed.startsWith("(")) setDescription(parsed);
+        found.push("IDENTITY.md");
+        // Try **Name:** format first, then "- Name:" format
+        const nameMatch = identityContent.match(/\*?\*?Name:?\*?\*?\s*(.+)/i)
+          ?? identityContent.match(/^-\s*Name:\s*(.+)/mi);
+        const emojiMatch = identityContent.match(/\*?\*?Emoji:?\*?\*?\s*(.+)/i)
+          ?? identityContent.match(/^-\s*Emoji:\s*(.+)/mi);
+        const vibeMatch = identityContent.match(/\*?\*?Vibe:?\*?\*?\s*(.+)/i)
+          ?? identityContent.match(/^-\s*Vibe:\s*(.+)/mi);
+        const creatureMatch = identityContent.match(/\*?\*?Creature:?\*?\*?\s*(.+)/i)
+          ?? identityContent.match(/^-\s*Creature:\s*(.+)/mi);
+
+        const trySet = (match: RegExpMatchArray | null, setter: (v: string) => void) => {
+          if (!match) return;
+          const val = match[1].trim().replace(/^_?\(.*\)_?$/, "").trim();
+          if (val && val.length > 0) setter(val);
+        };
+
+        trySet(nameMatch, (v) => {
+          setDisplayName(v);
+          setName(v.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+        });
+        trySet(emojiMatch, setEmoji);
+        trySet(vibeMatch, setTheme);
+        trySet(creatureMatch, setDescription);
+      }
+
+      // Map known RPC-supported files to state
+      const soul = getMd("SOUL.md");
+      if (soul) { setSoulMd(soul); found.push("SOUL.md"); }
+
+      const agents = getMd("AGENTS.md");
+      if (agents) { setAgentsMd(agents); found.push("AGENTS.md"); }
+
+      const heartbeat = getMd("HEARTBEAT.md");
+      if (heartbeat) { setHeartbeatMd(heartbeat); found.push("HEARTBEAT.md"); }
+
+      const user = getMd("USER.md");
+      if (user) { setUserMd(user); found.push("USER.md"); }
+
+      const memory = getMd("MEMORY.md");
+      if (memory) { setMemoryMd(memory); found.push("MEMORY.md"); }
+
+      const tools = getMd("TOOLS.md");
+      if (tools) { found.push("TOOLS.md"); }
+
+      const bootstrap = getMd("BOOTSTRAP.md");
+      if (bootstrap) found.push("BOOTSTRAP.md");
+
+      // SYSTEM.md → SOUL.md fallback
+      const system = getMd("SYSTEM.md");
+      if (!soul && system) {
+        setSoulMd(system);
+        found.push("SYSTEM.md → SOUL.md");
+      }
+
+      // Non-RPC custom files → concatenate into AGENTS.md as reference sections
+      const rpcFiles = new Set([
+        "IDENTITY.md", "SOUL.md", "AGENTS.md", "HEARTBEAT.md", "USER.md",
+        "MEMORY.md", "TOOLS.md", "BOOT.md", "HOOK.md", "WORKING.md",
+        "BOOTSTRAP.md", "README.md", "SYSTEM.md",
+      ]);
+      const customFiles: { name: string; content: string }[] = [];
+      for (const [fileName, content] of Object.entries(mdFiles)) {
+        const isRpc = Array.from(rpcFiles).some((r) => r.toUpperCase() === fileName.toUpperCase());
+        if (!isRpc) {
+          customFiles.push({ name: fileName, content });
         }
       }
 
-      // Map known files to state
-      const soul = mdFiles["SOUL.MD"] ?? mdFiles["SOUL.md"];
-      if (soul) setSoulMd(soul);
+      // Append custom files as sections in AGENTS.md
+      if (customFiles.length > 0) {
+        const currentAgents = agents ?? agentsMd;
+        const appendix = customFiles
+          .map((f) => `\n\n---\n\n<!-- Imported from: ${f.name} -->\n\n${f.content}`)
+          .join("");
+        setAgentsMd(currentAgents + appendix);
+        found.push(...customFiles.map((f) => `${f.name} → AGENTS.md`));
+      }
 
-      const agents = mdFiles["AGENTS.MD"] ?? mdFiles["AGENTS.md"];
-      if (agents) setAgentsMd(agents);
-
-      const heartbeat = mdFiles["HEARTBEAT.MD"] ?? mdFiles["HEARTBEAT.md"];
-      if (heartbeat) setHeartbeatMd(heartbeat);
-
-      const user = mdFiles["USER.MD"] ?? mdFiles["USER.md"];
-      if (user) setUserMd(user);
-
-      const memory = mdFiles["MEMORY.MD"] ?? mdFiles["MEMORY.md"];
-      if (memory) setMemoryMd(memory);
-
-      // Enable/disable file includes based on what was found
+      // Enable file includes
       setIncludeFiles((prev) => ({
         ...prev,
         soulMd: true,
         identityMd: !!identityContent,
-        agentsMd: !!agents,
+        agentsMd: !!(agents || customFiles.length > 0),
         heartbeatMd: !!heartbeat,
         userMd: !!user,
         memoryMd: !!memory,
-        toolsMd: !!(mdFiles["TOOLS.MD"] ?? mdFiles["TOOLS.md"]),
-        bootMd: !!(mdFiles["BOOT.MD"] ?? mdFiles["BOOT.md"]),
-        hookMd: !!(mdFiles["HOOK.MD"] ?? mdFiles["HOOK.md"]),
-        workingMd: !!(mdFiles["WORKING.MD"] ?? mdFiles["WORKING.md"]),
+        toolsMd: !!tools,
       }));
 
-      // Extra files → fileContents
-      const extras: Record<string, [string, string]> = {
-        toolsMd: ["TOOLS.MD", "TOOLS.md"],
-        bootMd: ["BOOT.MD", "BOOT.md"],
-        hookMd: ["HOOK.MD", "HOOK.md"],
-        workingMd: ["WORKING.MD", "WORKING.md"],
-      };
-      for (const [key, [upper, orig]] of Object.entries(extras)) {
-        const content = mdFiles[upper] ?? mdFiles[orig];
-        if (content) setFileContents((prev) => ({ ...prev, [key]: content }));
-      }
+      // Extra editable files
+      if (tools) setFileContents((prev) => ({ ...prev, toolsMd: tools }));
+      const boot = getMd("BOOT.md");
+      if (boot) { setIncludeFiles((prev) => ({ ...prev, bootMd: true })); setFileContents((prev) => ({ ...prev, bootMd: boot })); }
+      const hook = getMd("HOOK.md");
+      if (hook) { setIncludeFiles((prev) => ({ ...prev, hookMd: true })); setFileContents((prev) => ({ ...prev, hookMd: hook })); }
+      const working = getMd("WORKING.md");
+      if (working) { setIncludeFiles((prev) => ({ ...prev, workingMd: true })); setFileContents((prev) => ({ ...prev, workingMd: working })); }
 
-      // Also store custom non-standard .md files
-      const stdFiles = new Set([
-        "IDENTITY.MD", "SOUL.MD", "AGENTS.MD", "HEARTBEAT.MD", "USER.MD",
-        "MEMORY.MD", "TOOLS.MD", "BOOT.MD", "HOOK.MD", "WORKING.MD",
-        "BOOTSTRAP.MD", "README.MD", "SYSTEM.MD",
-      ]);
-      for (const [fileName, content] of Object.entries(mdFiles)) {
-        if (!stdFiles.has(fileName.toUpperCase()) && fileName.endsWith(".md")) {
-          setFileContents((prev) => ({ ...prev, [fileName]: content }));
-        }
-      }
-
-      // Also populate SYSTEM.md content into SOUL.md if no SOUL.md was found
-      if (!soul && (mdFiles["SYSTEM.MD"] ?? mdFiles["SYSTEM.md"])) {
-        setSoulMd(mdFiles["SYSTEM.MD"] ?? mdFiles["SYSTEM.md"] ?? "");
-      }
-    } catch {
-      setError("Failed to read ZIP file");
+      setImportResult(`Imported ${found.length} files: ${found.join(", ")}`);
+    } catch (err) {
+      setError(`Failed to read ZIP: ${err instanceof Error ? err.message : "unknown error"}`);
     }
     setImporting(false);
   };
@@ -1575,6 +1605,19 @@ export default function NewAgentPage() {
           <Link href="/agents/gateway" className="text-xs text-accent hover:text-accent-deep font-medium shrink-0 ml-auto">
             Connect →
           </Link>
+        </div>
+      )}
+
+      {importResult && (
+        <div className="flex items-center justify-between rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
+          <span className="text-xs text-accent">{importResult}</span>
+          <button
+            type="button"
+            onClick={() => setImportResult(null)}
+            className="text-accent/60 hover:text-accent ml-2"
+          >
+            <X size={12} />
+          </button>
         </div>
       )}
 
