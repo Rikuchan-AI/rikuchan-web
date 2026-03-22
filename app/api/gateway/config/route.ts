@@ -37,10 +37,9 @@ export async function GET() {
     const token = gw.auth?.token ?? "";
 
     return NextResponse.json({ url, token, port, mode: gw.mode ?? "local" });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Could not read openclaw.json", detail: String(err) },
-      { status: 500 }
-    );
+  } catch {
+    // openclaw.json not available on this host — return empty config
+    // Client will use saved credentials from localStorage instead
+    return NextResponse.json({ url: "", token: "", port: 0, mode: "remote" });
   }
 }
