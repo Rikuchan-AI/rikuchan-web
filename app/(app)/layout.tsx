@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { AuthProvider } from "@/lib/mc/auth-provider";
 import { resolveTenantId, ensureTenant, checkTenantOnboarding } from "@/lib/mc/tenant";
 
 export default async function AppLayout({
@@ -19,5 +20,9 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <AuthProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </AuthProvider>
+  );
 }
