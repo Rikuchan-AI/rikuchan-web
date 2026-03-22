@@ -778,6 +778,9 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       const sessionsInfo = payload.sessions as { count?: number } | undefined;
 
       if (agents) {
+        const onlineStatuses = new Set(["online", "idle", "thinking"]);
+        const wentOnline: string[] = [];
+
         set((s) => {
           const updated = agents.map((ha) => {
             const existing = s.agents.find((a) => a.id === ha.agentId);
@@ -787,10 +790,51 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
             const status = existing.status === "online" && mapped.status === "idle"
               ? "online"
               : mapped.status;
+            // Detect offline → online transition
+            if (!onlineStatuses.has(existing.status) && onlineStatuses.has(status)) {
+              wentOnline.push(mapped.id);
+            }
             return { ...existing, ...mapped, name: existing.name || mapped.name, status };
           });
           return { agents: updated };
         });
+
+        // Auto-start queued tasks for agents that just came online
+        if (wentOnline.length > 0) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { useProjectsStore: getProjStore } = require("./projects-store") as { useProjectsStore: { getState: () => Record<string, unknown> } };
+            const ps = getProjStore.getState() as Record<string, unknown>;
+            const allTasks = ps.tasks as Record<string, Array<Record<string, unknown>>> | undefined;
+            const allProjects = ps.projects as Array<Record<string, unknown>> | undefined;
+            const updateTask = ps.updateTask as (projectId: string, taskId: string, updates: Record<string, unknown>) => void;
+            if (allTasks && allProjects) {
+              for (const agentId of wentOnline) {
+                for (const [projId, tasks] of Object.entries(allTasks)) {
+                  const queued = tasks.filter((t) =>
+                    t.assignedAgentId === agentId &&
+                    t.status === "backlog" &&
+                    t.delegationStatus === "delegated"
+                  );
+                  if (queued.length > 0) {
+                    const project = allProjects.find((p) => p.id === projId);
+                    if (project) {
+                      const roster = project.roster as Array<Record<string, unknown>> | undefined;
+                      const member = roster?.find((m) => m.agentId === agentId);
+                      if (member && queued[0]) {
+                        console.log(`[Auto-start] ${agentId} came online — starting task "${queued[0].title}"`);
+                        updateTask(projId, queued[0].id as string, { status: "progress", startedAt: Date.now() });
+                        import("./em-delegation").then(({ startTaskExecution }) => {
+                          startTaskExecution(queued[0] as never, member as never, project as never);
+                        }).catch(() => {});
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch { /* ignore */ }
+        }
       }
 
       const ok = payload.ok as boolean | undefined;
