@@ -10,7 +10,8 @@ import {
 import JSZip from "jszip";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
-import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults } from "@/lib/mc/agent-files";
+import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults, listWorkspacesViaGateway } from "@/lib/mc/agent-files";
+import type { ExistingWorkspace } from "@/lib/mc/agent-files";
 import { InfoTooltip } from "@/components/mc/ui/InfoTooltip";
 import { Combobox } from "@/components/mc/ui/Combobox";
 import {
@@ -164,6 +165,10 @@ function RoleCombobox({ value, onChange }: { value: string; onChange: (v: string
 function StepIdentity({
   name, displayName, role, customRole, emoji, theme, description,
   onChange,
+  workspaceMode, onWorkspaceModeChange,
+  customWorkspace, onCustomWorkspaceChange,
+  selectedWorkspace, onSelectedWorkspaceChange,
+  existingWorkspaces,
 }: {
   name: string;
   displayName: string;
@@ -173,6 +178,13 @@ function StepIdentity({
   theme: string;
   description: string;
   onChange: (field: string, value: string) => void;
+  workspaceMode: "auto" | "existing" | "custom";
+  onWorkspaceModeChange: (v: "auto" | "existing" | "custom") => void;
+  customWorkspace: string;
+  onCustomWorkspaceChange: (v: string) => void;
+  selectedWorkspace: string;
+  onSelectedWorkspaceChange: (v: string) => void;
+  existingWorkspaces: ExistingWorkspace[];
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
@@ -281,6 +293,77 @@ function StepIdentity({
           className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 min-h-[72px] resize-none"
           placeholder="What does this agent do?"
         />
+      </div>
+
+      {/* Workspace */}
+      <div>
+        <FieldLabel>Workspace</FieldLabel>
+        <div className="flex items-center gap-2 mb-2">
+          {(["auto", "existing", "custom"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onWorkspaceModeChange(mode)}
+              className={`h-7 px-3 rounded-md text-xs font-medium transition-colors ${
+                workspaceMode === mode
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-surface-strong border border-line text-foreground-muted hover:text-foreground"
+              }`}
+            >
+              {mode === "auto" ? "Auto" : mode === "existing" ? "Existing" : "Custom"}
+            </button>
+          ))}
+        </div>
+        {workspaceMode === "auto" && (
+          <p className="text-[10px] text-foreground-muted">
+            Workspace will be created automatically based on agent name.
+          </p>
+        )}
+        {workspaceMode === "existing" && (
+          <div className="space-y-1.5">
+            {existingWorkspaces.length === 0 ? (
+              <p className="text-xs text-foreground-muted py-2">No existing workspaces found.</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto rounded-md border border-line bg-surface-strong">
+                {existingWorkspaces.map((w) => (
+                  <button
+                    key={w.workspace}
+                    type="button"
+                    onClick={() => onSelectedWorkspaceChange(w.workspace)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
+                      selectedWorkspace === w.workspace
+                        ? "bg-accent/10 border-l-2 border-accent"
+                        : "hover:bg-surface border-l-2 border-transparent"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{w.agentName}</p>
+                      <p className="mono text-[10px] text-foreground-muted truncate">{w.workspace}</p>
+                    </div>
+                    {selectedWorkspace === w.workspace && <Check size={12} className="text-accent shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-foreground-muted">
+              Share a workspace with an existing agent. Both agents will read the same files.
+            </p>
+          </div>
+        )}
+        {workspaceMode === "custom" && (
+          <div>
+            <input
+              type="text"
+              value={customWorkspace}
+              onChange={(e) => onCustomWorkspaceChange(e.target.value)}
+              className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50"
+              placeholder="/data/.openclaw/workspace/my-workspace"
+            />
+            <p className="mt-1 text-[10px] text-foreground-muted">
+              Absolute path on the OpenClaw host filesystem.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1130,6 +1213,19 @@ export default function NewAgentPage() {
   const [emoji, setEmoji] = useState("🤖");
   const [theme, setTheme] = useState("");
   const [description, setDescription] = useState("");
+  const [workspaceMode, setWorkspaceMode] = useState<"auto" | "existing" | "custom">("auto");
+  const [customWorkspace, setCustomWorkspace] = useState("");
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+  const [existingWorkspaces, setExistingWorkspaces] = useState<ExistingWorkspace[]>([]);
+
+  // Fetch existing workspaces on mount
+  useEffect(() => {
+    if (isConnected) {
+      listWorkspacesViaGateway().then((res) => {
+        if (res.ok) setExistingWorkspaces(res.workspaces);
+      });
+    }
+  }, [isConnected]);
 
   // Step 2 — Soul
   const [soulMd, setSoulMd] = useState(() => {
@@ -1314,8 +1410,15 @@ export default function NewAgentPage() {
     setSubmitting(true);
     setError(null);
 
-    const workspaceBase = stateDir ? stateDir.replace(/\/?$/, "") : "/data";
-    const workspace = `${workspaceBase}/workspace/${name}`;
+    let workspace: string;
+    if (workspaceMode === "existing" && selectedWorkspace) {
+      workspace = selectedWorkspace;
+    } else if (workspaceMode === "custom" && customWorkspace.trim()) {
+      workspace = customWorkspace.trim();
+    } else {
+      const workspaceBase = stateDir ? stateDir.replace(/\/?$/, "") : "/data";
+      workspace = `${workspaceBase}/workspace/${name}`;
+    }
 
     const result = await createAgentViaGateway({ name, workspace, emoji });
 
@@ -1482,7 +1585,17 @@ export default function NewAgentPage() {
         </div>
 
         {step === 1 && (
-          <StepIdentity {...identityFields} onChange={handleIdentityChange} />
+          <StepIdentity
+            {...identityFields}
+            onChange={handleIdentityChange}
+            workspaceMode={workspaceMode}
+            onWorkspaceModeChange={setWorkspaceMode}
+            customWorkspace={customWorkspace}
+            onCustomWorkspaceChange={setCustomWorkspace}
+            selectedWorkspace={selectedWorkspace}
+            onSelectedWorkspaceChange={setSelectedWorkspace}
+            existingWorkspaces={existingWorkspaces}
+          />
         )}
         {step === 2 && (
           <SoulEditor

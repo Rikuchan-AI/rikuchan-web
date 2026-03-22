@@ -665,3 +665,67 @@ export function getFreeModelsFromConfig(): Promise<{ ok: boolean; groups?: Array
     ws.send(JSON.stringify({ type: "req", id, method: "config.get", params: {} }));
   });
 }
+
+// ─── List existing workspaces ───────────────────────────────────────────────
+
+export interface ExistingWorkspace {
+  agentId: string;
+  agentName: string;
+  workspace: string;
+}
+
+/**
+ * Fetch all existing agent workspaces from openclaw config.
+ * Returns a list of { agentId, agentName, workspace } for each registered agent.
+ */
+export function listWorkspacesViaGateway(): Promise<{ ok: boolean; workspaces: ExistingWorkspace[]; stateDir?: string }> {
+  return new Promise((resolve) => {
+    const store = useGatewayStore.getState();
+    const ws = store._ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      resolve({ ok: false, workspaces: [] });
+      return;
+    }
+
+    const id = `list-ws-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    registerExternalRpcResponseId(id);
+    const timeout = setTimeout(() => {
+      ws.removeEventListener("message", handler);
+      unregisterExternalRpcResponseId(id);
+      resolve({ ok: false, workspaces: [] });
+    }, 10000);
+
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "res" && msg.id === id) {
+          ws.removeEventListener("message", handler);
+          clearTimeout(timeout);
+          unregisterExternalRpcResponseId(id);
+          if (!msg.ok) {
+            resolve({ ok: false, workspaces: [] });
+            return;
+          }
+          const config = msg.payload?.config as Record<string, unknown> | undefined;
+          const agentsCfg = config?.agents as { list?: Array<Record<string, unknown>> } | undefined;
+          const stateDir = (config?.session as Record<string, unknown>)?.store as string | undefined;
+          const workspaces: ExistingWorkspace[] = [];
+          if (agentsCfg?.list) {
+            for (const a of agentsCfg.list) {
+              const agentId = a.id as string;
+              const workspace = a.workspace as string | undefined;
+              const agentName = a.name as string ?? agentId;
+              if (workspace) {
+                workspaces.push({ agentId, agentName, workspace });
+              }
+            }
+          }
+          resolve({ ok: true, workspaces, stateDir: stateDir ?? undefined });
+        }
+      } catch { /* ignore */ }
+    };
+
+    ws.addEventListener("message", handler);
+    ws.send(JSON.stringify({ type: "req", id, method: "config.get", params: {} }));
+  });
+}
