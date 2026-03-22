@@ -198,11 +198,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (["tasks", "pipelines", "memory-docs", "triggers"].includes(resource)) {
     const projectId = segments[1] || body.projectId;
     const now = Date.now();
-    const { error } = await supabase.from(table).upsert(
-      { id: body.id, project_id: projectId, user_id: userId, tenant_id: tenantId, data: body, created_at: body.createdAt ?? now, updated_at: body.updatedAt ?? now },
-      { onConflict: "project_id,id" }
-    );
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const row = { id: body.id, project_id: projectId, user_id: userId, tenant_id: tenantId, data: body, created_at: body.createdAt ?? now, updated_at: body.updatedAt ?? now };
+    console.log(`[MC API] POST ${resource}: id=${body.id} project=${projectId} tenant=${tenantId} user=${userId}`);
+    const { error, count, status: upsertStatus, statusText } = await supabase.from(table).upsert(row, { onConflict: "project_id,id" });
+    if (error) {
+      console.error(`[MC API] Upsert failed: ${error.message} code=${error.code} details=${error.details}`);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    console.log(`[MC API] Upsert OK: count=${count} status=${upsertStatus} statusText=${statusText}`);
     return NextResponse.json(body);
   }
 
