@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
-import { X, MoreHorizontal, CheckCircle2, Copy, ArrowRight, Trash2, Paperclip } from "lucide-react";
+import { X, MoreHorizontal, CheckCircle2, Copy, ArrowRight, Trash2, Paperclip, AlertTriangle } from "lucide-react";
 import { TaskPriorityBadge } from "@/components/mc/projects/TaskPriorityBadge";
 import { RikuInlineLoader } from "@/components/shared/riku-loader";
 import { useElapsedTime } from "@/hooks/use-elapsed-time";
@@ -121,6 +121,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
   const { elapsed, isOvertime } = useElapsedTime(task.status === "progress" ? task.startedAt : undefined);
 
   const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "log" | "timeline">("chat");
   const [descExpanded, setDescExpanded] = useState(false);
   const [showReassign, setShowReassign] = useState(false);
@@ -276,7 +277,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                     <ArrowRight size={13} /> Move to {task.status === "progress" ? "Review" : "In Progress"}
                   </button>
                   <div className="border-t border-line my-1" />
-                  <button onClick={() => { useProjectsStore.getState().deleteTask(projectId, task.id); setShowMenu(false); onClose(); }} className="flex items-center gap-2 px-3 py-2 text-sm text-foreground-soft hover:text-danger hover:bg-danger-soft transition-colors w-full text-left">
+                  <button onClick={() => { setConfirmDelete(true); setShowMenu(false); }} className="flex items-center gap-2 px-3 py-2 text-sm text-foreground-soft hover:text-danger hover:bg-danger-soft transition-colors w-full text-left">
                     <Trash2 size={13} /> Delete Task
                   </button>
                 </div>
@@ -287,6 +288,16 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
             </button>
           </div>
         </div>
+
+        {/* Confirm delete */}
+        {confirmDelete && (
+          <div className="mx-5 mb-3 flex items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2.5">
+            <AlertTriangle size={13} className="text-danger shrink-0" />
+            <p className="text-xs text-danger flex-1">Delete this task permanently?</p>
+            <button onClick={() => setConfirmDelete(false)} className="h-6 px-2 rounded text-xs text-foreground-muted hover:text-foreground">Cancel</button>
+            <button onClick={() => { deleteTask(projectId, task.id); onClose(); }} className="h-6 px-2 rounded bg-danger/10 text-xs text-danger hover:bg-danger/20">Delete</button>
+          </div>
+        )}
 
         {/* ── 2. Blocked Alert (fixed, only when blocked) ────────────── */}
         {task.status === "blocked" && (

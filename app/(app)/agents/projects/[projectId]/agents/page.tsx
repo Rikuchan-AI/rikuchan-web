@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
   Crown, FileText, X, ChevronDown,
-  ChevronRight, Plus, UserMinus, Check,
+  ChevronRight, Plus, UserMinus, Check, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
@@ -92,6 +92,7 @@ function RosterMemberCard({
   projectId,
   onUpdateMember,
   onRemoveMember,
+  onSyncHeartbeat,
 }: {
   member: RosterMember;
   agentStatus?: string;
@@ -99,8 +100,11 @@ function RosterMemberCard({
   projectId: string;
   onUpdateMember: (agentId: string, updates: Partial<RosterMember>) => void;
   onRemoveMember: (agentId: string) => void;
+  onSyncHeartbeat: (agentId: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const hasContext =
     (member.contextOverlay && member.contextOverlay.length > 0) ||
@@ -147,10 +151,20 @@ function RosterMemberCard({
             </span>
           )}
 
+          <button
+            type="button"
+            onClick={async () => { setSyncing(true); await onSyncHeartbeat(member.agentId); setSyncing(false); }}
+            disabled={syncing}
+            className="flex h-7 px-2 items-center gap-1 rounded-md text-[10px] text-foreground-muted hover:bg-accent/10 hover:text-accent transition-colors disabled:opacity-50"
+            title="Sync heartbeat to OpenClaw"
+          >
+            <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Syncing" : "Sync"}
+          </button>
           {member.role !== "lead" && (
             <button
               type="button"
-              onClick={() => onRemoveMember(member.agentId)}
+              onClick={() => setConfirmRemove(true)}
               className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-danger/10 hover:text-danger transition-colors"
               title="Remove from roster"
             >
@@ -166,6 +180,28 @@ function RosterMemberCard({
           </button>
         </div>
       </div>
+
+      {/* Confirm remove */}
+      {confirmRemove && (
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2">
+          <AlertTriangle size={12} className="text-danger shrink-0" />
+          <p className="text-xs text-danger flex-1">Remove {member.agentName} from roster?</p>
+          <button
+            type="button"
+            onClick={() => setConfirmRemove(false)}
+            className="h-6 px-2 rounded text-xs text-foreground-muted hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => { onRemoveMember(member.agentId); setConfirmRemove(false); }}
+            className="h-6 px-2 rounded bg-danger/10 text-xs text-danger hover:bg-danger/20 transition-colors"
+          >
+            Remove
+          </button>
+        </div>
+      )}
 
       {/* Permissions summary */}
       <div className="px-4 pb-3 flex flex-wrap gap-1">
@@ -297,6 +333,25 @@ export default function RosterPage() {
     if (!project) return;
     await updateProject(projectId, {
       roster: project.roster.filter((m) => m.agentId !== agentId),
+    });
+  };
+
+  const handleSyncHeartbeat = async (agentId: string) => {
+    const member = roster.find((m) => m.agentId === agentId);
+    const intervalSeconds = member?.heartbeatConfig?.intervalSeconds ?? 300;
+    const { patchAgentDefaults } = await import("@/lib/mc/agent-files");
+    const intervalStr = intervalSeconds >= 60
+      ? `${Math.round(intervalSeconds / 60)}m`
+      : `${intervalSeconds}s`;
+    await patchAgentDefaults({
+      agentId,
+      perAgent: {
+        heartbeat: {
+          every: intervalStr,
+          model: "rikuchan-heartbeat/glm-4.7-flash",
+        },
+      },
+      globalDefaults: {},
     });
   };
 
@@ -436,6 +491,7 @@ export default function RosterPage() {
                 projectId={projectId}
                 onUpdateMember={handleUpdateMember}
                 onRemoveMember={handleRemoveMember}
+                onSyncHeartbeat={handleSyncHeartbeat}
               />
             );
           })}
