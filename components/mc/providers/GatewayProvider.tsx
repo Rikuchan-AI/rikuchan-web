@@ -1,103 +1,59 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useChatStore } from "@/lib/mc/chat-store";
 import { useNotificationsStore } from "@/lib/mc/notifications-store";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { CommandPalette } from "@/components/mc/CommandPalette";
-import { Mascot } from "@/components/shared/mascot";
 import { RefreshCw, WifiOff } from "lucide-react";
 
-function DisconnectedOverlay() {
+function DisconnectedBanner() {
   const connect = useGatewayStore((s) => s.connect);
-  const config = useGatewayStore((s) => s.config);
   const status = useGatewayStore((s) => s.status);
-  const reconnectAt = useGatewayStore((s) => s.reconnectAt);
   const reconnectAttempts = useGatewayStore((s) => s.reconnectAttempts);
-  const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);
+  const [dismissed, setDismissed] = useState(false);
 
-  const [countdown, setCountdown] = useState<number | null>(null);
-
-  const handleReconnect = useCallback(() => {
-    connect();
-  }, [connect]);
-
-  const shouldAutoReconnect = config.autoReconnect || Boolean(expectedRestartReason);
-
-  useEffect(() => {
-    if (status !== "disconnected" || !shouldAutoReconnect || !reconnectAt) {
-      setCountdown(null);
-      return;
-    }
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((reconnectAt - Date.now()) / 1000));
-      setCountdown(remaining);
-    }, 250);
-    setCountdown(Math.max(0, Math.ceil((reconnectAt - Date.now()) / 1000)));
-    return () => clearInterval(interval);
-  }, [reconnectAt, shouldAutoReconnect, status]);
+  if (dismissed) return null;
 
   const isReconnecting = status === "connecting";
-  const isExpectedRestart = expectedRestartReason === "heartbeat-model-update";
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60" style={{ backdropFilter: "blur(4px)" }}>
-      <div className="mx-4 w-full max-w-sm space-y-5 rounded-xl border border-danger/30 bg-surface p-8 text-center">
-        <div className="flex justify-center">
-          <div className={`relative ${isReconnecting ? "animate-pulse" : ""}`}>
-            <Mascot size="lg" />
-            <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-danger bg-surface">
-              <WifiOff size={10} className="text-danger" />
-            </div>
-          </div>
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold tracking-[-0.03em] text-foreground" style={{ fontFamily: "var(--font-display)" }}>
-            {isExpectedRestart
-              ? isReconnecting ? "Restarting OpenClaw..." : "Applying Heartbeat Model..."
-              : isReconnecting ? "Reconnecting..." : "Connection Lost"}
-          </h2>
-          <p className="mt-1 text-sm text-foreground-muted">
-            {isExpectedRestart
-              ? isReconnecting
-                ? "Waiting for OpenClaw to come back after applying the new heartbeat model."
-                : "The gateway is restarting to apply the new heartbeat model."
-              : isReconnecting
-                ? "Attempting to reconnect to the gateway..."
-                : "The connection to the OpenClaw gateway was lost."}
-          </p>
-        </div>
-        <div className="space-y-1.5 rounded-md border border-line bg-surface-muted p-3">
-          <div className="flex items-center justify-between">
-            <span className="mono text-xs text-foreground-muted">Gateway</span>
-            <span className="mono ml-2 max-w-[180px] truncate text-xs text-foreground-soft">{config.url}</span>
-          </div>
-          {reconnectAttempts > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="mono text-xs text-foreground-muted">Retries</span>
-              <span className="mono text-xs text-foreground-soft">{reconnectAttempts}</span>
-            </div>
-          )}
-        </div>
-        <div className="space-y-2">
-          <button
-            onClick={handleReconnect}
-            disabled={isReconnecting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-deep disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={isReconnecting ? "animate-spin" : ""} />
-            {isExpectedRestart
-              ? isReconnecting ? "Waiting for restart..." : "Retry Now"
-              : isReconnecting ? "Connecting..." : "Reconnect Now"}
-          </button>
-          {countdown !== null && !isReconnecting && (
-            <p className="text-xs text-foreground-muted">
-              Retrying in <span className="font-medium text-foreground">{countdown}s</span>
+    <div className="fixed bottom-4 right-4 z-30 w-80 rounded-xl border border-warning/30 bg-surface shadow-xl p-4 space-y-3">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <WifiOff size={14} className="text-warning shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {isReconnecting ? "Reconnecting..." : "Gateway Offline"}
             </p>
-          )}
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {isReconnecting
+                ? "Attempting to reconnect..."
+                : "Some features require gateway connection."}
+            </p>
+          </div>
         </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-foreground-muted hover:text-foreground text-xs ml-2 shrink-0"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => connect()}
+          disabled={isReconnecting}
+          className="flex items-center gap-1.5 h-7 px-3 rounded-md bg-accent text-accent-foreground text-xs font-medium hover:bg-accent-deep transition-colors disabled:opacity-50 flex-1"
+        >
+          <RefreshCw size={11} className={isReconnecting ? "animate-spin" : ""} />
+          {isReconnecting ? "Connecting..." : "Reconnect"}
+        </button>
+        {reconnectAttempts > 0 && (
+          <span className="text-[10px] text-foreground-muted">Attempt {reconnectAttempts}</span>
+        )}
       </div>
     </div>
   );
@@ -146,12 +102,13 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
-  const showDisconnectedOverlay = (status === "disconnected" || status === "connecting") && connectedAt !== undefined;
+  // Show non-blocking banner when gateway disconnects (not on first load)
+  const showDisconnectedBanner = status !== "connected" && connectedAt !== undefined;
 
   return (
     <>
       {children}
-      {showDisconnectedOverlay && <DisconnectedOverlay />}
+      {showDisconnectedBanner && <DisconnectedBanner />}
       <CommandPalette open={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
     </>
   );
