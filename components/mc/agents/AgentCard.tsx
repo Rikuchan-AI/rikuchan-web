@@ -159,13 +159,17 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
                 >
                   <Settings size={13} /> Configurar
                 </Link>
-                <div className="my-1 border-t border-line" />
-                <button
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors w-full text-left"
-                  onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
-                >
-                  <Trash2 size={13} /> Deletar agente
-                </button>
+                {agent.id !== "main" && (
+                  <>
+                    <div className="my-1 border-t border-line" />
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors w-full text-left"
+                      onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                    >
+                      <Trash2 size={13} /> Deletar agente
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
