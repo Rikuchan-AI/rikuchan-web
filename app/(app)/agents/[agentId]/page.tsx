@@ -235,7 +235,7 @@ function TabIdentity({
       </div>
 
       {/* IDENTITY.md editor */}
-      {fileStates["IDENTITY.md"] && (
+      {fileStates["IDENTITY.md"] ? (
         <div>
           <p className="mono text-xs uppercase text-foreground-muted mb-3" style={{ letterSpacing: "0.18em" }}>Identity File</p>
           <FileEditor
@@ -246,6 +246,11 @@ function TabIdentity({
             onSave={(s) => onSaveFile("IDENTITY.md", s)}
             onRevert={(v) => onRevertFile("IDENTITY.md", v)}
           />
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 py-8 justify-center text-foreground-muted text-xs">
+          <RefreshCw size={12} className="animate-spin" />
+          Carregando arquivos do agente...
         </div>
       )}
 
@@ -577,9 +582,12 @@ export default function AgentDetailPage() {
     setLoadingFiles(false);
   }, [agentId]);
 
+  // Reload files when connection becomes ready or agentId changes
   useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    if (status === "connected") {
+      loadFiles();
+    }
+  }, [loadFiles, status]);
 
   const handleContentChange = (fileName: string, content: string) => {
     setFileStates((prev) => ({
