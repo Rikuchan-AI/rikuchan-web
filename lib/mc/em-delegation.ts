@@ -1,4 +1,4 @@
-import { useGatewayStore } from "./gateway-store";
+import { useGatewayStore, registerExternalRpcResponseId, unregisterExternalRpcResponseId } from "./gateway-store";
 import { useProjectsStore } from "./projects-store";
 import { buildAgentSessionKey } from "./session-routing";
 import type { Task, Project, RosterMember, ExecutionMessage } from "./types-project";
@@ -323,6 +323,7 @@ export function startTaskExecution(
   }
 
   const reqId = `exec-${task.id}-${Date.now()}-${attempt}`;
+  registerExternalRpcResponseId(reqId);
   const execGroup = project.groupId
     ? useProjectsStore.getState().groups.find((g) => g.id === project.groupId)
     : undefined;
@@ -345,9 +346,12 @@ Execute this task:
 Start working on it now. Report progress as you go.
 If you cannot complete the task due to missing data or access issues, respond with BLOCKED: followed by the reason.`;
 
+  console.log(`[Task] Sending chat.send for "${task.title}" via ${agent.agentName} (attempt ${attempt + 1})`);
+
   // Listen for the response to detect failure
   const timeout = setTimeout(() => {
     ws.removeEventListener("message", handler);
+    unregisterExternalRpcResponseId(reqId);
     // No response in 10s — retry
     if (attempt < MAX_RETRIES) {
       const delay = RETRY_DELAYS[attempt] ?? 15_000;
@@ -363,6 +367,7 @@ If you cannot complete the task due to missing data or access issues, respond wi
       if (msg.type === "res" && msg.id === reqId) {
         ws.removeEventListener("message", handler);
         clearTimeout(timeout);
+        unregisterExternalRpcResponseId(reqId);
 
         if (msg.ok) {
           const payload = msg.payload as { runId?: string; sessionKey?: string } | undefined;
