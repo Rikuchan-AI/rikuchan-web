@@ -188,7 +188,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     set((s) => ({
       tasks: { ...s.tasks, [projectId]: [task, ...(s.tasks[projectId] ?? [])] },
     }));
-    await getStorageAdapter().createTask(projectId, task);
+    try {
+      await getStorageAdapter().createTask(projectId, task);
+    } catch (err) {
+      console.error("[Projects] Failed to persist task:", err);
+    }
     get().sendProjectCommand({ type: "task_create", projectId, task });
 
     // Auto-delegate: if project is active, not manual, and task is unassigned in backlog
@@ -214,7 +218,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
         ),
       },
     }));
-    await getStorageAdapter().updateTask(projectId, taskId, updates);
+    try {
+      await getStorageAdapter().updateTask(projectId, taskId, updates);
+    } catch (err) {
+      console.error("[Projects] Failed to persist task update:", err);
+    }
   },
 
   assignTask: async (projectId, taskId, agentId) => {

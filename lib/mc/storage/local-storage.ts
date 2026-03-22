@@ -26,7 +26,11 @@ function readJSON<T>(k: string, fallback: T): T {
 
 function writeJSON(k: string, data: unknown) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(k, JSON.stringify(data));
+  try {
+    localStorage.setItem(k, JSON.stringify(data));
+  } catch (e) {
+    console.warn(`[Storage] Failed to write ${k}:`, e instanceof Error ? e.message : e);
+  }
 }
 
 function removeKey(k: string) {
