@@ -22,11 +22,27 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
 
   const roster = project.roster.filter((m) => m.role !== "lead");
 
+  // Check which agents are online
+  const onlineStatuses = new Set(["online", "idle", "thinking"]);
+  const isAgentOnline = (agentId: string): boolean => {
+    const agent = gwStore.agents.find((a) => a.id === agentId);
+    return agent ? onlineStatuses.has(agent.status) : false;
+  };
+
   // If no non-lead agents, try to assign to the lead itself (solo project)
   if (roster.length === 0) {
     const leadOnly = project.roster.find((m) => m.role === "lead");
     if (!leadOnly) {
       store.updateTask(project.id, task.id, { delegationStatus: "em-unavailable" });
+      return null;
+    }
+    if (!isAgentOnline(leadOnly.agentId)) {
+      store.updateTask(project.id, task.id, {
+        delegationStatus: "em-unavailable",
+        assignedAgentId: leadOnly.agentId,
+        assignedAgentName: leadOnly.agentName,
+        emDecisionReason: "Lead agent is offline — task queued for when agent comes online",
+      });
       return null;
     }
     const decision: EMDecision = {
@@ -39,9 +55,22 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
     return decision;
   }
 
-  // If only one non-lead agent, assign directly
+  // If only one non-lead agent, assign directly (but check online status)
   if (roster.length === 1) {
     const agent = roster[0];
+    if (!isAgentOnline(agent.agentId)) {
+      store.updateTask(project.id, task.id, {
+        assignedAgentId: agent.agentId,
+        assignedAgentName: agent.agentName,
+        emDecisionReason: `${agent.agentName} is offline — task will execute when agent comes online`,
+        delegationStatus: "delegated",
+      });
+      return {
+        assignedAgentId: agent.agentId,
+        assignedAgentName: agent.agentName,
+        reason: `${agent.agentName} is offline — task queued`,
+      };
+    }
     const decision: EMDecision = {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
