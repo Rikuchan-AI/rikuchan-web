@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Check, Plus,
   Crown, Brain, Wrench, Cpu, Settings2,
-  ChevronDown, X,
+  ChevronDown, X, Upload,
 } from "lucide-react";
+import JSZip from "jszip";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults } from "@/lib/mc/agent-files";
@@ -1189,6 +1190,120 @@ export default function NewAgentPage() {
     if (field === "sandboxMode")  setSandboxMode(value as SandboxMode);
   };
 
+  // ─── Import from ZIP ──────────────────────────────────────────────────────
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleZipImport = async (file: File) => {
+    setImporting(true);
+    try {
+      const zip = await JSZip.loadAsync(file);
+      const mdFiles: Record<string, string> = {};
+
+      // Find .md files — support nested dirs (agent/, or flat)
+      for (const [path, entry] of Object.entries(zip.files)) {
+        if (entry.dir) continue;
+        const fileName = path.split("/").pop() ?? "";
+        if (!fileName.endsWith(".md")) continue;
+        const content = await entry.async("text");
+        mdFiles[fileName.toUpperCase()] = content;
+        // Also keep original case for non-standard files
+        mdFiles[fileName] = content;
+      }
+
+      // Parse IDENTITY.md to extract name/emoji/vibe
+      const identityContent = mdFiles["IDENTITY.MD"] ?? mdFiles["IDENTITY.md"] ?? "";
+      if (identityContent) {
+        const nameMatch = identityContent.match(/\*\*Name:\*\*\s*(.+)/i);
+        const emojiMatch = identityContent.match(/\*\*Emoji:\*\*\s*(.+)/i);
+        const vibeMatch = identityContent.match(/\*\*Vibe:\*\*\s*(.+)/i);
+        const creatureMatch = identityContent.match(/\*\*Creature:\*\*\s*(.+)/i);
+        if (nameMatch) {
+          const parsed = nameMatch[1].trim();
+          if (parsed && !parsed.startsWith("(")) {
+            setDisplayName(parsed);
+            setName(parsed.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+          }
+        }
+        if (emojiMatch) {
+          const parsed = emojiMatch[1].trim();
+          if (parsed && !parsed.startsWith("(")) setEmoji(parsed);
+        }
+        if (vibeMatch) {
+          const parsed = vibeMatch[1].trim();
+          if (parsed && !parsed.startsWith("(")) setTheme(parsed);
+        }
+        if (creatureMatch) {
+          const parsed = creatureMatch[1].trim();
+          if (parsed && !parsed.startsWith("(")) setDescription(parsed);
+        }
+      }
+
+      // Map known files to state
+      const soul = mdFiles["SOUL.MD"] ?? mdFiles["SOUL.md"];
+      if (soul) setSoulMd(soul);
+
+      const agents = mdFiles["AGENTS.MD"] ?? mdFiles["AGENTS.md"];
+      if (agents) setAgentsMd(agents);
+
+      const heartbeat = mdFiles["HEARTBEAT.MD"] ?? mdFiles["HEARTBEAT.md"];
+      if (heartbeat) setHeartbeatMd(heartbeat);
+
+      const user = mdFiles["USER.MD"] ?? mdFiles["USER.md"];
+      if (user) setUserMd(user);
+
+      const memory = mdFiles["MEMORY.MD"] ?? mdFiles["MEMORY.md"];
+      if (memory) setMemoryMd(memory);
+
+      // Enable/disable file includes based on what was found
+      setIncludeFiles((prev) => ({
+        ...prev,
+        soulMd: true,
+        identityMd: !!identityContent,
+        agentsMd: !!agents,
+        heartbeatMd: !!heartbeat,
+        userMd: !!user,
+        memoryMd: !!memory,
+        toolsMd: !!(mdFiles["TOOLS.MD"] ?? mdFiles["TOOLS.md"]),
+        bootMd: !!(mdFiles["BOOT.MD"] ?? mdFiles["BOOT.md"]),
+        hookMd: !!(mdFiles["HOOK.MD"] ?? mdFiles["HOOK.md"]),
+        workingMd: !!(mdFiles["WORKING.MD"] ?? mdFiles["WORKING.md"]),
+      }));
+
+      // Extra files → fileContents
+      const extras: Record<string, [string, string]> = {
+        toolsMd: ["TOOLS.MD", "TOOLS.md"],
+        bootMd: ["BOOT.MD", "BOOT.md"],
+        hookMd: ["HOOK.MD", "HOOK.md"],
+        workingMd: ["WORKING.MD", "WORKING.md"],
+      };
+      for (const [key, [upper, orig]] of Object.entries(extras)) {
+        const content = mdFiles[upper] ?? mdFiles[orig];
+        if (content) setFileContents((prev) => ({ ...prev, [key]: content }));
+      }
+
+      // Also store custom non-standard .md files
+      const stdFiles = new Set([
+        "IDENTITY.MD", "SOUL.MD", "AGENTS.MD", "HEARTBEAT.MD", "USER.MD",
+        "MEMORY.MD", "TOOLS.MD", "BOOT.MD", "HOOK.MD", "WORKING.MD",
+        "BOOTSTRAP.MD", "README.MD", "SYSTEM.MD",
+      ]);
+      for (const [fileName, content] of Object.entries(mdFiles)) {
+        if (!stdFiles.has(fileName.toUpperCase()) && fileName.endsWith(".md")) {
+          setFileContents((prev) => ({ ...prev, [fileName]: content }));
+        }
+      }
+
+      // Also populate SYSTEM.md content into SOUL.md if no SOUL.md was found
+      if (!soul && (mdFiles["SYSTEM.MD"] ?? mdFiles["SYSTEM.md"])) {
+        setSoulMd(mdFiles["SYSTEM.MD"] ?? mdFiles["SYSTEM.md"] ?? "");
+      }
+    } catch {
+      setError("Failed to read ZIP file");
+    }
+    setImporting(false);
+  };
+
   const canProceed = useMemo(() => {
     if (step === 1) return !!name.trim() && !!role;
     return true;
@@ -1316,12 +1431,36 @@ export default function NewAgentPage() {
       </Link>
 
       <div className="space-y-2">
-        <h2
-          className="text-xl font-semibold tracking-[-0.03em] text-foreground"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          New Agent
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2
+            className="text-xl font-semibold tracking-[-0.03em] text-foreground"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            New Agent
+          </h2>
+          <div>
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleZipImport(file);
+                if (zipInputRef.current) zipInputRef.current.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-line bg-surface-strong text-xs text-foreground-muted hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-50"
+            >
+              <Upload size={12} />
+              {importing ? "Importing..." : "Import from ZIP"}
+            </button>
+          </div>
+        </div>
         <StepIndicator current={step} />
       </div>
 
