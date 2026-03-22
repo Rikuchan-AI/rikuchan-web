@@ -58,27 +58,40 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
   // If only one non-lead agent, assign directly (but check online status)
   if (roster.length === 1) {
     const agent = roster[0];
-    if (!isAgentOnline(agent.agentId)) {
-      store.updateTask(project.id, task.id, {
+    if (isAgentOnline(agent.agentId)) {
+      const decision: EMDecision = {
         assignedAgentId: agent.agentId,
         assignedAgentName: agent.agentName,
-        emDecisionReason: `${agent.agentName} is offline — task will execute when agent comes online`,
-        delegationStatus: "delegated",
-      });
-      return {
-        assignedAgentId: agent.agentId,
-        assignedAgentName: agent.agentName,
-        reason: `${agent.agentName} is offline — task queued`,
+        reason: "Only available agent in roster",
       };
+      applyDelegation(project.id, task.id, decision);
+      startTaskExecution(task, agent, project);
+      return decision;
     }
-    const decision: EMDecision = {
+    // Agent offline — fall back to lead if online
+    const leadAgent = project.roster.find((m) => m.role === "lead");
+    if (leadAgent && isAgentOnline(leadAgent.agentId)) {
+      const decision: EMDecision = {
+        assignedAgentId: leadAgent.agentId,
+        assignedAgentName: leadAgent.agentName,
+        reason: `${agent.agentName} is offline — lead executing directly`,
+      };
+      applyDelegation(project.id, task.id, decision);
+      startTaskExecution(task, leadAgent, project);
+      return decision;
+    }
+    // Both offline — queue
+    store.updateTask(project.id, task.id, {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
-      reason: "Only available agent in roster",
+      emDecisionReason: `${agent.agentName} is offline — task queued`,
+      delegationStatus: "delegated",
+    });
+    return {
+      assignedAgentId: agent.agentId,
+      assignedAgentName: agent.agentName,
+      reason: `${agent.agentName} is offline — task queued`,
     };
-    applyDelegation(project.id, task.id, decision);
-    startTaskExecution(task, agent, project);
-    return decision;
   }
 
   // Find lead agent
