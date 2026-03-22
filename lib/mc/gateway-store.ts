@@ -118,6 +118,24 @@ function loadPersistedConfig(): Partial<GatewayConfig> {
 function persistConfig(config: GatewayConfig) {
   if (typeof window === "undefined") return;
   localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
+  // Also persist to Supabase settings (fire-and-forget)
+  fetch("/api/mc/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: "gateway-config", value: { url: config.url, token: config.token } }),
+  }).catch(() => {});
+}
+
+async function loadPersistedConfigFromServer(): Promise<Partial<GatewayConfig>> {
+  try {
+    const res = await fetch("/api/mc/settings/gateway-config");
+    if (!res.ok) return {};
+    const data = await res.json();
+    if (data?.url && data?.token) return data;
+    return {};
+  } catch {
+    return {};
+  }
 }
 
 function mkReqId() {
@@ -299,21 +317,41 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     if (get()._configHydrated) return;
     const persisted = loadPersistedConfig();
     if (persisted.token && persisted.url) {
-      // User has saved config — use it
+      // User has saved config in localStorage — use it
       set((s) => ({ config: { ...s.config, ...persisted }, _configHydrated: true }));
     } else {
-      // No saved config — try to auto-detect from openclaw.json
+      // No localStorage config — try Supabase settings, then auto-detect
       set({ _configHydrated: true });
-      fetch("/api/gateway/config")
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (data?.url && data?.token) {
-            const autoConfig = { url: data.url, token: data.token };
-            set((s) => ({ config: { ...s.config, ...autoConfig } }));
-            persistConfig({ ...get().config, ...autoConfig });
+      loadPersistedConfigFromServer()
+        .then((serverConfig) => {
+          if (serverConfig.url && serverConfig.token) {
+            // Found in Supabase — restore to localStorage and use
+            const restored = { url: serverConfig.url, token: serverConfig.token };
+            set((s) => ({ config: { ...s.config, ...restored } }));
+            if (typeof window !== "undefined") {
+              localStorage.setItem("rikuchan:gateway-config", JSON.stringify({ ...get().config, ...restored }));
+            }
+            // Auto-connect with restored config
+            setTimeout(() => {
+              const s = get();
+              if (s.status === "disconnected" && s.config.url && s.config.token) {
+                s.connect();
+              }
+            }, 100);
+            return;
           }
+          // Nothing in Supabase either — try local openclaw.json
+          return fetch("/api/gateway/config")
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+              if (data?.url && data?.token) {
+                const autoConfig = { url: data.url, token: data.token };
+                set((s) => ({ config: { ...s.config, ...autoConfig } }));
+                persistConfig({ ...get().config, ...autoConfig });
+              }
+            });
         })
-        .catch(() => { /* openclaw.json not available */ });
+        .catch(() => { /* no config available */ });
     }
   },
 
