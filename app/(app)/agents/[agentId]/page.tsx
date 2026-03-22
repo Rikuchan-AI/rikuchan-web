@@ -536,11 +536,11 @@ export default function AgentDetailPage() {
     const result = await listAgentFilesViaGateway(agentId);
     if (result.ok && result.files) {
       const states: Record<string, AgentFileState> = {};
+      // First pass: set up states from list (no content yet)
       for (const file of result.files) {
-        const content = file.content ?? "";
         states[file.name] = {
-          content,
-          original: content,
+          content: "",
+          original: "",
           dirty: false,
           saving: false,
           syncStatus: file.missing ? "desync" : "synced",
@@ -548,6 +548,31 @@ export default function AgentDetailPage() {
         };
       }
       setFileStates(states);
+
+      // Second pass: fetch content for each non-missing file in parallel
+      const contentFetches = result.files
+        .filter((f) => !f.missing)
+        .map(async (file) => {
+          const got = await getAgentFileViaGateway(agentId, file.name);
+          if (got.ok && got.content != null) {
+            return { name: file.name, content: got.content };
+          }
+          return null;
+        });
+      const fetched = await Promise.all(contentFetches);
+      setFileStates((prev) => {
+        const updated = { ...prev };
+        for (const item of fetched) {
+          if (item && updated[item.name]) {
+            updated[item.name] = {
+              ...updated[item.name],
+              content: item.content,
+              original: item.content,
+            };
+          }
+        }
+        return updated;
+      });
     }
     setLoadingFiles(false);
   }, [agentId]);

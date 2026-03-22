@@ -249,8 +249,8 @@ function healthAgentToAgent(
     avgResponseMs: 0,
     lastActivityAt,
     heartbeat: heartbeat ? {
-      lastSuccessAt: toMs(heartbeat.lastSuccessAt as number ?? 0),
-      failures: (heartbeat.consecutiveFailures as number) ?? 0,
+      lastSuccessAt: status !== "offline" ? lastActivityAt : 0,
+      failures: 0,
       model: heartbeatModel,
     } : undefined,
     model: heartbeatModel || undefined,
