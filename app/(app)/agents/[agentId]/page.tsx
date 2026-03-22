@@ -6,7 +6,9 @@ import {
   Crown, Code, Wrench, Cpu, History, FileText,
   RefreshCw, AlertTriangle, Check, Clock, Download,
   Copy, ChevronDown, ChevronRight, Upload, X, MoreHorizontal, Search,
+  Eye, Pencil,
 } from "lucide-react";
+import Markdown from "react-markdown";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
@@ -87,6 +89,7 @@ function FileEditor({
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const [saveSummary, setSaveSummary] = useState("");
+  const [preview, setPreview] = useState(false);
 
   return (
     <div className="space-y-3">
@@ -100,6 +103,18 @@ function FileEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPreview((v) => !v)}
+            className={`flex items-center gap-1 h-7 px-2 rounded-md border text-[10px] transition-colors ${
+              preview
+                ? "border-accent/40 bg-accent/10 text-accent"
+                : "border-line bg-surface-strong text-foreground-muted hover:text-foreground"
+            }`}
+          >
+            {preview ? <Pencil size={10} /> : <Eye size={10} />}
+            {preview ? "Edit" : "Preview"}
+          </button>
           {state.versions.length > 0 && (
             <button
               type="button"
@@ -150,13 +165,17 @@ function FileEditor({
         </div>
       )}
 
-      {/* Editor */}
+      {/* Editor / Preview */}
       {state.syncStatus === "desync" && !state.content ? (
         <div className="w-full rounded-md border border-line bg-surface-strong px-4 py-8 min-h-[320px] flex items-center justify-center">
           <p className="text-xs text-foreground-muted text-center">
             Arquivo não disponível — agente offline.<br />
             <span className="text-foreground-muted/60">Inicie o agente para carregar o conteúdo.</span>
           </p>
+        </div>
+      ) : preview ? (
+        <div className="w-full rounded-md border border-line bg-surface-strong px-4 py-4 min-h-[320px] overflow-y-auto prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground-soft prose-li:text-foreground-soft prose-strong:text-foreground prose-code:text-accent prose-code:bg-surface prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[11px] prose-pre:bg-surface prose-pre:border prose-pre:border-line prose-hr:border-line">
+          <Markdown>{state.content || "*Empty file*"}</Markdown>
         </div>
       ) : (
         <textarea
