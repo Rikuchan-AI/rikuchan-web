@@ -58,39 +58,31 @@ export async function triggerEMDelegation(task: Task, project: Project): Promise
   // If only one non-lead agent, assign to them
   if (roster.length === 1) {
     const agent = roster[0];
-    const decision: EMDecision = {
-      assignedAgentId: agent.agentId,
-      assignedAgentName: agent.agentName,
-      reason: "Only available agent in roster",
-    };
 
     if (isAgentOnline(agent.agentId)) {
       // Agent online — execute directly
+      const decision: EMDecision = {
+        assignedAgentId: agent.agentId,
+        assignedAgentName: agent.agentName,
+        reason: "Only available agent in roster",
+      };
       applyDelegation(project.id, task.id, decision);
       startTaskExecution(task, agent, project);
       return decision;
     }
 
-    // Agent offline — lead spawns the agent via sessions_spawn
-    const leadAgent = project.roster.find((m) => m.role === "lead");
-    if (leadAgent && isAgentOnline(leadAgent.agentId)) {
-      decision.reason = `${agent.agentName} is offline — lead spawning agent`;
-      applyDelegation(project.id, task.id, decision);
-      spawnAgentViaLead(task, agent, leadAgent, project);
-      return decision;
-    }
-
-    // Both offline — queue
+    // Agent offline — assign but keep in backlog, don't start execution
     store.updateTask(project.id, task.id, {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
-      emDecisionReason: `${agent.agentName} is offline — task queued`,
+      emDecisionReason: `${agent.agentName} is offline — task will start when agent comes online`,
       delegationStatus: "delegated",
+      // Keep in backlog, don't move to progress
     });
     return {
       assignedAgentId: agent.agentId,
       assignedAgentName: agent.agentName,
-      reason: `${agent.agentName} is offline — task queued`,
+      reason: `${agent.agentName} is offline — waiting for agent`,
     };
   }
 
@@ -301,96 +293,6 @@ function parseEMResponse(text: string, roster: RosterMember[]): EMDecision | nul
     console.warn("[Lead] Failed to parse response:", err);
     return null;
   }
-}
-
-/**
- * Ask the lead agent to spawn an offline agent for task execution.
- * The lead sends a sessions_spawn command via the gateway to wake the target agent.
- */
-function spawnAgentViaLead(
-  task: Task,
-  targetAgent: RosterMember,
-  leadAgent: RosterMember,
-  project: Project,
-): void {
-  const gwStore = useGatewayStore.getState();
-  const ws = gwStore._ws;
-
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    appendTaskLog(project.id, task.id, "system", "Cannot spawn agent — gateway not connected");
-    return;
-  }
-
-  const execGroup = project.groupId
-    ? useProjectsStore.getState().groups.find((g) => g.id === project.groupId)
-    : undefined;
-  const sessionKey = buildAgentSessionKey(leadAgent.agentId, project, execGroup?.agentId);
-
-  const workspace = project.workspacePath || "(not configured)";
-  const contextParts: string[] = [];
-  if (task.contextNote) contextParts.push(task.contextNote);
-  if (task.contextFiles) {
-    for (const cf of task.contextFiles) {
-      const truncated = cf.content.length > 8000 ? cf.content.slice(0, 8000) + "\n... (truncated)" : cf.content;
-      contextParts.push(`--- ${cf.name} ---\n${truncated}`);
-    }
-  }
-  const contextSection = contextParts.length > 0 ? `\n\nContext:\n${contextParts.join("\n\n")}` : "";
-
-  const spawnPrompt = `You are ${leadAgent.agentName}, the Lead Agent for project "${project.name}".
-
-Spawn agent "${targetAgent.agentName}" (id: ${targetAgent.agentId}) to execute this task:
-- Title: ${task.title}
-- Description: ${task.description}
-- Priority: ${task.priority}
-- Workspace: ${workspace}${contextSection}
-
-Use sessions_spawn to start "${targetAgent.agentName}" with the task details above.
-The spawned agent should work on this task and report back when done.`;
-
-  const reqId = `spawn-${task.id}-${Date.now()}`;
-  registerExternalRpcResponseId(reqId);
-
-  appendTaskLog(project.id, task.id, "system", `Lead spawning ${targetAgent.agentName}...`);
-
-  const timeout = setTimeout(() => {
-    ws.removeEventListener("message", handler);
-    unregisterExternalRpcResponseId(reqId);
-    appendTaskLog(project.id, task.id, "system", `Spawn request timed out — task remains assigned to ${targetAgent.agentName}`);
-  }, 15_000);
-
-  const handler = (event: MessageEvent) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === "res" && msg.id === reqId) {
-        ws.removeEventListener("message", handler);
-        clearTimeout(timeout);
-        unregisterExternalRpcResponseId(reqId);
-        if (msg.ok) {
-          appendTaskLog(project.id, task.id, "system", `Lead spawned ${targetAgent.agentName} successfully`);
-          useProjectsStore.getState().updateTask(project.id, task.id, {
-            status: "progress",
-            startedAt: Date.now(),
-          });
-        } else {
-          const err = msg.error as { message?: string } | undefined;
-          appendTaskLog(project.id, task.id, "system", `Spawn failed: ${err?.message ?? "unknown error"}`);
-        }
-      }
-    } catch { /* ignore */ }
-  };
-
-  ws.addEventListener("message", handler);
-  ws.send(JSON.stringify({
-    type: "req",
-    id: reqId,
-    method: "chat.send",
-    params: {
-      sessionKey,
-      message: spawnPrompt,
-      idempotencyKey: `spawn-${task.id}`,
-    },
-  }));
 }
 
 const MAX_RETRIES = 3;
