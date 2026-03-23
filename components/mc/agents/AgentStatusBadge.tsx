@@ -16,7 +16,7 @@ interface AgentStatusBadgeProps {
 }
 
 export function AgentStatusBadge({ status }: AgentStatusBadgeProps) {
-  const { label, className } = statusConfig[status];
+  const { label, className } = statusConfig[status] ?? { label: status ?? "Unknown", className: "bg-zinc-400/10 text-zinc-400 border border-zinc-400/15" };
   return (
     <span
       className={`rounded-md px-2.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-[0.06em] ${className}`}
