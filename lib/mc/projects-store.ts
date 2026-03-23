@@ -175,7 +175,15 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   createProject: async (project) => {
     set((s) => ({ projects: [project, ...s.projects] }));
     try {
-      await getApiClient().projects.create(project);
+      const created = await getApiClient().projects.create(project);
+      // If backend returned a different ID, update local state to match
+      if (created && created.id !== project.id) {
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === project.id ? { ...p, ...created } : p,
+          ),
+        }));
+      }
     } catch (err) {
       console.error("[projects] Failed to create project:", err);
     }
@@ -244,7 +252,18 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       },
     }));
     try {
-      await getApiClient().tasks.create(projectId, task);
+      const created = await getApiClient().tasks.create(projectId, task);
+      // If backend returned a different ID, update local state to match
+      if (created && created.id !== task.id) {
+        set((s) => ({
+          tasks: {
+            ...s.tasks,
+            [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+              t.id === task.id ? { ...t, ...created } : t,
+            ),
+          },
+        }));
+      }
     } catch (err) {
       console.error("[projects] Failed to create task:", err);
     }
