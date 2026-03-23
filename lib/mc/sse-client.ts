@@ -5,6 +5,11 @@ import {
   EventStreamContentType,
 } from "@microsoft/fetch-event-source";
 
+// ─── Error Types ─────────────────────────────────────────────────────────────
+
+class FatalError extends Error {}
+class RetriableError extends Error {}
+
 // ─── SSE Event Types ─────────────────────────────────────────────────────────
 
 export type SseEventMap = {
@@ -107,9 +112,9 @@ export class SseClient {
 
     await fetchEventSource(`${this.baseUrl}/api/events`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${await this.getToken()}` },
       signal: this.ctrl.signal,
 
+      // Fresh token on every connection attempt (including retries)
       async onopen(response) {
         if (
           response.ok &&
@@ -117,13 +122,17 @@ export class SseClient {
             .get("content-type")
             ?.includes(EventStreamContentType)
         ) {
-          // Reconnect: re-hydrate state
           if (self._onReconnect) {
             await self._onReconnect();
           }
           return;
         }
-        throw new Error(`SSE open failed: ${response.status}`);
+        // Stop retrying on auth errors — token is invalid
+        if (response.status === 401 || response.status === 403) {
+          self._connected = false;
+          throw new FatalError(`SSE auth failed: ${response.status}`);
+        }
+        throw new RetriableError(`SSE open failed: ${response.status}`);
       },
 
       onmessage(event) {
@@ -145,16 +154,30 @@ export class SseClient {
 
       onerror(err) {
         self._connected = false;
-        console.error("[sse] Error, will retry:", err);
-        // fetchEventSource handles retry with backoff automatically
+        // Fatal errors (like 401) should stop retrying
+        if (err instanceof FatalError) {
+          throw err; // This stops fetchEventSource from retrying
+        }
+        // Other errors: let fetchEventSource retry with backoff
       },
 
       onclose() {
         self._connected = false;
       },
 
-      // Keep connection alive even with hidden tab
       openWhenHidden: true,
+
+      // Fetch with fresh token on each attempt
+      fetch: async (input, init) => {
+        const token = await self.getToken();
+        return fetch(input, {
+          ...init,
+          headers: {
+            ...init?.headers,
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      },
     });
   }
 
