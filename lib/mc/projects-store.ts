@@ -157,37 +157,32 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   deleteGroup: async (id) => {
     const group = get().groups.find((g) => g.id === id);
 
-    // 1. Delete from Supabase first — only remove from UI if successful
+    // 1. Delete group from Supabase
     await getStorageAdapter().deleteGroup(id);
 
-    // 2. If group had an agent in OpenClaw, delete it via gateway
+    // 2. If group had its own agent in OpenClaw, delete it
     if (group?.agentId) {
       try {
         const { deleteAgentViaGateway } = await import("./agent-files");
         await deleteAgentViaGateway(group.agentId);
       } catch {
-        // Gateway may be offline — agent cleanup is best-effort
+        // Gateway may be offline — best-effort
       }
     }
 
-    // 3. Delete all projects belonging to this group (cascades tasks/pipelines via API)
+    // 3. Cascade delete all projects (each handles its own gateway agent cleanup)
     const groupProjects = get().projects.filter((p) => p.groupId === id);
     for (const p of groupProjects) {
       try {
-        await getStorageAdapter().deleteProject(p.id);
+        await get().deleteProject(p.id);
       } catch {
         // best-effort cascade
       }
     }
 
-    // 4. Only now update UI — remove group, projects, and their tasks
-    const projectIds = new Set(groupProjects.map((p) => p.id));
+    // 4. Remove group from UI (projects already removed by deleteProject)
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
-      projects: s.projects.filter((p) => p.groupId !== id),
-      tasks: Object.fromEntries(
-        Object.entries(s.tasks).filter(([pid]) => !projectIds.has(pid))
-      ),
     }));
   },
 
@@ -222,9 +217,27 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   },
 
   deleteProject: async (id) => {
-    // Delete from Supabase first (cascades tasks/pipelines/etc via API)
+    const project = get().projects.find((p) => p.id === id);
+
+    // 1. Delete from Supabase first (cascades tasks/pipelines/etc via API)
     await getStorageAdapter().deleteProject(id);
-    // Only remove from UI after confirmed deletion — including tasks
+
+    // 2. Clean up gateway agents (best-effort — gateway may be offline)
+    if (project?.roster?.length) {
+      try {
+        const { deleteAgentViaGateway } = await import("./agent-files");
+        for (const member of project.roster) {
+          const agentId = member.gatewayAgentId ?? member.agentId;
+          if (agentId) {
+            await deleteAgentViaGateway(agentId);
+          }
+        }
+      } catch {
+        // Gateway offline — agent cleanup skipped
+      }
+    }
+
+    // 3. Only remove from UI after confirmed deletion — including tasks
     set((s) => {
       const { [id]: _, ...remainingTasks } = s.tasks;
       return { projects: s.projects.filter((p) => p.id !== id), tasks: remainingTasks };
