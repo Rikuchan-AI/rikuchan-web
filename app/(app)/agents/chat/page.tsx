@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -15,7 +15,15 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-export default function ChatListPage() {
+export default function ChatListPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <ChatListPage />
+    </Suspense>
+  );
+}
+
+function ChatListPage() {
   const conversations = useDirectChatStore((s) => s.conversations);
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);

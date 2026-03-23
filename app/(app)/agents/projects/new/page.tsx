@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, AlertTriangle, Crown, Plus, Star } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
@@ -724,7 +724,15 @@ function StepReview({
 
 // ─── Main wizard ─────────────────────────────────────────────────────────────
 
-export default function NewProjectPage() {
+export default function NewProjectPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20 text-foreground-muted text-sm">Loading...</div>}>
+      <NewProjectPage />
+    </Suspense>
+  );
+}
+
+function NewProjectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createProject = useProjectsStore((s) => s.createProject);
