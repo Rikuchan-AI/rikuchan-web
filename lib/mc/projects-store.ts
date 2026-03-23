@@ -347,10 +347,20 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
 
   resumeProject: async (id) => {
     await getApiClient().projects.resume(id);
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, status: "active" as const, updatedAt: Date.now() } : p,
+      ),
+    }));
   },
 
   completeProject: async (id) => {
     await getApiClient().projects.complete(id);
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, status: "completed" as const, updatedAt: Date.now() } : p,
+      ),
+    }));
   },
 
   delegateTask: async (projectId, taskId) => {
