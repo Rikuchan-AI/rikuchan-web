@@ -284,6 +284,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     ctx = await requireTenant();
   } catch (res) {
+    console.error("[MC API DELETE] Auth failed");
     return res as NextResponse;
   }
   const { tenantId } = ctx;
@@ -291,6 +292,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const resource = segments[0];
   const itemId = segments[1];
   const table = TABLE_MAP[resource];
+  console.log(`[MC API DELETE] resource=${resource} id=${itemId} tenant=${tenantId} role=${ctx.role}`);
   if (!table || !itemId) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   // Granular permission check per resource
@@ -298,6 +300,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     await requirePermission(ctx, permission);
   } catch (res) {
+    console.error(`[MC API DELETE] Permission denied: ${permission} for role=${ctx.role}`);
     return res as NextResponse;
   }
 
@@ -328,6 +331,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return new NextResponse(null, { status: 204 });
   }
 
-  await supabase.from(table).delete().eq("id", itemId).eq("tenant_id", tenantId);
+  const { error } = await supabase.from(table).delete().eq("id", itemId).eq("tenant_id", tenantId);
+  if (error) {
+    console.error(`[MC API DELETE] Supabase error:`, error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  console.log(`[MC API DELETE] Success: ${resource}/${itemId}`);
   return new NextResponse(null, { status: 204 });
 }
