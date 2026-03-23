@@ -1,6 +1,6 @@
 // ─── Project Types ──────────────────────────────────────────────────────────
 
-export type ProjectStatus = "active" | "paused" | "archived";
+export type ProjectStatus = "draft" | "active" | "paused" | "completed" | "archived";
 export type OperationMode = "manual" | "supervised" | "autonomous";
 
 export type GroupColor =
