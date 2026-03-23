@@ -170,7 +170,7 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       }
     }
 
-    // 3. Delete all projects belonging to this group
+    // 3. Delete all projects belonging to this group (cascades tasks/pipelines via API)
     const groupProjects = get().projects.filter((p) => p.groupId === id);
     for (const p of groupProjects) {
       try {
@@ -180,10 +180,14 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       }
     }
 
-    // 4. Only now update UI
+    // 4. Only now update UI — remove group, projects, and their tasks
+    const projectIds = new Set(groupProjects.map((p) => p.id));
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
       projects: s.projects.filter((p) => p.groupId !== id),
+      tasks: Object.fromEntries(
+        Object.entries(s.tasks).filter(([pid]) => !projectIds.has(pid))
+      ),
     }));
   },
 
@@ -220,8 +224,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   deleteProject: async (id) => {
     // Delete from Supabase first (cascades tasks/pipelines/etc via API)
     await getStorageAdapter().deleteProject(id);
-    // Only remove from UI after confirmed deletion
-    set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    // Only remove from UI after confirmed deletion — including tasks
+    set((s) => {
+      const { [id]: _, ...remainingTasks } = s.tasks;
+      return { projects: s.projects.filter((p) => p.id !== id), tasks: remainingTasks };
+    });
     get().sendProjectCommand({ type: "project_delete", projectId: id });
   },
 
