@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import {
-  getHeartbeatModelGroups,
   HEARTBEAT_INTERVAL_OPTIONS,
   HEARTBEAT_TIMEOUT_OPTIONS,
 } from "@/lib/mc/models";
-import { syncHeartbeatDefaultsToGateway } from "@/lib/mc/heartbeat-integration";
+// heartbeat-integration removed — heartbeat managed by backend HeartbeatService
 import { toast } from "@/components/shared/toast";
 import { Star, Info, ChevronDown, Search } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
@@ -48,12 +47,12 @@ export function HeartbeatModelSelector() {
   }, [connectionStatus]);
 
   const modelGroups = useMemo(() => {
-    // null = still loading, don't show fallback yet
+    // No gateway connected or still loading — don't show any models
+    if (connectionStatus !== "connected") return [];
     if (configFreeGroups === null) return [];
-    if (configFreeGroups.length > 0) return configFreeGroups;
-    // config returned empty (no free models defined) → fallback to hardcoded
-    return getHeartbeatModelGroups([]);
-  }, [configFreeGroups]);
+    // Only show models actually returned from the gateway config
+    return configFreeGroups;
+  }, [configFreeGroups, connectionStatus]);
 
   const filteredModelGroups = useMemo(() => {
     if (!search.trim()) return modelGroups;
@@ -77,20 +76,7 @@ export function HeartbeatModelSelector() {
   const handleSave = async () => {
     setSaving(true);
 
-    if (connectionStatus === "connected") {
-      expectGatewayRestart("heartbeat-model-update");
-      const result = await syncHeartbeatDefaultsToGateway({
-        modelRef: selected,
-        intervalMs: interval,
-      });
-
-      if (!result.ok) {
-        clearExpectedGatewayRestart();
-        setSaving(false);
-        toast("error", `Falha ao sincronizar heartbeat no gateway: ${result.error ?? "erro desconhecido"}`);
-        return;
-      }
-    }
+    // Heartbeat sync is handled by backend HeartbeatService via settings API
 
     setHeartbeatModel(selected);
     setHeartbeatInterval(interval);

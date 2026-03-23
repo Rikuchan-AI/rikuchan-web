@@ -11,7 +11,7 @@ import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { formatRelativeTime } from "@/lib/mc/mc-utils";
 import type { Task, ExecutionMessage, TaskStatus } from "@/lib/mc/types-project";
-import { triggerEMDelegation } from "@/lib/mc/em-delegation";
+// em-delegation removed — delegation goes through backend API via projects-store
 import { toast } from "@/components/shared/toast";
 import { DetectedFilesSection } from "./DetectedFilesSection";
 import { detectFilePaths } from "@/lib/mc/file-detection";
@@ -202,8 +202,8 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
       assignedAgentId: reassignAgentId, assignedAgentName: agent.agentName,
       status: "progress", startedAt: Date.now(), updatedAt: Date.now(), delegationStatus: "delegated",
     });
-    const { startTaskExecution } = require("@/lib/mc/em-delegation");
-    startTaskExecution(task, agent, project);
+    // Delegation handled by backend
+    useProjectsStore.getState().delegateTask(projectId, task.id).catch(() => {});
     toast("success", `Reassigned to ${agent.agentName}`);
     setShowReassign(false);
   };

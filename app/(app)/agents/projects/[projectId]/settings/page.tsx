@@ -15,7 +15,7 @@ import {
 } from "@/lib/mc/agent-files";
 import { ProjectStatusBadge } from "@/components/mc/projects/ProjectStatusBadge";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
-import { MODEL_GROUPS } from "@/lib/mc/models";
+
 import type {
   ProjectStatus,
   OperationMode,
@@ -254,7 +254,7 @@ function SectionModel({ projectId }: { projectId: string }) {
   const project = useProjectsStore(selectProjectById(projectId));
   const gatewayModels = useGatewayStore((s) => s.availableModels);
   const updateProject = useProjectsStore((s) => s.updateProject);
-  const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
+  const modelGroups = gatewayModels;
   const allModels = modelGroups.flatMap((g) => g.models);
 
   const [config, setConfig] = useState<ProjectModelConfig>(

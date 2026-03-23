@@ -1,4 +1,4 @@
-import { useGatewayStore, registerExternalRpcResponseId, unregisterExternalRpcResponseId } from "./gateway-store";
+import { getApiClient, McApiError } from "./api-client";
 
 // ─── Core file templates for new agents ─────────────────────────────────────
 
@@ -111,482 +111,179 @@ Once onboarding is complete, this file will no longer be loaded.
 `;
 }
 
-// ─── Gateway RPC helpers ────────────────────────────────────────────────────
+// ─── Gateway RPC via backend proxy ──────────────────────────────────────────
 
-export function createAgentViaGateway(params: {
+async function gatewayRpc<T = Record<string, unknown>>(
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const result = await getApiClient().gatewayRpc(method, params);
+    return { ok: true, data: result as T };
+  } catch (err) {
+    if (err instanceof McApiError) {
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Agent CRUD ─────────────────────────────────────────────────────────────
+
+export async function createAgentViaGateway(params: {
   name: string;
   workspace: string;
   emoji?: string;
   avatar?: string;
 }): Promise<{ ok: boolean; agentId?: string; error?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
-    }
-
-    const id = `create-agent-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (msg.ok) {
-            const payload = msg.payload as { agentId?: string };
-            resolve({ ok: true, agentId: payload.agentId });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({
-      type: "req",
-      id,
-      method: "agents.create",
-      params: {
-        name: params.name,
-        workspace: params.workspace,
-        ...(params.emoji ? { emoji: params.emoji } : {}),
-        ...(params.avatar ? { avatar: params.avatar } : {}),
-      },
-    }));
+  const result = await gatewayRpc<{ agentId?: string }>("agents.create", {
+    name: params.name,
+    workspace: params.workspace,
+    ...(params.emoji ? { emoji: params.emoji } : {}),
+    ...(params.avatar ? { avatar: params.avatar } : {}),
   });
+  return { ok: result.ok, agentId: result.data?.agentId, error: result.error };
 }
 
-export function setAgentFileViaGateway(agentId: string, fileName: string, content: string): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
-    }
-
-    const id = `set-file-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (msg.ok) {
-            resolve({ ok: true });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({
-      type: "req",
-      id,
-      method: "agents.files.set",
-      params: { agentId, name: fileName, content },
-    }));
-  });
+export async function deleteAgentViaGateway(
+  agentId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return gatewayRpc("agents.delete", { agentId });
 }
 
-export function listAgentFilesViaGateway(agentId: string): Promise<{
+// ─── Agent Files ────────────────────────────────────────────────────────────
+
+export async function setAgentFileViaGateway(
+  agentId: string,
+  fileName: string,
+  content: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return gatewayRpc("agents.files.set", { agentId, name: fileName, content });
+}
+
+export async function listAgentFilesViaGateway(agentId: string): Promise<{
   ok: boolean;
   files?: Array<{ name: string; path: string; missing: boolean; size?: number; content?: string }>;
   error?: string;
 }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
-    }
-
-    const id = `list-files-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (msg.ok) {
-            const payload = msg.payload as { files?: Array<{ name: string; path: string; missing: boolean; size?: number; content?: string }> };
-            resolve({ ok: true, files: payload.files });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({
-      type: "req",
-      id,
-      method: "agents.files.list",
-      params: { agentId },
-    }));
-  });
+  const result = await gatewayRpc<{ files?: Array<{ name: string; path: string; missing: boolean; size?: number; content?: string }> }>(
+    "agents.files.list",
+    { agentId },
+  );
+  return { ok: result.ok, files: result.data?.files, error: result.error };
 }
 
-export function getAgentFileViaGateway(agentId: string, fileName: string): Promise<{
-  ok: boolean;
-  content?: string;
-  error?: string;
-}> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
-    }
-
-    const id = `get-file-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (msg.ok) {
-            const payload = msg.payload as { file?: { content?: string } };
-            resolve({ ok: true, content: payload.file?.content });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({
-      type: "req",
-      id,
-      method: "agents.files.get",
-      params: { agentId, name: fileName },
-    }));
-  });
+export async function getAgentFileViaGateway(
+  agentId: string,
+  fileName: string,
+): Promise<{ ok: boolean; content?: string; error?: string }> {
+  const result = await gatewayRpc<{ file?: { content?: string } }>(
+    "agents.files.get",
+    { agentId, name: fileName },
+  );
+  return { ok: result.ok, content: result.data?.file?.content, error: result.error };
 }
 
-/**
- * Fetch per-agent subagents.allowAgents config from the gateway.
- * Returns a map of agentId → allowAgents (string[] or ["*"] for allow-all).
- */
-export function getAgentSpawnConfigFromGateway(): Promise<{
+// ─── Config Operations ──────────────────────────────────────────────────────
+
+export async function getAgentSpawnConfigFromGateway(): Promise<{
   ok: boolean;
   spawnConfig?: Record<string, string[]>;
   error?: string;
 }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
+  const result = await gatewayRpc<{ config?: { agents?: { list?: Array<Record<string, unknown>> } } }>(
+    "config.get",
+    {},
+  );
+  if (!result.ok || !result.data) return { ok: false, error: result.error };
+
+  const agents = result.data.config?.agents?.list;
+  const spawnConfig: Record<string, string[]> = {};
+  if (agents) {
+    for (const agent of agents) {
+      const agentId = agent.id as string;
+      const subagents = agent.subagents as { allowAgents?: string[] } | undefined;
+      if (subagents?.allowAgents) {
+        spawnConfig[agentId] = subagents.allowAgents;
+      }
     }
-
-    const id = `config-get-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    const timeout = setTimeout(() => {
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          if (msg.ok) {
-            const config = msg.payload?.config as Record<string, unknown> | undefined;
-            const agents = (config?.agents as { list?: Array<Record<string, unknown>> })?.list;
-            const spawnConfig: Record<string, string[]> = {};
-
-            if (agents) {
-              for (const agent of agents) {
-                const agentId = agent.id as string;
-                const subagents = agent.subagents as { allowAgents?: string[] } | undefined;
-                if (subagents?.allowAgents) {
-                  spawnConfig[agentId] = subagents.allowAgents;
-                }
-              }
-            }
-
-            resolve({ ok: true, spawnConfig });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({
-      type: "req",
-      id,
-      method: "config.get",
-      params: {},
-    }));
-  });
+  }
+  return { ok: true, spawnConfig };
 }
 
-/**
- * Update an agent's subagents.allowAgents via config.patch.
- */
-export function setAgentSpawnConfigViaGateway(
+export async function setAgentSpawnConfigViaGateway(
   agentId: string,
   allowAgents: string[],
 ): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
+  // Get current config
+  const getResult = await gatewayRpc<{ hash?: string; config?: { agents?: { list?: Array<Record<string, unknown>> } } }>(
+    "config.get",
+    {},
+  );
+  if (!getResult.ok || !getResult.data) return { ok: false, error: "Failed to get config" };
+
+  const baseHash = getResult.data.hash;
+  const agentsList = getResult.data.config?.agents?.list ?? [];
+
+  const updatedList = agentsList.map((a) => {
+    if ((a.id as string) === agentId) {
+      return { ...a, subagents: { ...(a.subagents as Record<string, unknown> ?? {}), allowAgents } };
     }
+    return a;
+  });
 
-    // First get current config to obtain baseHash
-    const getId = `config-get-for-patch-${Date.now()}`;
-    const getTimeout = setTimeout(() => resolve({ ok: false, error: "Timed out getting config" }), 10000);
-
-    const getHandler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === getId) {
-          ws.removeEventListener("message", getHandler);
-          clearTimeout(getTimeout);
-
-          if (!msg.ok) {
-            resolve({ ok: false, error: "Failed to get config" });
-            return;
-          }
-
-          const baseHash = msg.payload?.hash as string | undefined;
-          const config = msg.payload?.config as { agents?: { list?: Array<Record<string, unknown>> } } | undefined;
-          const agentsList = config?.agents?.list ?? [];
-
-          // Update the specific agent's subagents.allowAgents
-          const updatedList = agentsList.map((a) => {
-            if ((a.id as string) === agentId) {
-              return { ...a, subagents: { ...(a.subagents as Record<string, unknown> ?? {}), allowAgents } };
-            }
-            return a;
-          });
-
-          // Patch via config.patch
-          const patchId = `config-patch-${Date.now()}`;
-          const patchTimeout = setTimeout(() => resolve({ ok: false, error: "Patch timed out" }), 10000);
-
-          const patchHandler = (event2: MessageEvent) => {
-            try {
-              const msg2 = JSON.parse(event2.data);
-              if (msg2.type === "res" && msg2.id === patchId) {
-                ws.removeEventListener("message", patchHandler);
-                clearTimeout(patchTimeout);
-                resolve({ ok: !!msg2.ok, error: msg2.error?.message });
-              }
-            } catch { /* ignore */ }
-          };
-
-          ws.addEventListener("message", patchHandler);
-          ws.send(JSON.stringify({
-            type: "req",
-            id: patchId,
-            method: "config.patch",
-            params: {
-              baseHash,
-              raw: JSON.stringify({ agents: { list: updatedList } }),
-            },
-          }));
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", getHandler);
-    ws.send(JSON.stringify({ type: "req", id: getId, method: "config.get", params: {} }));
+  return gatewayRpc("config.patch", {
+    baseHash,
+    raw: JSON.stringify({ agents: { list: updatedList } }),
   });
 }
 
-/**
- * Patch per-agent config fields and/or global agent defaults after agent creation.
- * - perAgent: written to agents.list[x] entry (subagents, humanDelay, etc.)
- * - globalDefaults: merged into agents.defaults (thinkingDefault, verboseDefault, etc.)
- * Only non-empty/non-null values are applied.
- */
-export function patchAgentDefaults(params: {
+export async function patchAgentDefaults(params: {
   agentId: string;
   perAgent: Record<string, unknown>;
   globalDefaults: Record<string, unknown>;
 }): Promise<{ ok: boolean; error?: string }> {
   const { agentId, perAgent, globalDefaults } = params;
-
-  // Nothing to do
   const hasPerAgent = Object.keys(perAgent).length > 0;
   const hasGlobal = Object.keys(globalDefaults).length > 0;
-  if (!hasPerAgent && !hasGlobal) return Promise.resolve({ ok: true });
+  if (!hasPerAgent && !hasGlobal) return { ok: true };
 
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
+  const getResult = await gatewayRpc<{
+    hash?: string;
+    config?: { agents?: { list?: Array<Record<string, unknown>>; defaults?: Record<string, unknown> } };
+  }>("config.get", {});
+  if (!getResult.ok || !getResult.data) return { ok: false, error: "Failed to get config" };
+
+  const baseHash = getResult.data.hash;
+  const agentsList = getResult.data.config?.agents?.list ?? [];
+  const existingDefaults = getResult.data.config?.agents?.defaults ?? {};
+
+  const updatedList = agentsList.map((a) => {
+    if ((a.id as string) !== agentId) return a;
+    const merged: Record<string, unknown> = { ...a };
+    for (const [k, v] of Object.entries(perAgent)) {
+      if (v !== null && v !== undefined && v !== "") merged[k] = v;
     }
+    return merged;
+  });
 
-    const getId = `config-get-defaults-${Date.now()}`;
-    const getTimeout = setTimeout(() => resolve({ ok: false, error: "Timed out getting config" }), 10000);
+  const updatedDefaults: Record<string, unknown> = { ...existingDefaults };
+  for (const [k, v] of Object.entries(globalDefaults)) {
+    if (v !== null && v !== undefined && v !== "") updatedDefaults[k] = v;
+  }
 
-    const getHandler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type !== "res" || msg.id !== getId) return;
-        ws.removeEventListener("message", getHandler);
-        clearTimeout(getTimeout);
+  const patchPayload: Record<string, unknown> = { agents: { list: updatedList } };
+  if (Object.keys(updatedDefaults).length > 0) {
+    (patchPayload.agents as Record<string, unknown>).defaults = updatedDefaults;
+  }
 
-        if (!msg.ok) {
-          resolve({ ok: false, error: "Failed to get config" });
-          return;
-        }
-
-        const baseHash = msg.payload?.hash as string | undefined;
-        const config = msg.payload?.config as {
-          agents?: {
-            list?: Array<Record<string, unknown>>;
-            defaults?: Record<string, unknown>;
-          };
-        } | undefined;
-
-        const agentsList = config?.agents?.list ?? [];
-        const existingDefaults = config?.agents?.defaults ?? {};
-
-        // Merge per-agent fields into this agent's list entry
-        const updatedList = agentsList.map((a) => {
-          if ((a.id as string) !== agentId) return a;
-          const merged: Record<string, unknown> = { ...a };
-          for (const [k, v] of Object.entries(perAgent)) {
-            if (v !== null && v !== undefined && v !== "") merged[k] = v;
-          }
-          return merged;
-        });
-
-        // Merge global defaults
-        const updatedDefaults: Record<string, unknown> = { ...existingDefaults };
-        for (const [k, v] of Object.entries(globalDefaults)) {
-          if (v !== null && v !== undefined && v !== "") updatedDefaults[k] = v;
-        }
-
-        const patchPayload: Record<string, unknown> = { agents: { list: updatedList } };
-        if (Object.keys(updatedDefaults).length > 0) {
-          (patchPayload.agents as Record<string, unknown>).defaults = updatedDefaults;
-        }
-
-        const patchId = `config-patch-defaults-${Date.now()}`;
-        const patchTimeout = setTimeout(() => resolve({ ok: false, error: "Patch timed out" }), 10000);
-
-        const patchHandler = (event2: MessageEvent) => {
-          try {
-            const msg2 = JSON.parse(event2.data);
-            if (msg2.type !== "res" || msg2.id !== patchId) return;
-            ws.removeEventListener("message", patchHandler);
-            clearTimeout(patchTimeout);
-            resolve({ ok: !!msg2.ok, error: msg2.error?.message });
-          } catch { /* ignore */ }
-        };
-
-        ws.addEventListener("message", patchHandler);
-        ws.send(JSON.stringify({
-          type: "req",
-          id: patchId,
-          method: "config.patch",
-          params: { baseHash, raw: JSON.stringify(patchPayload) },
-        }));
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", getHandler);
-    ws.send(JSON.stringify({ type: "req", id: getId, method: "config.get", params: {} }));
+  return gatewayRpc("config.patch", {
+    baseHash,
+    raw: JSON.stringify(patchPayload),
   });
 }
 
-// ─── Delete agent ────────────────────────────────────────────────────────────
-
-export function deleteAgentViaGateway(agentId: string): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
-    }
-
-    const id = `delete-agent-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, error: "Request timed out" });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (msg.ok) {
-            resolve({ ok: true });
-          } else {
-            const err = msg.error as { message?: string } | undefined;
-            resolve({ ok: false, error: err?.message ?? "Unknown error" });
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({ type: "req", id, method: "agents.delete", params: { agentId } }));
-  });
-}
-
-// ─── Get free models from config ─────────────────────────────────────────────
+// ─── Free Models ────────────────────────────────────────────────────────────
 
 export type FreeModelEntry = {
   provider: string;
@@ -596,77 +293,45 @@ export type FreeModelEntry = {
   maxTokens?: number;
 };
 
-export function getFreeModelsFromConfig(): Promise<{ ok: boolean; groups?: Array<{ provider: string; models: FreeModelEntry[] }>; error?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, error: "Gateway not connected" });
-      return;
+export async function getFreeModelsFromConfig(): Promise<{
+  ok: boolean;
+  groups?: Array<{ provider: string; models: FreeModelEntry[] }>;
+  error?: string;
+}> {
+  const result = await gatewayRpc<{ config?: { models?: { providers?: Record<string, { models?: Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number; cost?: { input?: number; output?: number } }> }> } } }>(
+    "config.get",
+    {},
+  );
+  if (!result.ok || !result.data) return { ok: false, error: result.error };
+
+  const providers = result.data.config?.models?.providers;
+  if (!providers) return { ok: true, groups: [] };
+
+  const EXCLUDED_PROVIDERS = ["rikuchan-heartbeat"];
+  const groups: Array<{ provider: string; models: FreeModelEntry[] }> = [];
+
+  for (const [providerKey, providerCfg] of Object.entries(providers)) {
+    if (EXCLUDED_PROVIDERS.includes(providerKey)) continue;
+    const freeModels = (providerCfg.models ?? []).filter(
+      (m) => m.cost != null && m.cost.input === 0 && m.cost.output === 0,
+    );
+    if (freeModels.length > 0) {
+      groups.push({
+        provider: providerKey,
+        models: freeModels.map((m) => ({
+          provider: providerKey,
+          id: m.id,
+          name: m.name ?? m.id,
+          contextWindow: m.contextWindow,
+          maxTokens: m.maxTokens,
+        })),
+      });
     }
-
-    const id = `config-get-free-models-${Date.now()}`;
-    const timeout = setTimeout(() => resolve({ ok: false, error: "Request timed out" }), 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type !== "res" || msg.id !== id) return;
-        ws.removeEventListener("message", handler);
-        clearTimeout(timeout);
-
-        if (!msg.ok) {
-          resolve({ ok: false, error: "Failed to get config" });
-          return;
-        }
-
-        type ProviderModels = {
-          models?: Array<{
-            id: string;
-            name?: string;
-            contextWindow?: number;
-            maxTokens?: number;
-            cost?: { input?: number; output?: number };
-          }>;
-        };
-        const providers = msg.payload?.config?.models?.providers as Record<string, ProviderModels> | undefined;
-        if (!providers) {
-          resolve({ ok: true, groups: [] });
-          return;
-        }
-
-        // Exclude internal/auxiliary providers not meant for user selection
-        const EXCLUDED_PROVIDERS = ["rikuchan-heartbeat"];
-
-        const groups: Array<{ provider: string; models: FreeModelEntry[] }> = [];
-        for (const [providerKey, providerCfg] of Object.entries(providers)) {
-          if (EXCLUDED_PROVIDERS.includes(providerKey)) continue;
-          const freeModels = (providerCfg.models ?? []).filter(
-            (m) => m.cost != null && m.cost.input === 0 && m.cost.output === 0
-          );
-          if (freeModels.length > 0) {
-            groups.push({
-              provider: providerKey,
-              models: freeModels.map((m) => ({
-                provider: providerKey,
-                id: m.id,
-                name: m.name ?? m.id,
-                contextWindow: m.contextWindow,
-                maxTokens: m.maxTokens,
-              })),
-            });
-          }
-        }
-        resolve({ ok: true, groups });
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({ type: "req", id, method: "config.get", params: {} }));
-  });
+  }
+  return { ok: true, groups };
 }
 
-// ─── List existing workspaces ───────────────────────────────────────────────
+// ─── Workspaces ─────────────────────────────────────────────────────────────
 
 export interface ExistingWorkspace {
   agentId: string;
@@ -674,58 +339,28 @@ export interface ExistingWorkspace {
   workspace: string;
 }
 
-/**
- * Fetch all existing agent workspaces from openclaw config.
- * Returns a list of { agentId, agentName, workspace } for each registered agent.
- */
-export function listWorkspacesViaGateway(): Promise<{ ok: boolean; workspaces: ExistingWorkspace[]; stateDir?: string }> {
-  return new Promise((resolve) => {
-    const store = useGatewayStore.getState();
-    const ws = store._ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, workspaces: [] });
-      return;
+export async function listWorkspacesViaGateway(): Promise<{
+  ok: boolean;
+  workspaces: ExistingWorkspace[];
+  stateDir?: string;
+}> {
+  const result = await gatewayRpc<{ config?: Record<string, unknown> }>("config.get", {});
+  if (!result.ok || !result.data) return { ok: false, workspaces: [] };
+
+  const config = result.data.config;
+  const agentsCfg = config?.agents as { list?: Array<Record<string, unknown>> } | undefined;
+  const stateDir = (config?.session as Record<string, unknown>)?.store as string | undefined;
+
+  const workspaces: ExistingWorkspace[] = [];
+  if (agentsCfg?.list) {
+    for (const a of agentsCfg.list) {
+      const agentId = a.id as string;
+      const workspace = a.workspace as string | undefined;
+      const agentName = (a.name as string) ?? agentId;
+      if (workspace) {
+        workspaces.push({ agentId, agentName, workspace });
+      }
     }
-
-    const id = `list-ws-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    registerExternalRpcResponseId(id);
-    const timeout = setTimeout(() => {
-      ws.removeEventListener("message", handler);
-      unregisterExternalRpcResponseId(id);
-      resolve({ ok: false, workspaces: [] });
-    }, 10000);
-
-    const handler = (event: MessageEvent) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "res" && msg.id === id) {
-          ws.removeEventListener("message", handler);
-          clearTimeout(timeout);
-          unregisterExternalRpcResponseId(id);
-          if (!msg.ok) {
-            resolve({ ok: false, workspaces: [] });
-            return;
-          }
-          const config = msg.payload?.config as Record<string, unknown> | undefined;
-          const agentsCfg = config?.agents as { list?: Array<Record<string, unknown>> } | undefined;
-          const stateDir = (config?.session as Record<string, unknown>)?.store as string | undefined;
-          const workspaces: ExistingWorkspace[] = [];
-          if (agentsCfg?.list) {
-            for (const a of agentsCfg.list) {
-              const agentId = a.id as string;
-              const workspace = a.workspace as string | undefined;
-              const agentName = a.name as string ?? agentId;
-              if (workspace) {
-                workspaces.push({ agentId, agentName, workspace });
-              }
-            }
-          }
-          resolve({ ok: true, workspaces, stateDir: stateDir ?? undefined });
-        }
-      } catch { /* ignore */ }
-    };
-
-    ws.addEventListener("message", handler);
-    ws.send(JSON.stringify({ type: "req", id, method: "config.get", params: {} }));
-  });
+  }
+  return { ok: true, workspaces, stateDir: stateDir ?? undefined };
 }

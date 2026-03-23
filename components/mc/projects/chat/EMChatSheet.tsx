@@ -5,7 +5,23 @@ import { X, Crown } from "lucide-react";
 import { ChatBubble, TypingIndicator } from "./ChatBubble";
 import { ChatInput } from "./ChatInput";
 import { useChatStore } from "@/lib/mc/chat-store";
-import { buildLeadSystemPrompt, parseLeadActions, stripActionBlocks, executeLeadActions } from "@/lib/mc/em-chat";
+// em-chat removed — lead actions executed by backend. Simple display-only parsing kept inline.
+function parseActionBlocks(content: string): { type: string; title?: string }[] {
+  const regex = /```action\n([\s\S]*?)```/g;
+  const actions: { type: string; title?: string }[] = [];
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      actions.push(parsed);
+    } catch { /* skip malformed */ }
+  }
+  return actions;
+}
+
+function stripActionBlocks(content: string): string {
+  return content.replace(/```action\n[\s\S]*?```/g, "").trim();
+}
 import { useProjectsStore, selectProjectById, useProjectTasks } from "@/lib/mc/projects-store";
 import { EM_SUGGESTED_PROMPTS } from "@/lib/mc/types-chat";
 import type { ChatMessage } from "@/lib/mc/types-chat";
@@ -27,25 +43,13 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const executedActionsRef = useRef<Set<string>>(new Set());
 
   const messages = session?.messages ?? [];
   const leadAgent = project?.roster.find((m) => m.role === "lead");
   const showSuggestions = messages.length === 0;
   const isThinking = leadAgent ? thinkingAgents.has(leadAgent.agentId) : false;
 
-  // Execute actions from new agent messages
-  useEffect(() => {
-    for (const msg of messages) {
-      if (msg.role === "agent" && !executedActionsRef.current.has(msg.id)) {
-        const actions = parseLeadActions(msg.content);
-        if (actions.length > 0) {
-          executedActionsRef.current.add(msg.id);
-          executeLeadActions(actions, projectId);
-        }
-      }
-    }
-  }, [messages, projectId]);
+  // Actions are executed by backend — frontend only displays them
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,7 +141,7 @@ export function EMChatSheet({ projectId, onClose }: EMChatSheetProps) {
               ? { ...msg, content: stripActionBlocks(msg.content) }
               : msg;
 
-            const actions = msg.role === "agent" ? parseLeadActions(msg.content) : [];
+            const actions = msg.role === "agent" ? parseActionBlocks(msg.content) : [];
 
             return (
               <div key={msg.id}>

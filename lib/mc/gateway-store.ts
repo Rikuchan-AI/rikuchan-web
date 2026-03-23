@@ -10,36 +10,11 @@ import type {
   GatewayCommand,
   HeartbeatConfig,
   ActivityEvent,
-  ActivityType,
   ModelGroup,
 } from "./types";
-import { gatewayModelsToGroups } from "./models";
+import { getApiClient } from "./api-client";
 
-const externalRpcResponseIds = new Set<string>();
-
-export function registerExternalRpcResponseId(id: string) {
-  externalRpcResponseIds.add(id);
-}
-
-export function unregisterExternalRpcResponseId(id: string) {
-  externalRpcResponseIds.delete(id);
-}
-
-/** Lazy accessor to avoid circular import with projects-store */
-function getProjectsStore() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { useProjectsStore } = require("./projects-store") as { useProjectsStore: { getState: () => { tasks: Record<string, Array<{ id: string; sessionId?: string; executionLog?: Array<{ role: string; content: string; timestamp: number }> }>>; updateTask: (projectId: string, taskId: string, updates: Record<string, unknown>) => void; createTask: (projectId: string, task: unknown) => void } } };
-  return useProjectsStore.getState();
-}
-
-const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
-  model: "gemini-2.0-flash-exp",
-  fallbackChain: ["gemini-2.0-flash-exp", "llama-3.1-8b-instant", "gemini-1.5-flash-8b"],
-  intervalMs: 30_000,
-  timeoutMs: 5_000,
-  maxRetries: 3,
-  backoffMultiplier: 2,
-};
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface HeartbeatStoreStats {
   totalBeats: number;
@@ -47,6 +22,30 @@ interface HeartbeatStoreStats {
   lastSuccessAt: number;
   currentModel: string;
 }
+
+const DEFAULT_CONFIG: GatewayConfig = {
+  url: "",
+  token: "",
+  autoReconnect: true,
+  permissionMode: "allow-all",
+};
+
+const DEFAULT_HEARTBEAT_CONFIG: HeartbeatConfig = {
+  model: "gemini-2.0-flash-exp",
+  fallbackChain: [
+    "gemini-2.0-flash-exp",
+    "llama-3.1-8b-instant",
+    "gemini-1.5-flash-8b",
+  ],
+  intervalMs: 30_000,
+  timeoutMs: 5_000,
+  maxRetries: 3,
+  backoffMultiplier: 2,
+};
+
+// ─── Store Interface ─────────────────────────────────────────────────────────
+// Keeps the same public API as before — consumers don't change.
+// Internals: REST+SSE backed, zero WebSocket.
 
 interface GatewayStore {
   status: "connecting" | "connected" | "disconnected" | "error";
@@ -60,7 +59,6 @@ interface GatewayStore {
   expectedRestartReason?: "heartbeat-model-update" | "config-patch";
 
   agents: Agent[];
-  /** Agents permanently registered in OpenClaw (from agents.list). Use this for roster selection. */
   registeredAgents: Agent[];
   sessions: Session[];
   logs: LogEntry[];
@@ -74,7 +72,12 @@ interface GatewayStore {
   modelsLoaded: boolean;
   heartbeatConfig: HeartbeatConfig;
   heartbeatStats: HeartbeatStoreStats;
-  pendingApprovals: { agentId: string; agentName: string; action: string; expiresAt: number }[];
+  pendingApprovals: {
+    agentId: string;
+    agentName: string;
+    action: string;
+    expiresAt: number;
+  }[];
 
   _ws: WebSocket | null;
   _pingInterval: ReturnType<typeof setInterval> | null;
@@ -88,7 +91,9 @@ interface GatewayStore {
   disconnect: () => void;
   sendCommand: (command: GatewayCommand) => void;
   sendRpc: (method: string, params?: unknown) => string;
-  expectGatewayRestart: (reason: "heartbeat-model-update" | "config-patch") => void;
+  expectGatewayRestart: (
+    reason: "heartbeat-model-update" | "config-patch",
+  ) => void;
   clearExpectedGatewayRestart: () => void;
   setLeadBoardAgent: (model: string, provider: string) => Promise<void>;
   setAgentModel: (agentId: string, model: string) => void;
@@ -103,198 +108,33 @@ interface GatewayStore {
   removeAgent: (agentId: string) => void;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function loadPersistedConfig(): Partial<GatewayConfig> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem("rikuchan:gateway-config");
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function persistConfig(config: GatewayConfig) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
-  // Also persist to Supabase settings (fire-and-forget)
-  fetch("/api/mc/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: "gateway-config", value: { url: config.url, token: config.token } }),
-  }).catch(() => {});
-}
-
-async function loadPersistedConfigFromServer(): Promise<Partial<GatewayConfig>> {
-  try {
-    const res = await fetch("/api/mc/settings/gateway-config");
-    if (!res.ok) return {};
-    const data = await res.json();
-    if (data?.url && data?.token) return data;
-    return {};
-  } catch {
-    return {};
-  }
-}
-
-function mkReqId() {
-  return `mc-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function mkLogId(seq: number) {
   return `log-${Date.now()}-${seq}`;
 }
 
-/** Create a log entry and append it to the store */
-function pushLog(
-  set: (fn: (s: GatewayStore) => Partial<GatewayStore>) => void,
-  get: () => GatewayStore,
-  level: LogEntry["level"],
-  message: string,
-  agentId?: string,
-) {
-  const seq = get()._logSeq + 1;
-  const entry: LogEntry = {
-    id: mkLogId(seq),
-    level,
-    message,
-    agentId,
-    timestamp: Date.now(),
-  };
-  set((s) => ({
-    logs: [...s.logs.slice(-499), entry],
-    _logSeq: seq,
-  }));
-}
-
-/** Create an activity event and prepend it to the store */
-function pushActivity(
-  set: (fn: (s: GatewayStore) => Partial<GatewayStore>) => void,
-  type: ActivityType,
-  agentId: string,
-  agentName: string,
-  message: string,
-) {
-  const event: ActivityEvent = {
-    id: `act-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-    type,
-    agentId,
-    agentName,
-    message,
-    timestamp: Date.now(),
-  };
-  set((s) => ({
-    activity: [event, ...s.activity].slice(0, 50),
-  }));
-}
-
-/** Map OpenClaw health agent data to our Agent type */
-const ONLINE_THRESHOLD_MS  = 10 * 60 * 1000;  // 10 min — recently active (heartbeat every 60s + buffer)
-const IDLE_THRESHOLD_MS    = 60 * 60 * 1000;  // 60 min — still responsive but not active
-
-function toMs(ts: number): number {
-  // If timestamp looks like seconds (< year 2100 in seconds = 4102444800), convert to ms
-  return ts < 4_102_444_800 ? ts * 1000 : ts;
-}
-
-function resolveAgentStatus(heartbeat: Record<string, unknown> | undefined): Agent["status"] {
-  if (!heartbeat) return "offline";
-
-  const state = heartbeat.state as string | undefined;
-  if (state === "error") return "error";
-  if (state === "degraded") return "degraded";
-  if ((heartbeat.consecutiveFailures as number) > 0) return "degraded";
-
-  const lastSuccess = heartbeat.lastSuccessAt as number | null | undefined;
-  if (!lastSuccess || lastSuccess <= 0) return "offline";
-
-  const age = Date.now() - toMs(lastSuccess);
-  if (age < ONLINE_THRESHOLD_MS) return "online";
-  if (age < IDLE_THRESHOLD_MS) return "idle";
-  return "offline";
-}
-
-function healthAgentToAgent(
-  ha: Record<string, unknown>,
-  identity?: { name?: string; emoji?: string },
-): Agent {
-  const agentId = ha.agentId as string;
-  const heartbeat = ha.heartbeat as Record<string, unknown> | undefined;
-  // sessions shape: { count, recent: [{ key, updatedAt, age }] }
-  const sessions = ha.sessions as {
-    count?: number;
-    recent?: Array<{ key?: string; updatedAt?: number | null; age?: number | null }>;
-  } | undefined;
-
-  // Determine status from session activity (age is already in ms)
-  const recentSession = sessions?.recent?.[0];
-  const sessionAge = recentSession?.age ?? null; // ms since last activity
-
-  let status: Agent["status"] = "offline";
-  let lastActivityAt = Date.now();
-
-  if (sessionAge !== null) {
-    lastActivityAt = Date.now() - sessionAge;
-    if (sessionAge < ONLINE_THRESHOLD_MS) status = "online";
-    else if (sessionAge < IDLE_THRESHOLD_MS) status = "idle";
-    else status = "offline";
-  } else if (recentSession?.updatedAt) {
-    // fallback: use updatedAt if age not present
-    const updatedAtMs = toMs(recentSession.updatedAt);
-    const age = Date.now() - updatedAtMs;
-    lastActivityAt = updatedAtMs;
-    if (age < ONLINE_THRESHOLD_MS) status = "online";
-    else if (age < IDLE_THRESHOLD_MS) status = "idle";
-    else status = "offline";
-  }
-
-  // Extract model from heartbeat config
-  const heartbeatModel = heartbeat ? (heartbeat.model as string) ?? "" : "";
-
-  // Calculate uptime from earliest active session
-  const uptimeMs = sessionAge !== null ? sessionAge : 0;
-  const uptimeSeconds = Math.floor(uptimeMs / 1000);
-
-  return {
-    id: agentId,
-    name: identity?.name ?? ha.name as string ?? agentId,
-    role: (ha.isDefault as boolean) ? "Lead Agent" : "Agent",
-    status,
-    capabilities: [],
-    permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
-    sessionCountToday: sessions?.count ?? 0,
-    avgResponseMs: 0,
-    lastActivityAt,
-    heartbeat: heartbeat ? {
-      lastSuccessAt: status !== "offline" ? lastActivityAt : 0,
-      failures: 0,
-      model: heartbeatModel,
-    } : undefined,
-    model: heartbeatModel || undefined,
-    uptime: status !== "offline" ? uptimeSeconds : 0,
-  };
-}
-
-// ─── Store ──────────────────────────────────────────────────────────────────
+// ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useGatewayStore = create<GatewayStore>((set, get) => ({
   status: "disconnected",
   latencyMs: 0,
+  connectedAt: undefined,
+  serverVersion: undefined,
+  connId: undefined,
+  stateDir: undefined,
   reconnectAttempts: 0,
+  reconnectAt: undefined,
+  expectedRestartReason: undefined,
+
   agents: [],
   registeredAgents: [],
   sessions: [],
   logs: [],
   activity: [],
-  config: {
-    url: "ws://127.0.0.1:18789",
-    token: "",
-    autoReconnect: false,
-    permissionMode: "approve-all",
-  },
-  _configHydrated: false,
-  leadBoardAgent: { model: "claude-sonnet-4-6", provider: "Anthropic" },
+
+  config: DEFAULT_CONFIG,
+  leadBoardAgent: { model: "", provider: "" },
   availableModels: [],
   agentsLoaded: false,
   sessionsLoaded: false,
@@ -304,1050 +144,226 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     totalBeats: 0,
     failures: 0,
     lastSuccessAt: 0,
-    currentModel: DEFAULT_HEARTBEAT_CONFIG.model,
+    currentModel: "",
   },
   pendingApprovals: [],
+
+  // Kept for interface compat — never used in new architecture
   _ws: null,
   _pingInterval: null,
+  _configHydrated: false,
   _authenticated: false,
   _lastTickAt: 0,
   _logSeq: 0,
 
+  // ─── Config Hydration ───
+  // In the new architecture, config comes from backend settings API.
+  // We mark as hydrated immediately — GatewayProvider handles the real boot.
   hydrateConfig: () => {
-    if (get()._configHydrated) return;
-    const persisted = loadPersistedConfig();
-    if (persisted.token && persisted.url) {
-      // User has saved config in localStorage — use it
-      set((s) => ({ config: { ...s.config, ...persisted }, _configHydrated: true }));
-    } else {
-      // No localStorage config — try Supabase settings, then auto-detect
-      set({ _configHydrated: true });
-      loadPersistedConfigFromServer()
-        .then((serverConfig) => {
-          if (serverConfig.url && serverConfig.token) {
-            // Found in Supabase — restore to localStorage but don't auto-connect
-            const restored = { url: serverConfig.url, token: serverConfig.token };
-            set((s) => ({ config: { ...s.config, ...restored } }));
-            if (typeof window !== "undefined") {
-              localStorage.setItem("rikuchan:gateway-config", JSON.stringify({ ...get().config, ...restored }));
-            }
-            return;
-          }
-          // Nothing in Supabase either — try local openclaw.json
-          return fetch("/api/gateway/config")
-            .then((r) => r.ok ? r.json() : null)
-            .then((data) => {
-              if (data?.url && data?.token) {
-                const autoConfig = { url: data.url, token: data.token };
-                set((s) => ({ config: { ...s.config, ...autoConfig } }));
-                persistConfig({ ...get().config, ...autoConfig });
-              }
-            });
-        })
-        .catch(() => { /* no config available */ });
+    // Load cached config from localStorage for backwards compat with sidebar display
+    let cached: Partial<GatewayConfig> = {};
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("rikuchan:gateway-config");
+        if (raw) cached = JSON.parse(raw);
+      } catch {
+        // ignore
+      }
     }
+    set({
+      config: { ...DEFAULT_CONFIG, ...cached },
+      _configHydrated: true,
+    });
   },
 
-  connect: (url?: string, token?: string) => {
-    const { config, _ws, _pingInterval } = get();
+  // ─── Connection ───
+  // Saves gateway config to backend settings and updates local state.
+  // Actual WebSocket to OpenClaw is managed server-side by the backend
+  // when a project is activated with this gateway config.
+  connect: async (url?: string, token?: string) => {
+    const state = get();
+    const gatewayUrl = url || state.config.url;
+    const gatewayToken = token || state.config.token;
 
-    if (_ws) { try { _ws.close(); } catch { /* ignore */ } }
-    if (_pingInterval) clearInterval(_pingInterval);
+    if (!gatewayUrl) return;
 
-    const finalUrl = url ?? config.url;
-    const finalToken = token ?? config.token;
+    // Update local config immediately
+    const config = { ...state.config, url: gatewayUrl, token: gatewayToken };
+    set({ config, status: "connecting" });
 
-    // Don't attempt connection without valid URL
-    if (!finalUrl || !finalToken) {
-      console.warn("[Gateway] No URL or token — skipping connect");
-      set({ status: "disconnected" });
-      return;
+    // Persist to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
     }
 
-    set({
-      status: "connecting",
-      connectedAt: undefined,
-      _ws: null,
-      _authenticated: false,
-      agentsLoaded: false,
-      sessionsLoaded: false,
-      modelsLoaded: false,
-    });
-
-    let ws: WebSocket;
+    // Persist gateway URL to backend settings (don't overwrite preferences)
     try {
-      ws = new WebSocket(finalUrl);
-    } catch (err) {
-      console.error("[Gateway] Failed to create WebSocket:", err);
-      set({ status: "error" });
-      return;
+      await getApiClient().settings.update({ gatewayUrl });
+    } catch {
+      // apiClient not initialized yet
     }
 
-    let tcpOpened = false;
-    let connectReqId: string | null = null;
-    // Track pending RPC callbacks
-    const rpcCallbacks = new Map<string, (msg: Record<string, unknown>) => void>();
-    // Accumulate assistant text per runId for chat-store routing
-    const runAccumulator = new Map<string, { sessionKey: string; text: string }>();
-
-    ws.onopen = () => {
-      tcpOpened = true;
-      console.log("[Gateway] TCP connected to", finalUrl);
-      set({ _ws: ws });
-    };
-
-    ws.onmessage = (event) => {
-      let msg: Record<string, unknown>;
-      try {
-        msg = JSON.parse(event.data as string);
-      } catch {
-        return;
-      }
-
-      const msgType = msg.type as string;
-
-      // ── Challenge-Response Handshake ───────────────────────────────────
-
-      if (msgType === "event" && msg.event === "connect.challenge") {
-        const payload = msg.payload as { nonce?: string } | undefined;
-        const nonce = payload?.nonce ?? "";
-        console.log("[Gateway] Challenge received, nonce:", nonce);
-
-        connectReqId = mkReqId();
-        ws.send(JSON.stringify({
-          type: "req",
-          id: connectReqId,
-          method: "connect",
-          params: {
-            minProtocol: 3,
-            maxProtocol: 3,
-            client: {
-              id: "openclaw-control-ui",
-              version: "1.0.0",
-              platform: "web",
-              mode: "ui",
-            },
-            role: "operator",
-            scopes: ["operator.read", "operator.admin", "operator.approvals", "operator.pairing"],
-            auth: finalToken ? { token: finalToken } : undefined,
-          },
-        }));
-        return;
-      }
-
-      // ── Connect response (hello-ok) ───────────────────────────────────
-
-      if (msgType === "res" && connectReqId && msg.id === connectReqId) {
-        if (msg.ok) {
-          const payload = msg.payload as Record<string, unknown> | undefined;
-          const server = payload?.server as { version?: string; connId?: string } | undefined;
-          const snapshot = payload?.snapshot as Record<string, unknown> | undefined;
-          const policy = payload?.policy as { tickIntervalMs?: number } | undefined;
-
-          console.log("[Gateway] Authenticated! Server:", server?.version, "ConnId:", server?.connId);
-
-          const stateDir = snapshot?.stateDir as string | undefined;
-
-          set({
-            status: "connected",
-            connectedAt: Date.now(),
-            _authenticated: true,
-            serverVersion: server?.version,
-            connId: server?.connId,
-            stateDir,
-            reconnectAttempts: 0,
-            reconnectAt: undefined,
-            expectedRestartReason: undefined,
-          });
-
-          // Persist config
-          const newConfig = { ...get().config, url: finalUrl, token: finalToken };
-          persistConfig(newConfig);
-          set({ config: newConfig });
-
-          // Start keep-alive ping every 25s to prevent idle disconnect
-          const pingInterval = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              const pingId = mkReqId();
-              const pingStart = Date.now();
-              rpcCallbacks.set(pingId, (res) => {
-                set({ latencyMs: Date.now() - pingStart });
-                if (res.ok && res.payload) {
-                  handleHealthPayload(res.payload as Record<string, unknown>);
-                }
-              });
-              ws.send(JSON.stringify({ type: "req", id: pingId, method: "health", params: {} }));
-            }
-          }, 25_000);
-          set({ _pingInterval: pingInterval });
-
-          pushLog(set, get, "INFO", `Connected to gateway v${server?.version ?? "?"} (${server?.connId ?? "?"})`);
-
-          // Extract health snapshot if available
-          if (snapshot?.health) {
-            handleHealthPayload(snapshot.health as Record<string, unknown>);
-          }
-
-          // Request agents list for full details
-          const agentsReqId = mkReqId();
-          rpcCallbacks.set(agentsReqId, (res) => {
-            if (res.ok) {
-              const p = res.payload as { agents?: Array<Record<string, unknown>>; defaultId?: string } | undefined;
-              if (p?.agents) {
-                // Build registeredAgents from agents.list (permanent OpenClaw agents)
-                const registered: Agent[] = p.agents.map((a) => {
-                  const identity = a.identity as { name?: string } | undefined;
-                  return {
-                    id: a.id as string,
-                    name: identity?.name ?? a.name as string ?? a.id as string,
-                    role: (a.isDefault as boolean) ? "Lead Agent" : "Agent",
-                    status: "idle",
-                    capabilities: [],
-                    permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
-                    sessionCountToday: 0,
-                    avgResponseMs: 0,
-                    lastActivityAt: Date.now(),
-                    uptime: 0,
-                  };
-                });
-
-                // Merge identity info into existing agents from health
-                set((s) => {
-                  const updatedAgents = s.agents.map((agent) => {
-                    const match = p.agents!.find((a) => a.id === agent.id);
-                    if (match) {
-                      const identity = match.identity as { name?: string } | undefined;
-                      return { ...agent, name: identity?.name ?? match.name as string ?? agent.name };
-                    }
-                    return agent;
-                  });
-                  // Add any agents from the list that weren't in health
-                  for (const a of p.agents!) {
-                    if (!updatedAgents.find((ua) => ua.id === a.id)) {
-                      const identity = a.identity as { name?: string } | undefined;
-                      updatedAgents.push({
-                        id: a.id as string,
-                        name: identity?.name ?? a.name as string ?? a.id as string,
-                        role: "Agent",
-                        status: "idle",
-                        capabilities: [],
-                        permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
-                        sessionCountToday: 0,
-                        avgResponseMs: 0,
-                        lastActivityAt: Date.now(),
-                        uptime: 0,
-                      });
-                    }
-                  }
-                  return { agents: updatedAgents, registeredAgents: registered };
-                });
-                pushLog(set, get, "INFO", `Loaded ${p.agents.length} agent(s)`);
-                set({ agentsLoaded: true });
-              } else {
-                set({ agentsLoaded: true });
-              }
-            } else {
-              set({ agentsLoaded: true });
-            }
-          });
-          ws.send(JSON.stringify({ type: "req", id: agentsReqId, method: "agents.list", params: {} }));
-
-          // Request available models from gateway
-          const modelsReqId = mkReqId();
-          rpcCallbacks.set(modelsReqId, (res) => {
-            if (res.ok) {
-              const p = res.payload as {
-                models?: Array<{
-                  id: string;
-                  name: string;
-                  provider: string;
-                  contextWindow?: number;
-                  reasoning?: boolean;
-                  cost?: {
-                    input?: number;
-                    output?: number;
-                    cacheRead?: number;
-                    cacheWrite?: number;
-                  };
-                  freeTier?: boolean;
-                }>;
-              } | undefined;
-              if (p?.models && p.models.length > 0) {
-                const groups = gatewayModelsToGroups(p.models);
-                set({ availableModels: groups, modelsLoaded: true });
-                pushLog(set, get, "INFO", `Loaded ${p.models.length} available model(s)`);
-              } else {
-                set({ availableModels: [], modelsLoaded: true });
-                pushLog(set, get, "WARN", "models.list returned empty list");
-              }
-            } else {
-              set({ availableModels: [], modelsLoaded: true });
-              const err = res.error as { message?: string } | undefined;
-              console.warn("[Gateway] models.list error:", err);
-              pushLog(set, get, "WARN", `models.list failed: ${err?.message ?? "unknown"}`);
-            }
-          });
-          ws.send(JSON.stringify({ type: "req", id: modelsReqId, method: "models.list", params: {} }));
-
-          // Request sessions list
-          const sessionsReqId = mkReqId();
-          rpcCallbacks.set(sessionsReqId, (res) => {
-            if (res.ok) {
-              const p = res.payload as { sessions?: Array<{ key: string; updatedAt?: number | null; age?: number | null }> } | undefined;
-              if (p?.sessions && p.sessions.length > 0) {
-                const mapped = p.sessions.map((s, i) => ({
-                  id: s.key,
-                  agentId: s.key.split(":")[1] ?? "",
-                  agentName: s.key.split(":")[1] ?? "",
-                  status: (s.age != null && s.age < 60000 ? "active" : "completed") as "active" | "completed",
-                  startedAt: s.updatedAt ? s.updatedAt - (s.age ?? 0) : Date.now(),
-                  endedAt: s.updatedAt ?? undefined,
-                  messages: [],
-                  taskPreview: s.key,
-                }));
-                set({ sessions: mapped, sessionsLoaded: true });
-                pushLog(set, get, "INFO", `Loaded ${mapped.length} session(s)`);
-              } else {
-                set({ sessions: [], sessionsLoaded: true });
-              }
-            } else {
-              set({ sessions: [], sessionsLoaded: true });
-            }
-          });
-          ws.send(JSON.stringify({ type: "req", id: sessionsReqId, method: "sessions.list", params: {} }));
-
-          // Request config to enrich agents with model/role info
-          const configReqId = mkReqId();
-          rpcCallbacks.set(configReqId, (res) => {
-            if (res.ok) {
-              const config = (res.payload as { config?: Record<string, unknown> })?.config;
-              const agentsConfig = config?.agents as {
-                defaults?: { model?: string | { primary?: string } };
-                list?: Array<{
-                  id: string;
-                  name?: string;
-                  heartbeat?: { model?: string; every?: string };
-                  isDefault?: boolean;
-                }>;
-              } | undefined;
-              if (agentsConfig) {
-                const defaultModel = typeof agentsConfig.defaults?.model === "string"
-                  ? agentsConfig.defaults.model
-                  : (agentsConfig.defaults?.model as { primary?: string })?.primary ?? "";
-                const agentsList = agentsConfig.list ?? [];
-
-                set((s) => {
-                  const enriched = s.agents.map((agent) => {
-                    const cfg = agentsList.find((a) => a.id === agent.id);
-                    const model = cfg?.heartbeat?.model ?? defaultModel;
-                    return {
-                      ...agent,
-                      model: model || agent.model,
-                    };
-                  });
-                  return { agents: enriched };
-                });
-              }
-            }
-          });
-          ws.send(JSON.stringify({ type: "req", id: configReqId, method: "config.get", params: {} }));
-
-          // Set up tick monitoring
-          if (policy?.tickIntervalMs) {
-            set({ _lastTickAt: Date.now() });
-          }
-        } else {
-          const error = msg.error as { code?: string; message?: string } | undefined;
-          console.error("[Gateway] Auth rejected:", error?.message ?? error?.code ?? "unknown");
-          pushLog(set, get, "ERROR", `Auth rejected: ${error?.message ?? "unknown error"}`);
-          set({ status: "error" });
-          try { ws.close(); } catch { /* ignore */ }
-        }
-        return;
-      }
-
-      // ── RPC responses ─────────────────────────────────────────────────
-
-      if (msgType === "res") {
-        const id = msg.id as string;
-        const cb = rpcCallbacks.get(id);
-        if (cb) {
-          rpcCallbacks.delete(id);
-          cb(msg);
-        } else if (externalRpcResponseIds.has(id)) {
-          externalRpcResponseIds.delete(id);
-        } else {
-          console.log("[Gateway] Unmatched RPC response:", id, msg.ok ? "ok" : "error", msg.payload ?? msg.error);
-        }
-        return;
-      }
-
-      // ── Events ────────────────────────────────────────────────────────
-
-      if (msgType === "event") {
-        const eventName = msg.event as string;
-        const payload = msg.payload as Record<string, unknown> | undefined;
-
-        switch (eventName) {
-          case "health":
-            if (payload) handleHealthPayload(payload);
-            break;
-
-          case "agent":
-            if (payload) handleAgentEvent(payload);
-            break;
-
-          case "heartbeat":
-            if (payload) handleHeartbeatEvent(payload);
-            break;
-
-          case "tick":
-            set({ _lastTickAt: Date.now() });
-            break;
-
-          case "shutdown":
-            pushLog(set, get, "WARN", "Gateway shutting down");
-            break;
-
-          case "em_delegation_decision": {
-            if (payload) {
-              const ps = getProjectsStore();
-              const taskId = payload.taskId as string;
-              const projId = payload.projectId as string;
-              ps.updateTask(projId, taskId, {
-                assignedAgentId: payload.assignedAgentId as string,
-                assignedAgentName: payload.assignedAgentName as string,
-                emDecisionReason: payload.reason as string,
-                emDelegatedAt: Date.now(),
-                delegationStatus: "delegated" as const,
-                status: "progress" as const,
-                startedAt: Date.now(),
-              });
-              pushLog(set, get, "INFO", `Lead delegated task to ${payload.assignedAgentName}`, payload.assignedAgentId as string);
-            }
-            break;
-          }
-
-          case "chat": {
-            if (payload) {
-              const chatSessionKey = payload.sessionKey as string | undefined;
-              const state = payload.state as string | undefined;
-              const message = payload.message as { role?: string; content?: unknown } | undefined;
-              const runId = payload.runId as string | undefined;
-
-              if (chatSessionKey && runId) {
-                if (state === "final" && message?.role === "assistant") {
-                  // Extract text content from message
-                  let text = "";
-                  if (typeof message.content === "string") {
-                    text = message.content;
-                  } else if (Array.isArray(message.content)) {
-                    text = (message.content as Array<{ type?: string; text?: string }>)
-                      .filter((c) => c.type === "text")
-                      .map((c) => c.text ?? "")
-                      .join("");
-                  }
-
-                  if (text) {
-                    try {
-                      const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { receiveMessage: (k: string, m: import("./types-chat").ChatMessage) => void; setThinking: (k: string, v: boolean) => void } } };
-                      const chatStore = useChatStore.getState();
-                      chatStore.setThinking(chatSessionKey, false);
-                      chatStore.receiveMessage(chatSessionKey, {
-                        id: `agent-${runId}-${Date.now()}`,
-                        role: "agent",
-                        content: text,
-                        timestamp: Date.now(),
-                      });
-                    } catch { /* ignore */ }
-                  }
-                } else if (state === "final" || state === "error") {
-                  // Clear thinking state regardless
-                  try {
-                    const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
-                    useChatStore.getState().setThinking(chatSessionKey, false);
-                  } catch { /* ignore */ }
-                }
-              }
-            }
-            break;
-          }
-
-          case "session_message": {
-            if (payload) {
-              const ps = getProjectsStore();
-              const sessionId = payload.sessionId as string;
-              const message = payload.message as { role: string; content: string; timestamp: number };
-              // Find and update the task with this sessionId
-              for (const [projId, tasks] of Object.entries(ps.tasks) as [string, Array<{ id: string; sessionId?: string; executionLog?: unknown[] }>][]) {
-                const task = tasks.find((t) => t.sessionId === sessionId);
-                if (task) {
-                  const log = [...((task.executionLog ?? []) as unknown[]), message];
-                  ps.updateTask(projId, task.id, { executionLog: log });
-                  break;
-                }
-              }
-            }
-            break;
-          }
-
-          case "subtask_created": {
-            if (payload) {
-              const ps = getProjectsStore();
-              const projId = payload.projectId as string;
-              const subtask = payload.subtask as import("./types-project").Task;
-              ps.createTask(projId, subtask);
-            }
-            break;
-          }
-
-          default:
-            pushLog(set, get, "DEBUG", `Event: ${eventName}`);
-        }
-        return;
-      }
-    };
-
-    // ── Event handlers ────────────────────────────────────────────────────
-
-    function handleHealthPayload(payload: Record<string, unknown>) {
-      const agents = payload.agents as Array<Record<string, unknown>> | undefined;
-      const sessionsInfo = payload.sessions as { count?: number } | undefined;
-
-      if (agents) {
-        const onlineStatuses = new Set(["online", "idle", "thinking"]);
-        const wentOnline: string[] = [];
-
-        set((s) => {
-          const updated = agents.map((ha) => {
-            const existing = s.agents.find((a) => a.id === ha.agentId);
-            const mapped = healthAgentToAgent(ha);
-            if (!existing) return mapped;
-            // Don't flicker: keep "online" if mapped says "idle" (borderline timing)
-            const status = existing.status === "online" && mapped.status === "idle"
-              ? "online"
-              : mapped.status;
-            // Detect offline → online transition
-            if (!onlineStatuses.has(existing.status) && onlineStatuses.has(status)) {
-              wentOnline.push(mapped.id);
-            }
-            return { ...existing, ...mapped, name: existing.name || mapped.name, status };
-          });
-          return { agents: updated };
-        });
-
-        // Auto-start queued tasks for agents that just came online
-        if (wentOnline.length > 0) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { useProjectsStore: getProjStore } = require("./projects-store") as { useProjectsStore: { getState: () => Record<string, unknown> } };
-            const ps = getProjStore.getState() as Record<string, unknown>;
-            const allTasks = ps.tasks as Record<string, Array<Record<string, unknown>>> | undefined;
-            const allProjects = ps.projects as Array<Record<string, unknown>> | undefined;
-            const updateTask = ps.updateTask as (projectId: string, taskId: string, updates: Record<string, unknown>) => void;
-            if (allTasks && allProjects) {
-              for (const agentId of wentOnline) {
-                for (const [projId, tasks] of Object.entries(allTasks)) {
-                  const queued = tasks.filter((t) =>
-                    t.assignedAgentId === agentId &&
-                    t.status === "backlog" &&
-                    t.delegationStatus === "delegated"
-                  );
-                  if (queued.length > 0) {
-                    const project = allProjects.find((p) => p.id === projId);
-                    if (project) {
-                      const roster = project.roster as Array<Record<string, unknown>> | undefined;
-                      const member = roster?.find((m) => m.agentId === agentId);
-                      if (member && queued[0]) {
-                        console.log(`[Auto-start] ${agentId} came online — starting task "${queued[0].title}"`);
-                        updateTask(projId, queued[0].id as string, { status: "progress", startedAt: Date.now() });
-                        import("./em-delegation").then(({ startTaskExecution }) => {
-                          startTaskExecution(queued[0] as never, member as never, project as never);
-                        }).catch(() => {});
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch { /* ignore */ }
-        }
-      }
-
-      const ok = payload.ok as boolean | undefined;
-      pushLog(set, get, ok ? "INFO" : "WARN",
-        `Health: ${ok ? "OK" : "degraded"} — ${agents?.length ?? 0} agents, ${sessionsInfo?.count ?? 0} sessions`
-      );
-    }
-
-    function handleAgentEvent(payload: Record<string, unknown>) {
-      const runId = payload.runId as string;
-      const stream = payload.stream as string;
-      const data = payload.data as Record<string, unknown> | undefined;
-      const sessionKey = payload.sessionKey as string | undefined;
-      const ts = payload.ts as number ?? Date.now();
-
-      // Extract agent id from sessionKey: "agent:<agentId>:<sessionName>"
-      let agentId = "";
-      let agentName = "";
-      if (sessionKey) {
-        const parts = sessionKey.split(":");
-        if (parts.length >= 2) {
-          agentId = parts[1];
-          const agent = get().agents.find((a) => a.id === agentId);
-          agentName = agent?.name ?? agentId;
-        }
-      }
-
-      // ── Route to task execution log if sessionKey matches a task ────
-      if (sessionKey) {
-        try {
-          const ps = getProjectsStore();
-          for (const [projId, tasks] of Object.entries(ps.tasks) as [string, Array<{ id: string; sessionId?: string; executionLog?: Array<{ role: string; content: string; timestamp: number }> }>][]) {
-            const task = tasks.find((t) => {
-              if (!t.sessionId) return false;
-              // Exact match
-              if (t.sessionId === sessionKey) return true;
-              // Match by agentId — handle prefixed IDs (e.g. "sempreit-tech-recruiter" vs "techrecruiter")
-              const taskAgentId = t.sessionId.split(":")[1] ?? "";
-              const eventAgentId = sessionKey.split(":")[1] ?? "";
-              if (!taskAgentId || !eventAgentId) return false;
-              // Either contains the other, or they share a suffix
-              return eventAgentId.includes(taskAgentId) ||
-                     taskAgentId.includes(eventAgentId) ||
-                     eventAgentId.endsWith(taskAgentId) ||
-                     taskAgentId.endsWith(eventAgentId);
-            });
-            if (task) {
-              const log = [...(task.executionLog ?? [])];
-              const updates: Record<string, unknown> = {};
-
-              if (stream === "assistant" && data) {
-                const delta = (data.delta as string) ?? (data.text as string) ?? "";
-                if (delta) {
-                  // Accumulate deltas into the last assistant message instead of creating new entries
-                  const lastMsg = log[log.length - 1];
-                  if (lastMsg && lastMsg.role === "assistant") {
-                    lastMsg.content += delta;
-                    lastMsg.timestamp = ts;
-                  } else {
-                    log.push({ role: "assistant", content: delta, timestamp: ts });
-                  }
-                  updates.executionLog = log;
-                }
-              } else if (stream === "error" && data) {
-                const errMsg = (data.error as string) ?? (data.message as string) ?? "Error occurred";
-                log.push({ role: "system", content: errMsg, timestamp: ts });
-                updates.executionLog = log;
-              } else if (stream === "tool" && data) {
-                const toolName = (data.toolName as string) ?? "unknown";
-                log.push({ role: "tool", content: `Tool: ${toolName}`, timestamp: ts });
-                updates.executionLog = log;
-              } else if (stream === "lifecycle" && data) {
-                const phase = (data.phase as string);
-                if (phase === "end") {
-                  // Check accumulated log for block signals
-                  const fullText = log
-                    .filter((m) => m.role === "assistant")
-                    .map((m) => m.content)
-                    .join("");
-                  const wasBlocked =
-                    fullText.includes("BLOCKED:") ||
-                    fullText.includes("Blocked") ||
-                    fullText.includes("Missing Data");
-
-                  if (wasBlocked) {
-                    updates.status = "blocked";
-                    updates.updatedAt = ts;
-                    log.push({ role: "system", content: "Task blocked — agent reported missing data or access issues", timestamp: ts });
-                    // Trigger auto-resolution
-                    const capturedTaskId = task.id;
-                    const capturedProjId = projId;
-                    setTimeout(() => {
-                      try {
-                        const { handleTaskBlocked } = require("./auto-resolve") as { handleTaskBlocked: (taskId: string, projectId: string) => void };
-                        handleTaskBlocked(capturedTaskId, capturedProjId);
-                      } catch { /* auto-resolve not loaded */ }
-                    }, 2000);
-                  } else {
-                    updates.status = "done";
-                    updates.completedAt = ts;
-                    updates.updatedAt = ts;
-                    log.push({ role: "system", content: "Task completed", timestamp: ts });
-                    // Push notification
-                    try {
-                      const { useNotificationsStore } = require("./notifications-store") as { useNotificationsStore: { getState: () => { push: (n: { type: string; title: string; message: string; taskId?: string }) => void } } };
-                      useNotificationsStore.getState().push({ type: "success", title: "Task Completed", message: `Task finished successfully`, taskId: task.id });
-                    } catch { /* ignore */ }
-                  }
-                  updates.executionLog = log;
-                } else if (phase === "error") {
-                  log.push({ role: "system", content: "Execution error", timestamp: ts });
-                  updates.executionLog = log;
-                }
-              }
-
-              if (Object.keys(updates).length > 0) {
-                // Auto-detect blocked from accumulated assistant text
-                if (updates.executionLog) {
-                  const fullAssistant = (updates.executionLog as Array<{ role: string; content: string }>)
-                    .filter((m) => m.role === "assistant")
-                    .map((m) => m.content)
-                    .join("");
-                  if (
-                    fullAssistant.includes("BLOCKED:") ||
-                    fullAssistant.includes("Status: ⚠️ Blocked")
-                  ) {
-                    updates.status = "blocked";
-                    updates.updatedAt = ts;
-                    pushLog(set, get, "WARN", `Task auto-blocked by agent response`);
-
-                    // Push notification
-                    try {
-                      const { useNotificationsStore } = require("./notifications-store") as { useNotificationsStore: { getState: () => { push: (n: { type: string; title: string; message: string; taskId?: string }) => void } } };
-                      useNotificationsStore.getState().push({ type: "warning", title: "Task Blocked", message: `Agent reported an issue`, taskId: task.id });
-                    } catch { /* ignore */ }
-
-                    // Trigger auto-resolution
-                    setTimeout(() => {
-                      try {
-                        const { handleTaskBlocked } = require("./auto-resolve") as { handleTaskBlocked: (taskId: string, projectId: string) => void };
-                        handleTaskBlocked(task.id, projId);
-                      } catch { /* auto-resolve not loaded */ }
-                    }, 2000); // Small delay to let the store update settle
-                  }
-                }
-
-                ps.updateTask(projId, task.id, updates);
-              }
-              break;
-            }
-          }
-        } catch { /* projects-store not loaded yet */ }
-      }
-
-      switch (stream) {
-        case "lifecycle": {
-          const phase = data?.phase as string | undefined;
-
-          if (phase === "start") {
-            // Agent started processing
-            if (agentId) {
-              set((s) => ({
-                agents: s.agents.map((a) =>
-                  a.id === agentId ? { ...a, status: "thinking" as const, lastActivityAt: ts } : a
-                ),
-              }));
-            }
-            // Mark session as thinking in chat-store
-            if (sessionKey) {
-              try {
-                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
-                useChatStore.getState().setThinking(sessionKey, true);
-              } catch { /* ignore */ }
-            }
-            pushLog(set, get, "INFO", `Agent run started (${runId.slice(0, 8)})`, agentId);
-            if (agentId) pushActivity(set, "session_started", agentId, agentName, "Started processing");
-          } else if (phase === "end") {
-            // Agent finished
-            if (agentId) {
-              set((s) => ({
-                agents: s.agents.map((a) =>
-                  a.id === agentId ? { ...a, status: "online" as const, lastActivityAt: ts } : a
-                ),
-              }));
-            }
-            // Dispatch accumulated text to chat-store
-            const accumulated = runAccumulator.get(runId);
-            runAccumulator.delete(runId);
-            if (accumulated?.text) {
-              try {
-                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { receiveMessage: (k: string, m: import("./types-chat").ChatMessage) => void; setThinking: (k: string, v: boolean) => void } } };
-                const chatStore = useChatStore.getState();
-                chatStore.setThinking(accumulated.sessionKey, false);
-                chatStore.receiveMessage(accumulated.sessionKey, {
-                  id: `agent-${runId}-${ts}`,
-                  role: "agent",
-                  content: accumulated.text,
-                  timestamp: ts,
-                });
-              } catch { /* ignore */ }
-            } else if (sessionKey) {
-              try {
-                const { useChatStore } = require("./chat-store") as { useChatStore: { getState: () => { setThinking: (k: string, v: boolean) => void } } };
-                useChatStore.getState().setThinking(sessionKey, false);
-              } catch { /* ignore */ }
-            }
-            pushLog(set, get, "INFO", `Agent run completed (${runId.slice(0, 8)})`, agentId);
-            if (agentId) pushActivity(set, "session_completed", agentId, agentName, "Completed processing");
-          } else if (phase === "error") {
-            if (agentId) {
-              set((s) => ({
-                agents: s.agents.map((a) =>
-                  a.id === agentId ? { ...a, status: "error" as const, lastActivityAt: ts } : a
-                ),
-              }));
-            }
-            pushLog(set, get, "ERROR", `Agent run error (${runId.slice(0, 8)})`, agentId);
-            if (agentId) pushActivity(set, "session_error", agentId, agentName, "Run error");
-          } else if (phase) {
-            pushLog(set, get, "DEBUG", `Agent ${phase} (${runId.slice(0, 8)})`, agentId);
-          }
-          break;
-        }
-
-        case "assistant": {
-          // LLM response stream — update agent to thinking status
-          if (agentId) {
-            set((s) => ({
-              agents: s.agents.map((a) =>
-                a.id === agentId ? { ...a, status: "thinking" as const, lastActivityAt: ts } : a
-              ),
-            }));
-          }
-          // Accumulate text for chat-store routing
-          if (sessionKey && data) {
-            const delta = (data.delta as string) ?? (data.text as string) ?? "";
-            if (delta) {
-              const existing = runAccumulator.get(runId);
-              if (existing) {
-                existing.text += delta;
-              } else {
-                runAccumulator.set(runId, { sessionKey, text: delta });
-              }
-            }
-          }
-          break;
-        }
-
-        case "error": {
-          const errorData = data?.error as string ?? data?.message as string ?? "Unknown error";
-          pushLog(set, get, "ERROR", `Agent error: ${errorData}`, agentId);
-          break;
-        }
-
-        case "tool": {
-          const toolName = data?.toolName as string ?? "unknown tool";
-          pushLog(set, get, "DEBUG", `Tool call: ${toolName}`, agentId);
-          break;
-        }
-
-        default:
-          pushLog(set, get, "DEBUG", `Agent stream "${stream}" (${runId.slice(0, 8)})`, agentId);
-      }
-    }
-
-    function handleHeartbeatEvent(payload: Record<string, unknown>) {
-      const status = payload.status as string ?? "unknown";
-      const durationMs = payload.durationMs as number ?? 0;
-
-      set((s) => ({
-        heartbeatStats: {
-          totalBeats: s.heartbeatStats.totalBeats + 1,
-          failures: status.startsWith("ok") ? 0 : s.heartbeatStats.failures + 1,
-          lastSuccessAt: status.startsWith("ok") ? Date.now() : s.heartbeatStats.lastSuccessAt,
-          currentModel: s.heartbeatStats.currentModel,
-        },
-      }));
-
-      if (!status.startsWith("ok")) {
-        pushLog(set, get, "WARN", `Heartbeat ${status} (${durationMs}ms)`);
-      } else {
-        pushLog(set, get, "DEBUG", `Heartbeat OK (${durationMs}ms)`);
-      }
-    }
-
-    // ── Connection lifecycle ──────────────────────────────────────────────
-
-    ws.onclose = (event) => {
-      const { _pingInterval: pi, config: cfg, _authenticated: wasAuthed } = get();
-      if (pi) clearInterval(pi);
-
-      console.warn(`[Gateway] Closed (code: ${event.code}, reason: "${event.reason}")`);
-
-      if (wasAuthed) {
-        const MAX_RECONNECT_ATTEMPTS = 5;
-        const nextAttempt = get().reconnectAttempts + 1;
-        const shouldReconnect = (cfg.autoReconnect || Boolean(get().expectedRestartReason)) && nextAttempt <= MAX_RECONNECT_ATTEMPTS;
-        const delayMs = Math.min(2_000 * (2 ** Math.max(0, nextAttempt - 1)), 30_000);
-
-        set({
-          status: "disconnected",
-          _ws: null,
-          _pingInterval: null,
-          _authenticated: false,
-          agentsLoaded: false,
-          sessionsLoaded: false,
-          modelsLoaded: false,
-          reconnectAttempts: nextAttempt,
-          reconnectAt: shouldReconnect ? Date.now() + delayMs : undefined,
-        });
-        pushLog(set, get, "WARN", `Disconnected (code: ${event.code})`);
-
-        if (shouldReconnect) {
-          console.log(`[Gateway] Auto-reconnecting in ${Math.round(delayMs / 1000)}s (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS})...`);
-          setTimeout(() => {
-            if (get().status === "disconnected") get().connect();
-          }, delayMs);
-        } else if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
-          console.warn("[Gateway] Max reconnect attempts reached. Use Gateway page to reconnect manually.");
-        }
-      } else {
-        set({ status: "disconnected", _ws: null, _pingInterval: null });
-      }
-    };
-
-    ws.onerror = (event) => {
-      console.error("[Gateway] WebSocket error:", event);
-    };
+    // Config saved. Gateway connection happens server-side when a project
+    // is activated with this URL. Mark as "disconnected" with config ready.
+    // Status will change to "connected" when a project activates successfully.
+    set({ status: "disconnected", _configHydrated: true });
   },
 
   disconnect: () => {
-    const { _ws, _pingInterval } = get();
-    if (_pingInterval) clearInterval(_pingInterval);
-    if (_ws) { try { _ws.close(); } catch { /* ignore */ } }
-    pushLog(set, get, "INFO", "Disconnected by user");
-    set({
-      status: "disconnected",
-      _ws: null,
-      _pingInterval: null,
-      _authenticated: false,
-      connectedAt: undefined,
-      reconnectAttempts: 0,
-      reconnectAt: undefined,
-      expectedRestartReason: undefined,
-      agents: [],
-      registeredAgents: [],
-      sessions: [],
-      availableModels: [],
-      agentsLoaded: false,
-      sessionsLoaded: false,
-      modelsLoaded: false,
+    set({ status: "disconnected", connectedAt: undefined });
+  },
+
+  // ─── Commands (no-op: all actions go through REST API now) ───
+  sendCommand: (_command) => {
+    console.warn(
+      "[gateway-store] sendCommand() is deprecated. Use apiClient methods instead.",
+    );
+  },
+
+  sendRpc: (_method, _params) => {
+    console.warn(
+      "[gateway-store] sendRpc() is deprecated. Use apiClient methods instead.",
+    );
+    return `deprecated-${Date.now()}`;
+  },
+
+  // ─── Config Updates ───
+  updateConfig: (partial) => {
+    set((s) => {
+      const config = { ...s.config, ...partial };
+      // Persist to localStorage for sidebar display
+      if (typeof window !== "undefined") {
+        localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
+      }
+      // Persist to backend (fire-and-forget)
+      try {
+        getApiClient()
+          .settings.update({
+            gatewayUrl: config.url,
+            preferences: { token: config.token },
+          })
+          .catch(() => {});
+      } catch {
+        // apiClient not initialized yet
+      }
+      return { config };
     });
   },
 
-  sendCommand: (command: GatewayCommand) => {
-    const { _ws } = get();
-    if (_ws?.readyState === WebSocket.OPEN) {
-      _ws.send(JSON.stringify(command));
-    }
-  },
+  // ─── Gateway Restart Expectations ───
+  expectGatewayRestart: (reason) => set({ expectedRestartReason: reason }),
+  clearExpectedGatewayRestart: () => set({ expectedRestartReason: undefined }),
 
-  sendRpc: (method: string, params?: unknown) => {
-    const { _ws } = get();
-    const id = mkReqId();
-    if (_ws?.readyState === WebSocket.OPEN) {
-      _ws.send(JSON.stringify({ type: "req", id, method, params: params ?? {} }));
-    }
-    return id;
-  },
-
-  expectGatewayRestart: (reason) => {
-    set({ expectedRestartReason: reason, reconnectAttempts: 0, reconnectAt: undefined });
-  },
-
-  clearExpectedGatewayRestart: () => {
-    set({ expectedRestartReason: undefined, reconnectAttempts: 0, reconnectAt: undefined });
-  },
-
-  setLeadBoardAgent: async (model: string, provider: string) => {
+  // ─── Lead Board Agent ───
+  setLeadBoardAgent: async (model, provider) => {
     set({ leadBoardAgent: { model, provider } });
-    if (typeof window !== "undefined") {
-      localStorage.setItem("rikuchan:lead-agent", JSON.stringify({ model, provider }));
+    try {
+      await getApiClient().settings.update({
+        preferences: { leadBoardAgent: { model, provider } },
+      });
+    } catch (err) {
+      console.error("[gateway-store] Failed to save lead board agent:", err);
     }
   },
 
-  setAgentModel: (agentId: string, model: string) => {
+  // ─── Agent Model (update via settings) ───
+  setAgentModel: (agentId, model) => {
     set((s) => ({
       agents: s.agents.map((a) =>
-        a.id === agentId ? { ...a, model } : a
+        a.id === agentId ? { ...a, model } : a,
       ),
     }));
   },
 
-  setHeartbeatModel: (model: string) => {
-    set((s) => ({ heartbeatConfig: { ...s.heartbeatConfig, model } }));
-    if (typeof window !== "undefined") {
-      localStorage.setItem("rikuchan:heartbeat-model", model);
+  // ─── Heartbeat Config ───
+  setHeartbeatModel: (model) => {
+    set((s) => ({
+      heartbeatConfig: { ...s.heartbeatConfig, model },
+    }));
+    try {
+      getApiClient()
+        .settings.update({
+          preferences: { heartbeatModel: model },
+        })
+        .catch(() => {});
+    } catch {
+      // not initialized
     }
   },
 
-  setHeartbeatInterval: (intervalMs: number) => {
-    set((s) => ({ heartbeatConfig: { ...s.heartbeatConfig, intervalMs } }));
-  },
-
-  setHeartbeatTimeout: (timeoutMs: number) => {
-    set((s) => ({ heartbeatConfig: { ...s.heartbeatConfig, timeoutMs } }));
-  },
-
-  updateConfig: (partial: Partial<GatewayConfig>) => {
-    const newConfig = { ...get().config, ...partial };
-    persistConfig(newConfig);
-    set({ config: newConfig });
-  },
-
-  clearLogs: () => set({ logs: [] }),
-
-  approveAction: (agentId: string) => {
+  setHeartbeatInterval: (intervalMs) => {
     set((s) => ({
-      pendingApprovals: s.pendingApprovals.filter((p) => p.agentId !== agentId),
-    }));
-    get().sendCommand({ type: "agent_action", agentId, action: "restart" });
-  },
-
-  addLog: (entry: LogEntry) => {
-    set((s) => ({ logs: [...s.logs.slice(-499), entry] }));
-  },
-
-  updateAgent: (agentId: string, updates: Partial<Agent>) => {
-    set((s) => ({
-      agents: s.agents.map((a) => (a.id === agentId ? { ...a, ...updates } : a)),
+      heartbeatConfig: { ...s.heartbeatConfig, intervalMs },
     }));
   },
 
-  removeAgent: (agentId: string) => {
+  setHeartbeatTimeout: (timeoutMs) => {
+    set((s) => ({
+      heartbeatConfig: { ...s.heartbeatConfig, timeoutMs },
+    }));
+  },
+
+  // ─── Logs ───
+  clearLogs: () => set({ logs: [], _logSeq: 0 }),
+
+  addLog: (entry) => {
+    set((s) => ({
+      logs: [...s.logs.slice(-499), entry],
+      _logSeq: s._logSeq + 1,
+    }));
+  },
+
+  // ─── Approvals ───
+  approveAction: (agentId) => {
+    set((s) => ({
+      pendingApprovals: s.pendingApprovals.filter(
+        (a) => a.agentId !== agentId,
+      ),
+    }));
+    // TODO: call backend approval endpoint when available
+  },
+
+  // ─── Agent CRUD (local state — authoritative data from SSE) ───
+  updateAgent: (agentId, updates) => {
+    set((s) => ({
+      agents: s.agents.map((a) =>
+        a.id === agentId ? { ...a, ...updates } : a,
+      ),
+    }));
+  },
+
+  removeAgent: (agentId) => {
     set((s) => ({
       agents: s.agents.filter((a) => a.id !== agentId),
     }));
   },
 }));
 
-// ─── Derived selectors ──────────────────────────────────────────────────────
+// ─── Selectors (same as before) ─────────────────────────────────────────────
 
-export const selectCompletedToday = (s: GatewayStore) =>
-  s.sessions.filter((sess) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return sess.status === "completed" && sess.endedAt && sess.endedAt >= today.getTime();
-  }).length;
-
-export const selectErrorRate = (s: GatewayStore) => {
-  const total = s.sessions.length;
-  if (total === 0) return 0;
-  const errors = s.sessions.filter((sess) => sess.status === "error").length;
-  return Math.round((errors / total) * 100);
-};
-
-export const selectAgentById = (id: string) => (s: GatewayStore) =>
-  s.agents.find((a) => a.id === id);
-
-export const selectSessionById = (id: string) => (s: GatewayStore) =>
-  s.sessions.find((s) => s.id === id);
-
-export const selectOnlineAgents = (s: GatewayStore) =>
+const selectOnlineAgents = (s: GatewayStore) =>
   s.agents.filter((a) => a.status === "online" || a.status === "thinking");
-
-export const selectActiveSessions = (s: GatewayStore) =>
-  s.sessions.filter((sess) => sess.status === "active");
-
-export const selectSessionsByAgent = (agentId: string) => (s: GatewayStore) =>
-  s.sessions.filter((sess) => sess.agentId === agentId);
+const selectActiveSessions = (s: GatewayStore) =>
+  s.sessions.filter((s) => s.status === "active");
+const selectSessionsByAgent = (agentId: string) => (s: GatewayStore) =>
+  s.sessions.filter((s) => s.agentId === agentId);
 
 export const useOnlineAgents = () =>
   useGatewayStore(useShallow(selectOnlineAgents));
-
 export const useActiveSessions = () =>
   useGatewayStore(useShallow(selectActiveSessions));
-
-export const useSessionsByAgent = (agentId: string) =>
+export const useAgentSessions = (agentId: string) =>
   useGatewayStore(useShallow(selectSessionsByAgent(agentId)));
+
+// ─── RPC Response ID tracking (kept for agent-files.ts compat) ───────────────
+// These are no-ops in the new architecture since RPC goes through the backend.
+
+const _externalRpcResponseIds = new Set<string>();
+
+export function registerExternalRpcResponseId(id: string) {
+  _externalRpcResponseIds.add(id);
+}
+
+export function unregisterExternalRpcResponseId(id: string) {
+  _externalRpcResponseIds.delete(id);
+}

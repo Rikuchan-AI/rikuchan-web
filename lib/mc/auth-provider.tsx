@@ -2,9 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { setStorageAdapter } from "./storage";
-import { SupabaseAdapter } from "./storage/supabase-adapter";
-import { setSettingsAdapter, SupabaseSettingsAdapter } from "./storage/settings-adapter";
 
 interface AuthContextValue {
   ready: boolean;
@@ -23,14 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoaded) return;
-
-    if (userId) {
-      // User is authenticated — switch to Supabase adapters
-      setStorageAdapter(new SupabaseAdapter());
-      setSettingsAdapter(new SupabaseSettingsAdapter());
-    }
-    // If no userId, keep default localStorage adapters
-
+    // In the new architecture, API client handles auth via Clerk JWT.
+    // Storage adapters are no longer used — backend is the source of truth.
     setReady(true);
   }, [isLoaded, userId]);
 

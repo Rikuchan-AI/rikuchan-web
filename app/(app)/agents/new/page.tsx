@@ -24,7 +24,7 @@ import {
   generateHeartbeatMd,
   generateBootstrapMd,
 } from "@/lib/mc/agent-files";
-import { MODEL_GROUPS, gatewayModelsToGroups } from "@/lib/mc/models";
+import { gatewayModelsToGroups } from "@/lib/mc/models";
 import { SOUL_TEMPLATES, applyTemplateName } from "@/lib/mc/soul-templates";
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
@@ -655,7 +655,7 @@ function StepModel({
   onChange: (field: string, value: string | boolean | number) => void;
 }) {
   const gatewayModels = useGatewayStore((s) => s.availableModels);
-  const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
+  const modelGroups = gatewayModels;
   const allModels = modelGroups.flatMap((g) => g.models);
 
   const IDLE_OPTIONS: { value: IdleAction; label: string; description: string }[] = [
@@ -1043,7 +1043,8 @@ function SubAgentCombobox({ value, onChange }: { value: string; onChange: (v: st
 }
 
 function ModelCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const options = MODEL_GROUPS.flatMap((g) =>
+  const gatewayModels = useGatewayStore((s) => s.availableModels);
+  const options = gatewayModels.flatMap((g) =>
     g.models.map((m) => ({ id: m.id, label: m.label, sub: g.provider }))
   );
   return <SimpleCombobox value={value} onChange={onChange} options={options} placeholder="Inherit global model..." mono />;

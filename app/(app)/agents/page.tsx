@@ -18,14 +18,14 @@ export default function AgentsPage() {
   const { connected, GatewayRequiredScreen } = useGatewayGate();
 
   const isConnected = status === "connected";
-
-  if (!connected) return <GatewayRequiredScreen feature="Agentes" />;
   const [gatewayExpanded, setGatewayExpanded] = useState(!isConnected);
 
   // Collapse when connected, expand when disconnected
   useEffect(() => {
     setGatewayExpanded(!isConnected);
   }, [isConnected]);
+
+  if (!connected) return <GatewayRequiredScreen feature="Agentes" />;
 
   return (
     <div className="space-y-6">

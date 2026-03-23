@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { AlertTriangle, Paperclip, Send, RefreshCw, Users, Crown, Loader2 } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
-import { startTaskExecution, triggerEMDelegation } from "@/lib/mc/em-delegation";
 import { toast } from "@/components/shared/toast";
 import type { Task, Project, FileAttachment } from "@/lib/mc/types-project";
 
@@ -84,7 +83,8 @@ export function BlockedResolvePanel({ task, project }: BlockedResolvePanelProps)
       attachments: allAttachments,
       description: task.description + "\n\n---\n" + buildRetryContext(),
     };
-    startTaskExecution(updatedTask, agent, project);
+    // Delegate to backend — backend orchestrates execution
+    useProjectsStore.getState().delegateTask(project.id, task.id).catch(() => {});
     toast("success", `Retrying "${task.title}" with ${agent.agentName}`);
     setResolving(null);
   };
@@ -117,7 +117,7 @@ export function BlockedResolvePanel({ task, project }: BlockedResolvePanelProps)
       attachments: allAttachments,
       description: task.description + (context.trim() ? "\n\n---\n" + buildRetryContext() : ""),
     };
-    startTaskExecution(updatedTask, agent, project);
+    useProjectsStore.getState().delegateTask(project.id, task.id).catch(() => {});
     toast("success", `Reassigned to ${agent.agentName}`);
     setResolving(null);
   };
@@ -146,12 +146,8 @@ Analyze this blocked task and decide:
 Respond with your decision and action.`,
     };
 
-    const decision = await triggerEMDelegation(blockedTask, project);
-    if (decision) {
-      toast("success", `Lead assigned resolution to ${decision.assignedAgentName}`);
-    } else {
-      toast("error", "Lead could not resolve — try manual resolution");
-    }
+    await useProjectsStore.getState().delegateTask(project.id, task.id);
+    toast("success", "Sent to lead for resolution");
     setResolving(null);
   };
 

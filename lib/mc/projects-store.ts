@@ -12,8 +12,7 @@ import type {
   MemoryDocument,
   ProjectTrigger,
 } from "./types-project";
-import { useGatewayStore } from "./gateway-store";
-import { getStorageAdapter } from "./storage";
+import { getApiClient } from "./api-client";
 
 interface ProjectsStore {
   groups: BoardGroup[];
@@ -51,6 +50,14 @@ interface ProjectsStore {
   assignTask: (projectId: string, taskId: string, agentId: string | null) => Promise<void>;
   deleteTask: (projectId: string, taskId: string) => Promise<void>;
 
+  // Lifecycle (delegate to backend)
+  activateProject: (id: string) => Promise<void>;
+  pauseProject: (id: string) => Promise<void>;
+  resumeProject: (id: string) => Promise<void>;
+  completeProject: (id: string) => Promise<void>;
+  delegateTask: (projectId: string, taskId: string) => Promise<void>;
+  chatWithLead: (projectId: string, message: string) => Promise<void>;
+
   // Pipelines
   setPipelines: (projectId: string, pipelines: Pipeline[]) => void;
   updatePipelineStep: (pipelineId: string, step: PipelineStep) => void;
@@ -66,7 +73,7 @@ interface ProjectsStore {
   setTriggers: (projectId: string, triggers: ProjectTrigger[]) => void;
   toggleTrigger: (projectId: string, triggerId: string, enabled: boolean) => Promise<void>;
 
-  // Gateway integration
+  // Gateway integration (no-op — kept for compat)
   sendProjectCommand: (command: Record<string, unknown>) => void;
 }
 
@@ -81,97 +88,65 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   memoryDocs: {},
   triggers: {},
 
-  // ─── Hydration from storage adapter ─────────────────────────────────
+  // ─── Hydration from backend API ───────────────────────────────────
 
   hydrate: async () => {
     if (get()._hydrated) return;
-    const adapter = getStorageAdapter();
-    let groups = await adapter.listGroups();
-    let projects = await adapter.listProjects();
-
-    // One-time migration: localStorage → Supabase (skipped if already done)
-    const migrated = typeof window !== "undefined" && localStorage.getItem("rikuchan:migrated-to-supabase");
-    if (!migrated && groups.length === 0 && projects.length === 0 && typeof window !== "undefined") {
-      try {
-        const { LocalStorageAdapter } = await import("./storage/local-storage");
-        const local = new LocalStorageAdapter();
-        const localGroups = await local.listGroups();
-        const localProjects = await local.listProjects();
-        if (localGroups.length > 0 || localProjects.length > 0) {
-          console.log(`[Projects] Migrating ${localGroups.length} groups + ${localProjects.length} projects from localStorage to Supabase`);
-          for (const g of localGroups) {
-            try { await adapter.createGroup(g); } catch { /* skip duplicates */ }
-          }
-          for (const p of localProjects) {
-            try { await adapter.createProject(p); } catch { /* skip duplicates */ }
-          }
-          for (const p of localProjects) {
-            const localTasks = await local.listTasks(p.id);
-            for (const t of localTasks) {
-              try { await adapter.createTask(p.id, t); } catch { /* skip */ }
-            }
-          }
-          groups = await adapter.listGroups();
-          projects = await adapter.listProjects();
-          console.log(`[Projects] Migration complete: ${groups.length} groups, ${projects.length} projects`);
-        }
-      } catch (err) {
-        console.warn("[Projects] Migration failed:", err);
-      }
-      // Mark as migrated — never run again regardless of outcome
-      localStorage.setItem("rikuchan:migrated-to-supabase", "1");
+    try {
+      const api = getApiClient();
+      const [groups, projects] = await Promise.all([
+        api.groups.list(),
+        api.projects.list(),
+      ]);
+      set({ groups, projects, _hydrated: true });
+    } catch (err) {
+      console.error("[projects] Hydration failed:", err);
+      set({ _hydrated: true }); // Mark hydrated to avoid infinite retries
     }
-
-    set({ groups, projects, _hydrated: true });
   },
 
   hydrateProject: async (projectId: string) => {
-    const adapter = getStorageAdapter();
-    const [tasks, pipelines, docs, triggers] = await Promise.all([
-      adapter.listTasks(projectId),
-      adapter.listPipelines(projectId),
-      adapter.listMemoryDocs(projectId),
-      adapter.listTriggers(projectId),
-    ]);
-    set((s) => ({
-      tasks: { ...s.tasks, [projectId]: tasks },
-      pipelines: { ...s.pipelines, [projectId]: pipelines },
-      memoryDocs: { ...s.memoryDocs, [projectId]: docs },
-      triggers: { ...s.triggers, [projectId]: triggers },
-    }));
+    try {
+      const api = getApiClient();
+      const [tasks, memoryDocs] = await Promise.all([
+        api.tasks.list(projectId),
+        api.memoryDocs.list(projectId),
+      ]);
+      set((s) => ({
+        tasks: { ...s.tasks, [projectId]: tasks },
+        memoryDocs: { ...s.memoryDocs, [projectId]: memoryDocs },
+      }));
+    } catch (err) {
+      console.error("[projects] Project hydration failed:", err);
+    }
   },
 
   // ─── Groups ────────────────────────────────────────────────────────
 
   createGroup: async (group) => {
     set((s) => ({ groups: [group, ...s.groups] }));
-    await getStorageAdapter().createGroup(group);
+    try {
+      await getApiClient().groups.create(group);
+    } catch (err) {
+      console.error("[projects] Failed to create group:", err);
+    }
   },
 
   updateGroup: async (id, updates) => {
     set((s) => ({
-      groups: s.groups.map((g) => (g.id === id ? { ...g, ...updates, updatedAt: Date.now() } : g)),
+      groups: s.groups.map((g) =>
+        g.id === id ? { ...g, ...updates, updatedAt: Date.now() } : g,
+      ),
     }));
-    await getStorageAdapter().updateGroup(id, updates);
+    try {
+      await getApiClient().groups.update(id, updates);
+    } catch (err) {
+      console.error("[projects] Failed to update group:", err);
+    }
   },
 
   deleteGroup: async (id) => {
-    const group = get().groups.find((g) => g.id === id);
-
-    // 1. Delete group from Supabase
-    await getStorageAdapter().deleteGroup(id);
-
-    // 2. If group had its own agent in OpenClaw, delete it
-    if (group?.agentId) {
-      try {
-        const { deleteAgentViaGateway } = await import("./agent-files");
-        await deleteAgentViaGateway(group.agentId);
-      } catch {
-        // Gateway may be offline — best-effort
-      }
-    }
-
-    // 3. Cascade delete all projects (each handles its own gateway agent cleanup)
+    // Cascade delete projects in group
     const groupProjects = get().projects.filter((p) => p.groupId === id);
     for (const p of groupProjects) {
       try {
@@ -181,117 +156,97 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       }
     }
 
-    // 4. Remove group from UI (projects already removed by deleteProject)
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
     }));
+
+    try {
+      await getApiClient().groups.delete(id);
+    } catch (err) {
+      console.error("[projects] Failed to delete group:", err);
+    }
   },
 
-  // ─── Project CRUD ───────────────────────────────────────────────────
+  // ─── Project CRUD ─────────────────────────────────────────────────
 
   setProjects: (projects) => set({ projects }),
   setActiveProject: (id) => set({ activeProjectId: id }),
 
   createProject: async (project) => {
-    // Auto-generate workspace if empty
-    if (!project.workspacePath) {
-      const stateDir = useGatewayStore.getState().stateDir;
-      const base = stateDir ?? "~/.openclaw";
-      project = { ...project, workspacePath: `${base}/projects/${project.id}` };
-    }
-
     set((s) => ({ projects: [project, ...s.projects] }));
-    await getStorageAdapter().createProject(project);
-
-    // Sync all roster agents to use the project workspace
-    for (const member of project.roster) {
-      syncAgentToGateway(member.agentId, { workspace: project.workspacePath });
+    try {
+      await getApiClient().projects.create(project);
+    } catch (err) {
+      console.error("[projects] Failed to create project:", err);
     }
   },
 
   updateProject: async (id, updates) => {
     set((s) => ({
-      projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p)),
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p,
+      ),
     }));
-    await getStorageAdapter().updateProject(id, updates);
-    get().sendProjectCommand({ type: "project_update", projectId: id, updates });
+    try {
+      await getApiClient().projects.update(id, updates);
+    } catch (err) {
+      console.error("[projects] Failed to update project:", err);
+    }
   },
 
   deleteProject: async (id) => {
-    const project = get().projects.find((p) => p.id === id);
-
-    // 1. Delete from Supabase first (cascades tasks/pipelines/etc via API)
-    await getStorageAdapter().deleteProject(id);
-
-    // 2. Clean up gateway agents (best-effort — gateway may be offline)
-    if (project?.roster?.length) {
-      try {
-        const { deleteAgentViaGateway } = await import("./agent-files");
-        for (const member of project.roster) {
-          const agentId = member.gatewayAgentId ?? member.agentId;
-          if (agentId) {
-            await deleteAgentViaGateway(agentId);
-          }
-        }
-      } catch {
-        // Gateway offline — agent cleanup skipped
-      }
-    }
-
-    // 3. Only remove from UI after confirmed deletion — including tasks
     set((s) => {
       const { [id]: _, ...remainingTasks } = s.tasks;
-      return { projects: s.projects.filter((p) => p.id !== id), tasks: remainingTasks };
+      return {
+        projects: s.projects.filter((p) => p.id !== id),
+        tasks: remainingTasks,
+      };
     });
-    get().sendProjectCommand({ type: "project_delete", projectId: id });
+    try {
+      await getApiClient().projects.delete(id);
+    } catch (err) {
+      console.error("[projects] Failed to delete project:", err);
+    }
   },
 
-  // ─── Tasks ──────────────────────────────────────────────────────────
+  // ─── Tasks ────────────────────────────────────────────────────────
 
   setTasks: (projectId, tasks) => {
     set((s) => ({ tasks: { ...s.tasks, [projectId]: tasks } }));
   },
 
   moveTask: async (projectId, taskId, newStatus) => {
-    set((s) => {
-      const tasks = (s.tasks[projectId] ?? []).map((t) =>
-        t.id === taskId ? { ...t, status: newStatus, updatedAt: Date.now() } : t
-      );
-      return { tasks: { ...s.tasks, [projectId]: tasks } };
-    });
+    // Optimistic update
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId
+            ? { ...t, status: newStatus, updatedAt: Date.now() }
+            : t,
+        ),
+      },
+    }));
     try {
-      await getStorageAdapter().updateTask(projectId, taskId, { status: newStatus });
+      await getApiClient().tasks.move(projectId, taskId, {
+        status: newStatus,
+      });
     } catch (err) {
-      const is404 = err instanceof Error && err.message.includes("404");
-      if (!is404) {
-        console.error("[Projects] Failed to persist task move:", err instanceof Error ? err.message : err);
-      }
+      console.error("[projects] Failed to move task:", err);
     }
-    get().sendProjectCommand({ type: "task_move", taskId, newStatus, projectId });
   },
 
   createTask: async (projectId, task) => {
     set((s) => ({
-      tasks: { ...s.tasks, [projectId]: [task, ...(s.tasks[projectId] ?? [])] },
+      tasks: {
+        ...s.tasks,
+        [projectId]: [task, ...(s.tasks[projectId] ?? [])],
+      },
     }));
     try {
-      await getStorageAdapter().createTask(projectId, task);
+      await getApiClient().tasks.create(projectId, task);
     } catch (err) {
-      console.error("[Projects] Failed to persist task:", err instanceof Error ? err.message : err);
-    }
-    get().sendProjectCommand({ type: "task_create", projectId, task });
-
-    // Auto-delegate: if project is active, not manual, and task is unassigned in backlog
-    if (task.status === "backlog" && !task.assignedAgentId) {
-      const project = get().projects.find((p) => p.id === projectId);
-      if (project && project.status === "active" && project.operationMode !== "manual") {
-        // Dynamic import to avoid circular dependency (em-delegation imports projects-store)
-        import("./em-delegation").then(({ triggerEMDelegation }) => {
-          triggerEMDelegation(task, project).catch((err) => {
-            console.warn("[Projects] Auto-delegation failed:", err);
-          });
-        }).catch(() => { /* ignore import errors */ });
-      }
+      console.error("[projects] Failed to create task:", err);
     }
   },
 
@@ -300,17 +255,16 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       tasks: {
         ...s.tasks,
         [projectId]: (s.tasks[projectId] ?? []).map((t) =>
-          t.id === taskId ? { ...t, ...updates, updatedAt: Date.now() } : t
+          t.id === taskId ? { ...t, ...updates, updatedAt: Date.now() } : t,
         ),
       },
     }));
     try {
-      await getStorageAdapter().updateTask(projectId, taskId, updates);
+      await getApiClient().tasks.update(projectId, taskId, updates);
     } catch (err) {
-      // 404 is expected when task was already deleted (e.g. gateway event arrives after deletion)
       const is404 = err instanceof Error && err.message.includes("404");
       if (!is404) {
-        console.error("[Projects] Failed to persist task update:", err);
+        console.error("[projects] Failed to update task:", err);
       }
     }
   },
@@ -320,25 +274,67 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       tasks: {
         ...s.tasks,
         [projectId]: (s.tasks[projectId] ?? []).map((t) =>
-          t.id === taskId ? { ...t, assignedAgentId: agentId, updatedAt: Date.now() } : t
+          t.id === taskId
+            ? { ...t, assignedAgentId: agentId, updatedAt: Date.now() }
+            : t,
         ),
       },
     }));
-    await getStorageAdapter().updateTask(projectId, taskId, { assignedAgentId: agentId });
-    get().sendProjectCommand({ type: "task_assign", taskId, agentId, projectId });
+    try {
+      await getApiClient().tasks.update(projectId, taskId, {
+        assignedAgentId: agentId,
+      });
+    } catch (err) {
+      console.error("[projects] Failed to assign task:", err);
+    }
   },
 
   deleteTask: async (projectId, taskId) => {
     set((s) => ({
       tasks: {
         ...s.tasks,
-        [projectId]: (s.tasks[projectId] ?? []).filter((t) => t.id !== taskId),
+        [projectId]: (s.tasks[projectId] ?? []).filter(
+          (t) => t.id !== taskId,
+        ),
       },
     }));
-    await getStorageAdapter().deleteTask(projectId, taskId);
+    try {
+      await getApiClient().tasks.delete(projectId, taskId);
+    } catch (err) {
+      console.error("[projects] Failed to delete task:", err);
+    }
   },
 
-  // ─── Pipelines ──────────────────────────────────────────────────────
+  // ─── Lifecycle Actions (backend handles the orchestration) ────────
+
+  activateProject: async (id) => {
+    await getApiClient().projects.activate(id);
+    // SSE will send project status update
+  },
+
+  pauseProject: async (id) => {
+    await getApiClient().projects.pause(id);
+  },
+
+  resumeProject: async (id) => {
+    await getApiClient().projects.resume(id);
+  },
+
+  completeProject: async (id) => {
+    await getApiClient().projects.complete(id);
+  },
+
+  delegateTask: async (projectId, taskId) => {
+    await getApiClient().tasks.delegate(projectId, taskId);
+    // SSE will send delegation:status update
+  },
+
+  chatWithLead: async (projectId, message) => {
+    await getApiClient().projects.chat(projectId, message);
+    // Response comes via SSE execution:log
+  },
+
+  // ─── Pipelines ────────────────────────────────────────────────────
 
   setPipelines: (projectId, pipelines) => {
     set((s) => ({ pipelines: { ...s.pipelines, [projectId]: pipelines } }));
@@ -349,7 +345,7 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       activePipelineRun: {
         ...s.activePipelineRun,
         [pipelineId]: (s.activePipelineRun[pipelineId] ?? []).map((st) =>
-          st.id === step.id ? step : st
+          st.id === step.id ? step : st,
         ),
       },
     }));
@@ -359,13 +355,15 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     set((s) => {
       const updated: Record<string, Pipeline[]> = {};
       for (const [pid, pls] of Object.entries(s.pipelines)) {
-        updated[pid] = pls.map((p) => (p.id === pipelineId ? { ...p, status } : p));
+        updated[pid] = pls.map((p) =>
+          p.id === pipelineId ? { ...p, status } : p,
+        );
       }
       return { pipelines: updated };
     });
   },
 
-  // ─── Memory ─────────────────────────────────────────────────────────
+  // ─── Memory ───────────────────────────────────────────────────────
 
   setMemoryDocs: (projectId, docs) => {
     set((s) => ({ memoryDocs: { ...s.memoryDocs, [projectId]: docs } }));
@@ -378,8 +376,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
         [projectId]: [doc, ...(s.memoryDocs[projectId] ?? [])],
       },
     }));
-    await getStorageAdapter().addMemoryDoc(projectId, doc);
-    get().sendProjectCommand({ type: "memory_add", projectId, doc });
+    try {
+      await getApiClient().memoryDocs.create(projectId, doc);
+    } catch (err) {
+      console.error("[projects] Failed to create memory doc:", err);
+    }
   },
 
   updateMemoryDoc: async (projectId, docId, updates) => {
@@ -387,24 +388,34 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       memoryDocs: {
         ...s.memoryDocs,
         [projectId]: (s.memoryDocs[projectId] ?? []).map((d) =>
-          d.id === docId ? { ...d, ...updates } : d
+          d.id === docId ? { ...d, ...updates } : d,
         ),
       },
     }));
-    await getStorageAdapter().updateMemoryDoc(projectId, docId, updates);
+    try {
+      await getApiClient().memoryDocs.update(projectId, docId, updates);
+    } catch (err) {
+      console.error("[projects] Failed to update memory doc:", err);
+    }
   },
 
   deleteMemoryDoc: async (projectId, docId) => {
     set((s) => ({
       memoryDocs: {
         ...s.memoryDocs,
-        [projectId]: (s.memoryDocs[projectId] ?? []).filter((d) => d.id !== docId),
+        [projectId]: (s.memoryDocs[projectId] ?? []).filter(
+          (d) => d.id !== docId,
+        ),
       },
     }));
-    await getStorageAdapter().deleteMemoryDoc(projectId, docId);
+    try {
+      await getApiClient().memoryDocs.delete(projectId, docId);
+    } catch (err) {
+      console.error("[projects] Failed to delete memory doc:", err);
+    }
   },
 
-  // ─── Triggers ───────────────────────────────────────────────────────
+  // ─── Triggers ─────────────────────────────────────────────────────
 
   setTriggers: (projectId, triggers) => {
     set((s) => ({ triggers: { ...s.triggers, [projectId]: triggers } }));
@@ -415,52 +426,33 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       triggers: {
         ...s.triggers,
         [projectId]: (s.triggers[projectId] ?? []).map((t) =>
-          t.id === triggerId ? { ...t, enabled } : t
+          t.id === triggerId ? { ...t, enabled } : t,
         ),
       },
     }));
-    const trigger = get().triggers[projectId]?.find((t) => t.id === triggerId);
-    if (trigger) await getStorageAdapter().saveTrigger(projectId, { ...trigger, enabled });
-    get().sendProjectCommand({ type: "trigger_toggle", triggerId, enabled });
   },
 
-  // ─── Gateway ────────────────────────────────────────────────────────
+  // ─── Gateway (no-op) ──────────────────────────────────────────────
 
-  sendProjectCommand: (_command) => {
-    // No-op: OpenClaw gateway doesn't support project commands yet.
-    // Project data is persisted via the storage adapter (localStorage/Supabase).
-    // Agent-level config (spawn targets, heartbeat, model) is synced
-    // via dedicated RPCs (agents.update, config.patch).
+  sendProjectCommand: () => {
+    // No-op: all project commands go through REST API now
   },
 }));
 
-// ─── Gateway RPC helpers ────────────────────────────────────────────────────
+// ─── Gateway RPC helpers (kept for compat — agent-files.ts uses this) ────────
 
-/**
- * Sync agent config to OpenClaw gateway via agents.update RPC.
- * Supports: model, name, workspace.
- * Spawn targets are project-level config (not in gateway schema).
- */
 export function syncAgentToGateway(
-  agentId: string,
-  updates: { model?: string; name?: string; workspace?: string },
+  _agentId: string,
+  _updates: { model?: string; name?: string; workspace?: string },
 ) {
-  const store = useGatewayStore.getState();
-  if (store._ws?.readyState !== WebSocket.OPEN) return;
-
-  const params: Record<string, string> = { agentId };
-  if (updates.model) params.model = updates.model;
-  if (updates.name) params.name = updates.name;
-  if (updates.workspace) params.workspace = updates.workspace;
-
-  // Only send if there's something besides agentId
-  if (Object.keys(params).length <= 1) return;
-
-  store.sendRpc("agents.update", params);
-  console.log("[Projects] Synced agent to gateway:", agentId, params);
+  // In the new architecture, agent syncing is handled by the backend
+  // when projects are activated/updated. This is a no-op.
+  console.warn(
+    "[projects] syncAgentToGateway() is deprecated. Backend handles gateway sync.",
+  );
 }
 
-// ─── Scalar selectors (safe to use directly — return object or primitive) ───
+// ─── Selectors ──────────────────────────────────────────────────────────────
 
 export const selectProjectById = (id: string) => (s: ProjectsStore) =>
   s.projects.find((p) => p.id === id);
@@ -468,24 +460,25 @@ export const selectProjectById = (id: string) => (s: ProjectsStore) =>
 export const selectGroupById = (id?: string | null) => (s: ProjectsStore) =>
   id ? s.groups.find((g) => g.id === id) : undefined;
 
-// ─── Array selectors (use these hooks to avoid infinite re-render loops) ────
-
 export const selectProjectTasks = (projectId: string) => (s: ProjectsStore) =>
   s.tasks[projectId] ?? [];
 
-export const selectProjectPipelines = (projectId: string) => (s: ProjectsStore) =>
-  s.pipelines[projectId] ?? [];
+export const selectProjectPipelines =
+  (projectId: string) => (s: ProjectsStore) =>
+    s.pipelines[projectId] ?? [];
 
-export const selectProjectMemory = (projectId: string) => (s: ProjectsStore) =>
-  s.memoryDocs[projectId] ?? [];
+export const selectProjectMemory =
+  (projectId: string) => (s: ProjectsStore) =>
+    s.memoryDocs[projectId] ?? [];
 
-export const selectProjectTriggers = (projectId: string) => (s: ProjectsStore) =>
-  s.triggers[projectId] ?? [];
+export const selectProjectTriggers =
+  (projectId: string) => (s: ProjectsStore) =>
+    s.triggers[projectId] ?? [];
 
 export const selectActiveProjects = (s: ProjectsStore) =>
   s.projects.filter((p) => p.status === "active");
 
-// ─── Safe hooks (wrap array selectors with useShallow) ──────────────────────
+// ─── Safe hooks ─────────────────────────────────────────────────────────────
 
 export const useProjectTasks = (projectId: string) =>
   useProjectsStore(useShallow(selectProjectTasks(projectId)));

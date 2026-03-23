@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
@@ -9,7 +9,7 @@ import { Plus } from "lucide-react";
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { RikuPageLoader } from "@/components/shared/riku-loader";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
-import { activateProject, pauseProject, resumeProject } from "@/lib/mc/project-activation";
+// project-activation removed — lifecycle managed by backend via projects-store
 import { TASK_COLUMNS } from "@/lib/mc/types-project";
 import type { Task, TaskPriority, TaskStatus } from "@/lib/mc/types-project";
 import { canTransition, type OperationMode } from "@/lib/mc/pipeline-governance";
@@ -103,34 +103,32 @@ function NewTaskForm({
         rows={2}
         className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:border-accent/40 focus:outline-none resize-none"
       />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          {(["low", "medium", "high", "critical"] as TaskPriority[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPriority(p)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-                priority === p
-                  ? "bg-accent-soft text-accent border border-accent/15"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-strong border border-transparent"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors">
-            Cancel
-          </button>
+      <div className="flex items-center gap-1">
+        {(["low", "medium", "high", "critical"] as TaskPriority[]).map((p) => (
           <button
-            onClick={handleSubmit}
-            disabled={saving || !title.trim()}
-            className="rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep disabled:opacity-50 transition-colors"
+            key={p}
+            onClick={() => setPriority(p)}
+            className={`rounded-md px-2 py-1 text-[11px] font-medium capitalize transition-colors ${
+              priority === p
+                ? "bg-accent-soft text-accent border border-accent/15"
+                : "text-foreground-muted hover:text-foreground hover:bg-surface-strong border border-transparent"
+            }`}
           >
-            {saving ? "Creating..." : "Create"}
+            {p}
           </button>
-        </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onClose} className="px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors">
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={saving || !title.trim()}
+          className="rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep disabled:opacity-50 transition-colors"
+        >
+          {saving ? "Creating..." : "Create"}
+        </button>
       </div>
     </div>
   );
@@ -165,9 +163,12 @@ export default function BoardPage() {
   const leadAgent = project?.roster.find((m) => m.role === "lead");
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
 
+  const router = useRouter();
   const gwAgents = useGatewayStore((s) => s.agents);
   const gwConnected = useGatewayStore((s) => s.status === "connected");
   const gwStatus = useGatewayStore((s) => s.status);
+  const gwConfig = useGatewayStore((s) => s.config);
+  const gwConnect = useGatewayStore((s) => s.connect);
   const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
   const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
@@ -245,6 +246,7 @@ export default function BoardPage() {
   );
 
   const handleNewTaskInColumn = (status: TaskStatus) => {
+    if (!gwConnected) return;
     setNewTaskColumn(status);
     setShowNewTask(true);
   };
@@ -252,24 +254,34 @@ export default function BoardPage() {
   const handleActivate = async () => {
     if (!project || lifecycleLoading) return;
     setLifecycleLoading(true);
-    const result = await activateProject(project.id);
+    try {
+      await useProjectsStore.getState().activateProject(project.id);
+    } catch (err) {
+      console.error("[Board] Activation failed:", err);
+    }
     setLifecycleLoading(false);
-    if (!result.ok) console.error("[Board] Activation failed:", result.error);
   };
 
   const handlePause = async () => {
     if (!project || lifecycleLoading) return;
     setLifecycleLoading(true);
-    await pauseProject(project.id);
+    try {
+      await useProjectsStore.getState().pauseProject(project.id);
+    } catch (err) {
+      console.error("[Board] Pause failed:", err);
+    }
     setLifecycleLoading(false);
   };
 
   const handleResume = async () => {
     if (!project || lifecycleLoading) return;
     setLifecycleLoading(true);
-    const result = await resumeProject(project.id);
+    try {
+      await useProjectsStore.getState().resumeProject(project.id);
+    } catch (err) {
+      console.error("[Board] Resume failed:", err);
+    }
     setLifecycleLoading(false);
-    if (!result.ok) console.error("[Board] Resume failed:", result.error);
   };
 
   if (!hydrated) {
@@ -284,29 +296,45 @@ export default function BoardPage() {
     );
   }
 
-  // Banner state: show when gateway disconnects/reconnects
-  const showGatewayBanner = gwStatus !== "connected" && gwConnectedAt !== undefined;
+  // Banner state: show whenever gateway is not connected
+  const showGatewayBanner = gwStatus !== "connected";
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
       {/* Gateway reconnect / applying config banner */}
       {showGatewayBanner && (
-        <div className={`mb-3 flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-sm ${
+        <div className={`mb-3 flex items-center justify-between rounded-lg border px-4 py-2.5 text-sm ${
           gatewayBannerIsExpected
             ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
             : "border-red-500/20 bg-red-500/5 text-red-400"
         }`}>
-          <span className={`h-2 w-2 shrink-0 rounded-full animate-pulse ${
-            gatewayBannerIsExpected ? "bg-amber-400" : "bg-red-400"
-          }`} />
-          <span className="font-medium">
-            {gatewayBannerIsExpected
-              ? "Applying configurations — gateway restarting..."
-              : gwStatus === "connecting"
-                ? "Reconnecting to gateway..."
-                : "Gateway offline — check connection"}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span className={`h-2 w-2 shrink-0 rounded-full animate-pulse ${
+              gatewayBannerIsExpected ? "bg-amber-400" : "bg-red-400"
+            }`} />
+            <span className="font-medium">
+              {gatewayBannerIsExpected
+                ? "Applying configurations, gateway restarting..."
+                : gwStatus === "connecting"
+                  ? gwConnectedAt ? "Reconnecting to gateway..." : "Connecting to gateway..."
+                  : "Gateway offline, task creation disabled"}
+            </span>
+          </div>
+          {gwStatus === "disconnected" && !gatewayBannerIsExpected && (
+            <button
+              onClick={() => {
+                if (gwConfig.url && gwConfig.token) {
+                  gwConnect();
+                } else {
+                  router.push("/agents/gateway");
+                }
+              }}
+              className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              Connect
+            </button>
+          )}
         </div>
       )}
 
@@ -318,7 +346,7 @@ export default function BoardPage() {
         agentsLoaded={agentsLoaded}
         operationMode={operationMode}
         onModeChange={setOperationMode}
-        onNewTask={() => setShowCreateModal(true)}
+        onNewTask={gwConnected ? () => setShowCreateModal(true) : undefined}
         onEMChat={() => setShowEMChat(true)}
         onTeamChat={() => setShowTeamChat(true)}
         onHealth={() => setShowHealth(true)}
@@ -355,6 +383,7 @@ export default function BoardPage() {
               title: t.title,
               assignedAgentId: t.assignedAgentId,
               status: t.status,
+              subagentSessionKey: t.subagentSessionKey,
             }))}
             onSelectTask={setSelectedTaskId}
           />
@@ -367,7 +396,7 @@ export default function BoardPage() {
               {TASK_COLUMNS.map((col) => {
                 const columnTasks = filteredTasks.filter((t) => t.status === col.id);
                 return (
-                  <div key={col.id} className={`flex flex-col border-t-2 ${COLUMN_COLORS[col.id] ?? "border-t-zinc-600"} rounded-t-lg`}>
+                  <div key={col.id} className={`flex min-h-0 flex-col border-t-2 ${COLUMN_COLORS[col.id] ?? "border-t-zinc-600"} rounded-t-lg`}>
                     {/* Column header */}
                     <div className="mb-3 flex items-center justify-between pt-2.5 px-1">
                       <div className="flex items-center gap-2">
@@ -380,15 +409,16 @@ export default function BoardPage() {
                       </div>
                       <button
                         onClick={() => handleNewTaskInColumn(col.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-foreground-muted/40 hover:bg-surface-strong hover:text-foreground-muted transition-colors"
+                        disabled={!gwConnected}
+                        className={`flex h-5 w-5 items-center justify-center rounded transition-colors ${gwConnected ? "text-foreground-muted hover:bg-surface-strong hover:text-foreground" : "text-foreground-muted/15 cursor-not-allowed"}`}
                       >
-                        <Plus size={10} />
+                        <Plus size={12} />
                       </button>
                     </div>
 
                     {/* In-column new task */}
                     {showNewTask && newTaskColumn === col.id && (
-                      <div className="mb-2">
+                      <div className="mb-2 px-1.5">
                         <NewTaskForm
                           projectId={projectId}
                           defaultStatus={col.id}

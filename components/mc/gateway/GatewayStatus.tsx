@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Eye, EyeOff, RefreshCw, Settings } from "lucide-react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { LivePulse } from "@/components/mc/ui/LivePulse";
+import { Combobox } from "@/components/mc/ui/Combobox";
+import type { SavedGateway } from "@/lib/mc/types";
+
+const SAVED_GATEWAYS_KEY = "saved-gateways";
 
 interface GatewayStatusProps {
   presetName?: string;
@@ -23,6 +27,25 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
   const [showToken, setShowToken] = useState(false);
   const [editUrl, setEditUrl] = useState(config.url);
   const [editToken, setEditToken] = useState(config.token);
+  const [savedGateways, setSavedGateways] = useState<SavedGateway[]>([]);
+  const [selectedGatewayId, setSelectedGatewayId] = useState("");
+  const [loadingGateways, setLoadingGateways] = useState(true);
+
+  const loadSavedGateways = useCallback(async () => {
+    try {
+      const { getApiClient } = await import("@/lib/mc/api-client");
+      const settings = await getApiClient().settings.get();
+      const gateways = (settings?.preferences as Record<string, unknown>)?.[SAVED_GATEWAYS_KEY];
+      setSavedGateways(Array.isArray(gateways) ? gateways as SavedGateway[] : []);
+    } catch {
+      // silent fail — apiClient may not be initialized
+    }
+    setLoadingGateways(false);
+  }, []);
+
+  useEffect(() => {
+    loadSavedGateways();
+  }, [loadSavedGateways]);
 
   useEffect(() => {
     setEditUrl(presetUrl ?? config.url);
@@ -32,7 +55,24 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
     setEditToken(presetToken ?? config.token);
   }, [config.token, presetToken]);
 
+  const handleGatewaySelect = (id: string) => {
+    setSelectedGatewayId(id);
+    if (!id) return;
+    const gw = savedGateways.find((g) => g.id === id);
+    if (gw) {
+      setEditUrl(gw.url);
+      setEditToken(gw.token);
+    }
+  };
+
   const isConnected = status === "connected";
+  const hasPreset = Boolean(presetUrl);
+
+  const gatewayOptions = savedGateways.map((gw) => ({
+    id: gw.id,
+    label: gw.name,
+    sub: gw.url,
+  }));
 
   const permissionModes: { value: typeof config.permissionMode; label: string }[] = [
     { value: "allow-all",    label: "Allow All" },
@@ -78,8 +118,39 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
           </div>
         </div>
 
-        {/* URL */}
         <div className="space-y-3">
+          {/* Saved gateway selector */}
+          {!hasPreset && (
+            <div>
+              <label className="mono text-xs uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
+                Gateway
+              </label>
+              {loadingGateways ? (
+                <div className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground-muted animate-pulse">
+                  Carregando...
+                </div>
+              ) : savedGateways.length > 0 ? (
+                <Combobox
+                  value={selectedGatewayId}
+                  onChange={handleGatewaySelect}
+                  options={gatewayOptions}
+                  placeholder="Selecione um gateway..."
+                />
+              ) : (
+                <div className="flex items-center gap-2 rounded-md border border-line bg-surface-strong px-3 py-2">
+                  <Settings size={13} className="text-foreground-muted" />
+                  <span className="text-xs text-foreground-muted">
+                    Nenhum gateway salvo.{" "}
+                    <a href="/agents/settings" className="text-accent hover:underline">
+                      Configurar nas Settings
+                    </a>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* URL */}
           <div>
             <label className="mono text-xs uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
               Gateway URL
@@ -87,7 +158,7 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
             <input
               type="text"
               value={editUrl}
-              onChange={(e) => setEditUrl(e.target.value)}
+              onChange={(e) => { setEditUrl(e.target.value); setSelectedGatewayId(""); }}
               className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50 transition-colors"
               placeholder="ws://127.0.0.1:18789"
             />
@@ -102,7 +173,7 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
               <input
                 type={showToken ? "text" : "password"}
                 value={editToken}
-                onChange={(e) => setEditToken(e.target.value)}
+                onChange={(e) => { setEditToken(e.target.value); setSelectedGatewayId(""); }}
                 className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 pr-10 text-sm font-mono text-foreground focus:outline-none focus:border-accent/50 transition-colors"
                 placeholder="••••••••••••••••"
               />

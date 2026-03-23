@@ -20,7 +20,7 @@ import {
   listAgentFilesViaGateway,
   AGENT_CORE_FILES,
 } from "@/lib/mc/agent-files";
-import { MODEL_GROUPS } from "@/lib/mc/models";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -402,7 +402,7 @@ function TabModel({ agentId }: { agentId: string }) {
   const agent = useGatewayStore((s) => s.agents.find((a) => a.id === agentId));
   const gatewayModels = useGatewayStore((s) => s.availableModels);
   const sendRpc = useGatewayStore((s) => s.sendRpc);
-  const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
+  const modelGroups = gatewayModels;
 
   const [selectedModel, setSelectedModel] = useState(agent?.model ?? "");
   const [saving, setSaving] = useState(false);

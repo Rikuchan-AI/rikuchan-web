@@ -20,7 +20,7 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
   ROLE_DEFAULT_HEARTBEAT,
 } from "@/lib/mc/types-project";
-import { MODEL_GROUPS } from "@/lib/mc/models";
+
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
@@ -456,7 +456,7 @@ function StepConfig({
   onHeartbeatChange: (v: ProjectHeartbeatConfig) => void;
 }) {
   const gatewayModels = useGatewayStore((s) => s.availableModels);
-  const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
+  const modelGroups = gatewayModels;
   const allModels = modelGroups.flatMap((g) => g.models.map((m) => ({ ...m, provider: g.provider })));
 
   const MODES: { value: OperationMode; label: string; description: string }[] = [

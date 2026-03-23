@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Star, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
-import { MODEL_GROUPS, findModelProvider, isPremiumModel } from "@/lib/mc/models";
+import { findModelProvider, isPremiumModel } from "@/lib/mc/models";
 import { toast } from "@/components/shared/toast";
 
 export function LeadBoardAgentSelector() {
@@ -19,7 +19,7 @@ export function LeadBoardAgentSelector() {
   const [collapsed, setCollapsed] = useState(false);
 
   // Use gateway models if available, fallback to hardcoded
-  const modelGroups = gatewayModels.length > 0 ? gatewayModels : MODEL_GROUPS;
+  const modelGroups = gatewayModels;
 
   const filteredModelGroups = useMemo(() => {
     if (!search.trim()) return modelGroups;

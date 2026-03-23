@@ -3,20 +3,18 @@
 import { create } from "zustand";
 import type { ChatMessage, ChatMode, AgentChatSession } from "./types-chat";
 import { chatSessionKey } from "./types-chat";
-import { useGatewayStore } from "./gateway-store";
-import { useProjectsStore } from "./projects-store";
-import { buildAgentSessionKey } from "./session-routing";
+import { getApiClient } from "./api-client";
 
 interface ChatStore {
   sessions: Record<string, AgentChatSession>;
   unreadCounts: Record<string, number>;
-  /** Agent IDs currently being processed (agent is thinking) */
   thinkingAgents: Set<string>;
 
-  getChatSession: (opts:
-    | { mode: "task"; taskId: string }
-    | { mode: "direct"; projectId: string; agentId: string }
-    | { mode: "em"; projectId: string }
+  getChatSession: (
+    opts:
+      | { mode: "task"; taskId: string }
+      | { mode: "direct"; projectId: string; agentId: string }
+      | { mode: "em"; projectId: string },
   ) => AgentChatSession | undefined;
 
   sendMessage: (opts: {
@@ -52,7 +50,6 @@ function loadSessions(): Record<string, AgentChatSession> {
 
 function saveSessions(sessions: Record<string, AgentChatSession>) {
   if (typeof window === "undefined") return;
-  // Trim messages before saving
   const trimmed: Record<string, AgentChatSession> = {};
   for (const [key, session] of Object.entries(sessions)) {
     trimmed[key] = {
@@ -83,11 +80,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   sendMessage: async (opts) => {
     const { mode, content, agentId, agentName, projectId, taskId } = opts;
-    const keyOpts = mode === "task"
-      ? { mode: "task" as const, taskId: taskId! }
-      : mode === "em"
-        ? { mode: "em" as const, projectId }
-        : { mode: "direct" as const, projectId, agentId };
+    const keyOpts =
+      mode === "task"
+        ? { mode: "task" as const, taskId: taskId! }
+        : mode === "em"
+          ? { mode: "em" as const, projectId }
+          : { mode: "direct" as const, projectId, agentId };
     const key = chatSessionKey(keyOpts);
 
     const now = Date.now();
@@ -99,7 +97,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       taskId,
     };
 
-    // Ensure session exists
+    // Ensure session exists and add user message
     set((s) => {
       const existing = s.sessions[key];
       const session: AgentChatSession = existing ?? {
@@ -127,38 +125,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       };
     });
 
-    // Send to gateway via chat.send
-    const ws = useGatewayStore.getState()._ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      const project = useProjectsStore.getState().projects.find((p) => p.id === projectId);
-      const group = project?.groupId
-        ? useProjectsStore.getState().groups.find((g) => g.id === project.groupId)
-        : undefined;
-      const sessionKeyStr = project
-        ? buildAgentSessionKey(agentId, project, group?.agentId)
-        : `agent:${agentId}:main`;
-      const reqId = `chat-${now}-${Math.random().toString(16).slice(2, 6)}`;
-
-      ws.send(JSON.stringify({
-        type: "req",
-        id: reqId,
-        method: "chat.send",
-        params: {
-          sessionKey: sessionKeyStr,
-          message: content,
-          idempotencyKey: `chat-${key}-${now}`,
-        },
-      }));
-
-      // Mark agent as thinking immediately after sending
-      get().setThinking(sessionKeyStr, true);
+    // Send to backend via REST API
+    try {
+      await getApiClient().projects.chat(projectId, content);
+    } catch (err) {
+      console.error("[chat] Failed to send message:", err);
     }
 
     get()._persistToStorage();
   },
 
   setThinking: (gatewaySessionKey, thinking) => {
-    // gatewaySessionKey: "agent:<agentId>:<scope>"
     const agentId = gatewaySessionKey.split(":")[1] ?? gatewaySessionKey;
     set((s) => {
       const next = new Set(s.thinkingAgents);
@@ -169,8 +146,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   receiveMessage: (gatewaySessionKey, message) => {
-    // gatewaySessionKey format: "agent:<agentId>:<scope>"
-    // Map to chat session key by finding a session whose agentId matches
     const agentIdFromGw = gatewaySessionKey.split(":")[1] ?? "";
     set((s) => {
       const allKeys = Object.keys(s.sessions);
@@ -185,14 +160,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         return last?.role === "user";
       };
 
-      // Priority 1: session with pending user message (last msg is user) + agentId match
-      // Priority 2: most recently updated session with agentId match
-      const pending = allKeys.filter((k) => agentMatches(s.sessions[k]) && lastMessageIsUser(s.sessions[k]));
+      const pending = allKeys.filter(
+        (k) => agentMatches(s.sessions[k]) && lastMessageIsUser(s.sessions[k]),
+      );
       const fallback = allKeys.filter((k) => agentMatches(s.sessions[k]));
 
       const candidates = pending.length > 0 ? pending : fallback;
-      const sessionKey = candidates.sort((a, b) =>
-        (s.sessions[b].updatedAt ?? 0) - (s.sessions[a].updatedAt ?? 0)
+      const sessionKey = candidates.sort(
+        (a, b) =>
+          (s.sessions[b].updatedAt ?? 0) - (s.sessions[a].updatedAt ?? 0),
       )[0];
 
       const session = sessionKey ? s.sessions[sessionKey] : undefined;
@@ -204,7 +180,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           ...s.sessions,
           [sessionKey]: {
             ...session,
-            messages: [...session.messages, message].slice(-MAX_MESSAGES_PER_SESSION),
+            messages: [...session.messages, message].slice(
+              -MAX_MESSAGES_PER_SESSION,
+            ),
             updatedAt: Date.now(),
           },
         },
@@ -224,7 +202,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return {
         sessions: {
           ...s.sessions,
-          [sessionKey]: { ...session, status: "closed", updatedAt: Date.now() },
+          [sessionKey]: {
+            ...session,
+            status: "closed",
+            updatedAt: Date.now(),
+          },
         },
       };
     });
