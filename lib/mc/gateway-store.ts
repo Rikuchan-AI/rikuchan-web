@@ -239,11 +239,25 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
         if (backendConfig.url || backendConfig.token) {
           const merged = { ...DEFAULT_CONFIG, ...cached, ...backendConfig };
           set({ config: merged });
-          // Sync localStorage with backend values
           if (typeof window !== "undefined") {
             localStorage.setItem("rikuchan:gateway-config", JSON.stringify(merged));
           }
         }
+      }
+
+      // 3. Check if backend already has an active gateway connection
+      const gwStatus = await getApiClient().gateway.status();
+      if (gwStatus?.connected) {
+        // Backend is already connected — sync frontend state
+        const rawAgents = await getApiClient().agents.list();
+        const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
+        set({
+          status: "connected",
+          connectedAt: Date.now(),
+          agents,
+          registeredAgents: agents,
+          agentsLoaded: true,
+        });
       }
     } catch {
       // Backend not reachable — localStorage cache is fine
