@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronRight, AlertTriangle, Check, Trash2,
   Shield, Bell, Wrench, Cpu, Activity, Settings, Zap, DollarSign,
 } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import {
@@ -138,29 +139,29 @@ function SectionGeneral({ projectId }: { projectId: string }) {
           <FieldLabel>Status</FieldLabel>
           <div className="flex items-center gap-3">
             <ProjectStatusBadge status={status} />
-            <select
+            <Combobox
               value={status}
-              onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-              className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
-            >
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="archived">Archived</option>
-            </select>
+              onChange={(v) => setStatus(v as ProjectStatus)}
+              options={[
+                { id: "active", label: "Active" },
+                { id: "paused", label: "Paused" },
+                { id: "archived", label: "Archived" },
+              ]}
+              placeholder="Select status"
+            />
           </div>
         </div>
         <div>
           <FieldLabel>Group</FieldLabel>
-          <select
+          <Combobox
             value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-          >
-            <option value="">Ungrouped</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>{g.icon ? `${g.icon} ` : ""}{g.name}</option>
-            ))}
-          </select>
+            onChange={setGroupId}
+            options={[
+              { id: "", label: "Ungrouped" },
+              ...groups.map((g) => ({ id: g.id, label: `${g.icon ? `${g.icon} ` : ""}${g.name}` })),
+            ]}
+            placeholder="Select group"
+          />
         </div>
       </div>
       <div>
@@ -273,20 +274,22 @@ function SectionModel({ projectId }: { projectId: string }) {
     <>
       <div>
         <FieldLabel>Default Model</FieldLabel>
-        <select
+        <Combobox
           value={config.preferred}
-          onChange={(e) => setConfig({ ...config, preferred: e.target.value })}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          <option value="">Gateway routing (auto)</option>
-          {modelGroups.map((group) => (
-            <optgroup key={group.provider} label={group.provider}>
-              {group.models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}{m.recommended ? " ★" : ""}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(v) => setConfig({ ...config, preferred: v })}
+          options={[
+            { id: "", label: "Gateway routing (auto)" },
+            ...modelGroups.flatMap((group) =>
+              group.models.map((m) => ({
+                id: m.id,
+                label: `${m.label}${m.recommended ? " ★" : ""}`,
+                group: group.provider,
+              }))
+            ),
+          ]}
+          placeholder="Select model"
+          mono
+        />
       </div>
 
       <label className="flex items-start gap-3 cursor-pointer">
@@ -310,16 +313,19 @@ function SectionModel({ projectId }: { projectId: string }) {
       {config.preferred && (
         <div>
           <FieldLabel>Fallback Model</FieldLabel>
-          <select
+          <Combobox
             value={config.fallback ?? ""}
-            onChange={(e) => setConfig({ ...config, fallback: e.target.value || undefined })}
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-          >
-            <option value="">None</option>
-            {allModels.filter((m) => m.id !== config.preferred).map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
+            onChange={(v) => setConfig({ ...config, fallback: v || undefined })}
+            options={[
+              { id: "", label: "None" },
+              ...allModels.filter((m) => m.id !== config.preferred).map((m) => ({
+                id: m.id,
+                label: m.label,
+              })),
+            ]}
+            placeholder="Select fallback"
+            mono
+          />
         </div>
       )}
 
@@ -455,17 +461,17 @@ function SectionHeartbeat({ projectId }: { projectId: string }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <select
-                    value={hbCfg?.intervalSeconds ?? 300}
-                    onChange={(e) => handleUpdateAgentHeartbeat(member.agentId, Number(e.target.value), true)}
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-foreground focus:outline-none focus:border-accent/50"
-                  >
-                    <option value={30}>30s</option>
-                    <option value={60}>1m</option>
-                    <option value={120}>2m</option>
-                    <option value={300}>5m</option>
-                    <option value={600}>10m</option>
-                  </select>
+                  <Combobox
+                    value={String(hbCfg?.intervalSeconds ?? 300)}
+                    onChange={(v) => handleUpdateAgentHeartbeat(member.agentId, Number(v), true)}
+                    options={[
+                      { id: "30", label: "30s" },
+                      { id: "60", label: "1m" },
+                      { id: "120", label: "2m" },
+                      { id: "300", label: "5m" },
+                      { id: "600", label: "10m" },
+                    ]}
+                  />
                   <button
                     type="button"
                     onClick={() => handleSyncHeartbeat(member.agentId, hbCfg?.intervalSeconds ?? 300)}

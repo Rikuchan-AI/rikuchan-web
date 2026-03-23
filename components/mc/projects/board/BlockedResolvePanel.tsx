@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { AlertTriangle, Paperclip, Send, RefreshCw, Users, Crown, Loader2 } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { startTaskExecution, triggerEMDelegation } from "@/lib/mc/em-delegation";
 import { toast } from "@/components/shared/toast";
@@ -239,18 +240,14 @@ Respond with your decision and action.`,
           <div className="flex gap-2">
             {/* Reassign */}
             <div className="flex-1 flex gap-1.5">
-              <select
+              <Combobox
                 value={reassignAgentId}
-                onChange={(e) => setReassignAgentId(e.target.value)}
-                className="flex-1 rounded-md border border-line bg-surface-strong px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-              >
-                <option value="">Pick agent...</option>
-                {roster
+                onChange={setReassignAgentId}
+                options={roster
                   .filter((m) => m.agentId !== task.assignedAgentId)
-                  .map((m) => (
-                    <option key={m.agentId} value={m.agentId}>{m.agentName} ({m.role})</option>
-                  ))}
-              </select>
+                  .map((m) => ({ id: m.agentId, label: `${m.agentName} (${m.role})` }))}
+                placeholder="Pick agent..."
+              />
               <button
                 onClick={handleReassign}
                 disabled={resolving !== null || !reassignAgentId}

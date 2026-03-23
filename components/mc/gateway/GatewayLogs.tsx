@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { PauseCircle, PlayCircle, Trash2, Download } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import type { LogLevel } from "@/lib/mc/types";
 import { formatTimestamp } from "@/lib/mc/mc-utils";
@@ -63,28 +64,26 @@ export function GatewayLogs() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted">
         <div className="flex items-center gap-2">
           {/* Level filter */}
-          <select
+          <Combobox
             value={filterLevel}
-            onChange={(e) => setFilterLevel(e.target.value as LogLevel | "ALL")}
-            className="rounded-md border border-line bg-surface-strong px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-          >
-            <option value="ALL">All Levels</option>
-            <option value="INFO">INFO</option>
-            <option value="WARN">WARN</option>
-            <option value="ERROR">ERROR</option>
-            <option value="DEBUG">DEBUG</option>
-          </select>
+            onChange={(v) => setFilterLevel(v as LogLevel | "ALL")}
+            options={[
+              { id: "ALL", label: "All Levels" },
+              { id: "INFO", label: "INFO" },
+              { id: "WARN", label: "WARN" },
+              { id: "ERROR", label: "ERROR" },
+              { id: "DEBUG", label: "DEBUG" },
+            ]}
+            placeholder="Filter level"
+          />
 
           {/* Agent filter */}
-          <select
+          <Combobox
             value={filterAgent || "ALL"}
-            onChange={(e) => setFilterAgent(e.target.value === "ALL" ? "" : e.target.value)}
-            className="rounded-md border border-line bg-surface-strong px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50 max-w-[140px]"
-          >
-            {agentOptions.map(({ id, name }) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
+            onChange={(v) => setFilterAgent(v === "ALL" ? "" : v)}
+            options={agentOptions.map(({ id, name }) => ({ id, label: name }))}
+            placeholder="Filter agent"
+          />
 
           <span className="mono text-xs text-foreground-muted">{filtered.length} entries</span>
         </div>

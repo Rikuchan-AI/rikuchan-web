@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy, ChevronDown } from "lucide-react";
+import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 import { gatewayFetch } from "@/lib/mc/gateway-api";
 import { RikuLoader } from "@/components/shared/riku-loader";
@@ -201,28 +202,19 @@ function ModelSelector({
   }, {});
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0 min-w-[180px]">
       <span className="mono mb-0.5 block text-[9px] uppercase tracking-[0.08em] text-foreground-muted/50">
         Model
       </span>
-      <div className="relative">
-        <select
-          value={currentModel}
-          onChange={(e) => onChange(e.target.value)}
-          className="mono appearance-none rounded-md border border-line bg-surface-strong py-1.5 pl-2.5 pr-7 text-xs text-foreground-muted transition-colors hover:border-accent/30 hover:text-foreground focus:border-accent/40 focus:outline-none"
-        >
-          {Object.entries(grouped).map(([provider, providerModels]) => (
-            <optgroup key={provider} label={provider}>
-              {providerModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted" />
-      </div>
+      <Combobox
+        value={currentModel}
+        onChange={onChange}
+        options={Object.entries(grouped).flatMap(([provider, providerModels]) =>
+          providerModels.map((m) => ({ id: m.id, label: m.id, group: provider }))
+        )}
+        placeholder="Select model"
+        mono
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { syncHeartbeatDefaultsToGateway } from "@/lib/mc/heartbeat-integration";
 import { toast } from "@/components/shared/toast";
 import { Star, Info, ChevronDown, Search } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { SkeletonList } from "@/components/shared/skeleton";
 import { getFreeModelsFromConfig } from "@/lib/mc/agent-files";
 
@@ -142,29 +143,23 @@ export function HeartbeatModelSelector() {
             <label className="mono text-xs uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
               Frequência
             </label>
-            <select
-              value={interval}
-              onChange={(e) => setIntervalMs(Number(e.target.value))}
-              className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 transition-colors"
-            >
-              {HEARTBEAT_INTERVAL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <Combobox
+              value={String(interval)}
+              onChange={(v) => setIntervalMs(Number(v))}
+              options={HEARTBEAT_INTERVAL_OPTIONS.map((o) => ({ id: String(o.value), label: o.label }))}
+              placeholder="Select interval"
+            />
           </div>
           <div>
             <label className="mono text-xs uppercase text-foreground-muted block mb-1.5" style={{ letterSpacing: "0.18em" }}>
               Timeout
             </label>
-            <select
-              value={timeout}
-              onChange={(e) => setTimeoutMs(Number(e.target.value))}
-              className="rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 transition-colors"
-            >
-              {HEARTBEAT_TIMEOUT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <Combobox
+              value={String(timeout)}
+              onChange={(v) => setTimeoutMs(Number(v))}
+              options={HEARTBEAT_TIMEOUT_OPTIONS.map((o) => ({ id: String(o.value), label: o.label }))}
+              placeholder="Select timeout"
+            />
           </div>
         </div>
 

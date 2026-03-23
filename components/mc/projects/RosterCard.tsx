@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import {
   Crown,
   Code,
@@ -293,21 +294,21 @@ export function RosterCard({ member, agentStatus, currentTask, rosterMembers, on
             {/* Interval */}
             <div>
               <span className="text-[0.6rem] text-foreground-muted uppercase">Interval</span>
-              <select
-                value={hbConfig.intervalSeconds}
-                onChange={(e) => {
-                  const updated = { ...hbConfig, intervalSeconds: Number(e.target.value) };
+              <Combobox
+                value={String(hbConfig.intervalSeconds)}
+                onChange={(v) => {
+                  const updated = { ...hbConfig, intervalSeconds: Number(v) };
                   onUpdateHeartbeat?.(member.agentId, updated);
                 }}
-                className="w-full mt-1 rounded-md border border-line bg-surface-strong px-2 py-1 text-xs text-foreground focus:outline-none focus:border-accent/50"
-              >
-                <option value={30}>30s</option>
-                <option value={60}>1 min</option>
-                <option value={120}>2 min</option>
-                <option value={300}>5 min</option>
-                <option value={600}>10 min</option>
-                <option value={900}>15 min</option>
-              </select>
+                options={[
+                  { id: "30", label: "30s" },
+                  { id: "60", label: "1 min" },
+                  { id: "120", label: "2 min" },
+                  { id: "300", label: "5 min" },
+                  { id: "600", label: "10 min" },
+                  { id: "900", label: "15 min" },
+                ]}
+              />
             </div>
 
             {/* Focus areas */}

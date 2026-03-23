@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { Mail, MoreVertical, Shield, UserPlus, X } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 
 type Role = "org:admin" | "org:member";
 
@@ -142,14 +143,15 @@ export default function MembersPage() {
               placeholder="email@example.com"
               className="flex-1 rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent focus:outline-none"
             />
-            <select
+            <Combobox
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as Role)}
-              className="rounded-md border border-line bg-surface-strong px-2 py-2 text-sm text-foreground"
-            >
-              <option value="org:member">Operator</option>
-              <option value="org:admin">Admin</option>
-            </select>
+              onChange={(v) => setInviteRole(v as Role)}
+              options={[
+                { id: "org:member", label: "Operator" },
+                { id: "org:admin", label: "Admin" },
+              ]}
+              placeholder="Select role"
+            />
             <button
               onClick={handleInvite}
               disabled={!inviteEmail.trim() || sending}
@@ -196,14 +198,14 @@ export default function MembersPage() {
                         {roleLabel(member.role)}
                       </span>
                     ) : (
-                      <select
+                      <Combobox
                         value={member.role}
-                        onChange={(e) => handleChangeRole(userData?.userId || "", e.target.value as Role)}
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border bg-transparent cursor-pointer ${roleBadgeClass(member.role)}`}
-                      >
-                        <option value="org:admin">Admin</option>
-                        <option value="org:member">Operator</option>
-                      </select>
+                        onChange={(v) => handleChangeRole(userData?.userId || "", v as Role)}
+                        options={[
+                          { id: "org:admin", label: "Admin" },
+                          { id: "org:member", label: "Operator" },
+                        ]}
+                      />
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-foreground-muted">

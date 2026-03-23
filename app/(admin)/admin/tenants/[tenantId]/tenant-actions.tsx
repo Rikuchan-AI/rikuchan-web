@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 
 interface TenantActionsProps {
   tenantId: string;
@@ -29,17 +30,17 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
 
   return (
     <div className="flex items-center gap-2">
-      <select
-        className="rounded-md border border-line bg-surface-strong px-3 py-1.5 text-sm text-foreground"
+      <Combobox
         value={plan}
-        onChange={(e) => handleAction("change_plan", { plan: e.target.value })}
-        disabled={loading}
-      >
-        <option value="free">Free</option>
-        <option value="starter">Starter</option>
-        <option value="team">Team</option>
-        <option value="enterprise">Enterprise</option>
-      </select>
+        onChange={(v) => { if (!loading) handleAction("change_plan", { plan: v }); }}
+        options={[
+          { id: "free", label: "Free" },
+          { id: "starter", label: "Starter" },
+          { id: "team", label: "Team" },
+          { id: "enterprise", label: "Enterprise" },
+        ]}
+        placeholder="Select plan"
+      />
 
       <button
         onClick={() => handleAction(suspended ? "unsuspend" : "suspend")}

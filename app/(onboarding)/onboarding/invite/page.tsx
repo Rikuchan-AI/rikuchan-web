@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import { Plus, X, Info } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 
 interface Invite {
   email: string;
@@ -80,14 +81,15 @@ export default function OnboardingInvitePage() {
               placeholder="email@example.com"
               className="flex-1 rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent focus:outline-none"
             />
-            <select
+            <Combobox
               value={inv.role}
-              onChange={(e) => updateInvite(i, "role", e.target.value)}
-              className="rounded-md border border-line bg-surface-strong px-2 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
-            >
-              <option value="org:member">Operator</option>
-              <option value="org:admin">Admin</option>
-            </select>
+              onChange={(v) => updateInvite(i, "role", v)}
+              options={[
+                { id: "org:member", label: "Operator" },
+                { id: "org:admin", label: "Admin" },
+              ]}
+              placeholder="Select role"
+            />
             {invites.length > 1 && (
               <button onClick={() => removeRow(i)} className="text-foreground-muted hover:text-foreground transition">
                 <X size={16} />

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { SessionCard } from "@/components/mc/sessions/SessionCard";
+import { Combobox } from "@/components/mc/ui/Combobox";
 
 export default function SessionsPage() {
   const sessions = useGatewayStore((s) => s.sessions);
@@ -32,28 +33,28 @@ export default function SessionsPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <select
+        <Combobox
           value={filterAgent}
-          onChange={(e) => setFilterAgent(e.target.value)}
-          className="rounded-md border border-line bg-surface-strong px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-        >
-          <option value="">All Agents</option>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
+          onChange={setFilterAgent}
+          options={[
+            { id: "", label: "All Agents" },
+            ...agents.map((a) => ({ id: a.id, label: a.name })),
+          ]}
+          placeholder="Filter agent"
+        />
 
-        <select
+        <Combobox
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="rounded-md border border-line bg-surface-strong px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent/50"
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="completed">Completed</option>
-          <option value="error">Error</option>
-          <option value="idle">Idle</option>
-        </select>
+          onChange={setFilterStatus}
+          options={[
+            { id: "", label: "All Statuses" },
+            { id: "active", label: "Active" },
+            { id: "completed", label: "Completed" },
+            { id: "error", label: "Error" },
+            { id: "idle", label: "Idle" },
+          ]}
+          placeholder="Filter status"
+        />
       </div>
 
       {/* Session list */}

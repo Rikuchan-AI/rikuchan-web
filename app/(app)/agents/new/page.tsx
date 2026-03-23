@@ -8,13 +8,13 @@ import {
   Crown, Brain, Wrench, Cpu, Settings2,
   ChevronDown, X, Upload,
 } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import JSZip from "jszip";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults, listWorkspacesViaGateway } from "@/lib/mc/agent-files";
 import type { ExistingWorkspace } from "@/lib/mc/agent-files";
 import { InfoTooltip } from "@/components/mc/ui/InfoTooltip";
-import { Combobox } from "@/components/mc/ui/Combobox";
 import {
   generateIdentityMd,
   generateSoulMd,
@@ -759,14 +759,15 @@ function StepModel({
             <label className="mono text-xs uppercase text-foreground-muted" style={{ letterSpacing: "0.18em" }}>Sandbox</label>
             <InfoTooltip text="Host: agente executa ferramentas com acesso direto ao sistema. Docker: execução isolada em container, sem acesso ao host." />
           </div>
-          <select
+          <Combobox
             value={sandboxMode}
-            onChange={(e) => onChange("sandboxMode", e.target.value)}
-            className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-          >
-            <option value="host">Host (full access)</option>
-            <option value="docker">Docker (sandboxed)</option>
-          </select>
+            onChange={(v) => onChange("sandboxMode", v)}
+            options={[
+              { id: "host", label: "Host (full access)" },
+              { id: "docker", label: "Docker (sandboxed)" },
+            ]}
+            placeholder="Select sandbox"
+          />
         </div>
       </div>
     </div>
@@ -827,14 +828,15 @@ function SelectInput({ value, onChange, options }: {
   options: { value: string; label: string }[];
 }) {
   return (
-    <select
+    <Combobox
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-    >
-      <option value="">Inherit default</option>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+      onChange={onChange}
+      options={[
+        { id: "", label: "Inherit default" },
+        ...options.map((o) => ({ id: o.value, label: o.label })),
+      ]}
+      placeholder="Inherit default"
+    />
   );
 }
 

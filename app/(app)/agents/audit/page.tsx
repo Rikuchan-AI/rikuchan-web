@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Download, Trash2, Filter } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { useAuditStore } from "@/lib/mc/audit-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import type { AuditActorType, AuditResourceType } from "@/lib/mc/audit-store";
@@ -169,24 +170,18 @@ export default function AuditLogPage() {
           placeholder="Search actions, agents, resources..."
           className="h-8 rounded-md border border-line bg-surface-strong px-3 text-sm text-foreground focus:outline-none focus:border-accent/50 w-64"
         />
-        <select
+        <Combobox
           value={filterActor}
-          onChange={(e) => setFilterActor(e.target.value as AuditActorType | "")}
-          className="h-8 rounded-md border border-line bg-surface-strong px-2 text-xs text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          {ACTOR_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <select
+          onChange={(v) => setFilterActor(v as AuditActorType | "")}
+          options={ACTOR_OPTIONS.map((o) => ({ id: o.value, label: o.label }))}
+          placeholder="Filter actor"
+        />
+        <Combobox
           value={filterResource}
-          onChange={(e) => setFilterResource(e.target.value as AuditResourceType | "")}
-          className="h-8 rounded-md border border-line bg-surface-strong px-2 text-xs text-foreground focus:outline-none focus:border-accent/50 appearance-none"
-        >
-          {RESOURCE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          onChange={(v) => setFilterResource(v as AuditResourceType | "")}
+          options={RESOURCE_OPTIONS.map((o) => ({ id: o.value, label: o.label }))}
+          placeholder="Filter resource"
+        />
         {(filterActor || filterResource || search) && (
           <button
             onClick={() => { setFilterActor(""); setFilterResource(""); setSearch(""); }}

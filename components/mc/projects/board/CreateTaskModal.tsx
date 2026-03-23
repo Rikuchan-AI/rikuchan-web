@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Plus } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import type { Task, TaskPriority, RosterMember, RosterContextFile } from "@/lib/mc/types-project";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { FileDropzone } from "@/components/shared/file-dropzone";
@@ -180,16 +181,15 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
           {/* Template selector */}
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">Template</label>
-            <select
+            <Combobox
               value={selectedTemplate}
-              onChange={(e) => handleTemplateChange(e.target.value)}
-              className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:border-accent/40 focus:outline-none transition-colors"
-            >
-              <option value="">None</option>
-              {TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
+              onChange={handleTemplateChange}
+              options={[
+                { id: "", label: "None" },
+                ...TEMPLATES.map((t) => ({ id: t.id, label: t.label })),
+              ]}
+              placeholder="Select template"
+            />
           </div>
 
           {/* Basic info */}
@@ -268,18 +268,15 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
             {/* Agent dropdown */}
             <div>
               <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">Assign Agent</label>
-              <select
+              <Combobox
                 value={assignedAgentId}
-                onChange={(e) => setAssignedAgentId(e.target.value)}
-                className="w-full rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:border-accent/40 focus:outline-none transition-colors"
-              >
-                <option value="">Auto-assign (lead decides)</option>
-                {roster.map((m) => (
-                  <option key={m.agentId} value={m.agentId}>
-                    {m.agentName} ({m.role})
-                  </option>
-                ))}
-              </select>
+                onChange={setAssignedAgentId}
+                options={[
+                  { id: "", label: "Auto-assign (lead decides)" },
+                  ...roster.map((m) => ({ id: m.agentId, label: `${m.agentName} (${m.role})` })),
+                ]}
+                placeholder="Select agent"
+              />
             </div>
 
             {/* Labels */}

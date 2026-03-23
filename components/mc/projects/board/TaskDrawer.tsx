@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { X, MoreHorizontal, CheckCircle2, Copy, ArrowRight, Trash2, Paperclip, AlertTriangle } from "lucide-react";
+import { Combobox } from "@/components/mc/ui/Combobox";
 import { TaskPriorityBadge } from "@/components/mc/projects/TaskPriorityBadge";
 import { RikuInlineLoader } from "@/components/shared/riku-loader";
 import { useElapsedTime } from "@/hooks/use-elapsed-time";
@@ -521,16 +522,12 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
         {showReassign && (
           <div className="px-5 py-3 border-t border-line bg-surface-muted flex-shrink-0">
             <div className="flex gap-2">
-              <select
+              <Combobox
                 value={reassignAgentId}
-                onChange={(e) => setReassignAgentId(e.target.value)}
-                className="flex-1 rounded-md border border-line bg-surface-strong px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent/50"
-              >
-                <option value="">Select agent...</option>
-                {roster.map((m) => (
-                  <option key={m.agentId} value={m.agentId}>{m.agentName} ({m.role})</option>
-                ))}
-              </select>
+                onChange={setReassignAgentId}
+                options={roster.map((m) => ({ id: m.agentId, label: `${m.agentName} (${m.role})` }))}
+                placeholder="Select agent..."
+              />
               <button onClick={handleReassign} disabled={!reassignAgentId} className="h-9 px-3 rounded-md bg-accent text-accent-foreground text-xs font-medium hover:bg-accent-deep transition-colors disabled:opacity-50">
                 Confirm
               </button>
