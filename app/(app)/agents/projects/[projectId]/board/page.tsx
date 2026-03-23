@@ -172,6 +172,7 @@ export default function BoardPage() {
   const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
   const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
+  const configHydrated = useGatewayStore((s) => s._configHydrated);
   // Use gatewayAgentId (persisted after activation) for accurate gateway lookup
   const leadGwId = leadAgent?.gatewayAgentId ?? leadAgent?.agentId;
   const leadGwAgent = gwAgents.find((a) =>
@@ -297,7 +298,6 @@ export default function BoardPage() {
   }
 
   // Banner state: only show after gateway status has been checked (not during initial boot)
-  const configHydrated = useGatewayStore((s) => s._configHydrated);
   const showGatewayBanner = configHydrated && gwStatus !== "connected";
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
