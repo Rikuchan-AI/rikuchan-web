@@ -1,26 +1,28 @@
-import { auth } from "@clerk/nextjs/server";
-import { AuthProvider } from "@/lib/mc/auth-provider";
-import { DashboardShellWrapper } from "@/components/dashboard/dashboard-shell-wrapper";
-import { resolveTenantId, ensureTenant } from "@/lib/mc/tenant";
+"use client";
 
-export default async function AppLayout({
+import { useEffect } from "react";
+import { AuthProvider, useAuthContext } from "@/lib/mc/auth-provider";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+
+function TenantSetup() {
+  const { ready, userId } = useAuthContext();
+  useEffect(() => {
+    if (!ready || !userId) return;
+    // Fire-and-forget tenant provisioning (GET auto-provisions)
+    fetch("/api/mc/tenant").catch(() => {});
+  }, [ready, userId]);
+  return null;
+}
+
+export default function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth.protect();
-
-  // Ensure tenant exists (best-effort, don't block rendering)
-  try {
-    const { tenantId, userId } = await resolveTenantId();
-    await ensureTenant(tenantId, userId, session.orgId);
-  } catch (err) {
-    console.error("[Layout] Tenant setup failed:", err instanceof Error ? err.message : err);
-  }
-
   return (
     <AuthProvider>
-      <DashboardShellWrapper>{children}</DashboardShellWrapper>
+      <TenantSetup />
+      <DashboardShell>{children}</DashboardShell>
     </AuthProvider>
   );
 }

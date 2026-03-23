@@ -157,7 +157,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               hidePersonal={false}
             />
             <UserButton
-              afterSignOutUrl="/"
               appearance={{
                 elements: {
                   avatarBox: "h-9 w-9",
