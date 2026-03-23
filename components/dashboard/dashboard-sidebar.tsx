@@ -257,9 +257,9 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
             )} />
             <span className={cn(
               "mono text-[10px] font-semibold uppercase tracking-wider truncate",
-              gatewayStatus === "connected" ? "text-emerald-400" : "text-red-400",
+              gatewayStatus === "connected" ? "text-emerald-400" : gatewayStatus === "disconnected" ? "text-red-400" : "text-foreground-muted",
             )}>
-              {gatewayStatus === "connected" ? "Gateway online" : gatewayStatus === "connecting" ? "Connecting..." : "Gateway offline"}
+              {gatewayStatus === "connected" ? "Gateway online" : gatewayStatus === "connecting" ? "Checking..." : gatewayStatus === "disconnected" ? "Gateway offline" : ""}
             </span>
           </div>
         )}

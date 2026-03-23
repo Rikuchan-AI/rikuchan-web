@@ -296,8 +296,9 @@ export default function BoardPage() {
     );
   }
 
-  // Banner state: show whenever gateway is not connected
-  const showGatewayBanner = gwStatus !== "connected";
+  // Banner state: only show after gateway status has been checked (not during initial boot)
+  const configHydrated = useGatewayStore((s) => s._configHydrated);
+  const showGatewayBanner = configHydrated && gwStatus !== "connected";
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
   return (
