@@ -328,11 +328,21 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
 
   activateProject: async (id) => {
     await getApiClient().projects.activate(id);
-    // SSE will send project status update
+    // Update local state immediately (SSE gateway:status doesn't update project store)
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, status: "active" as const, updatedAt: Date.now() } : p,
+      ),
+    }));
   },
 
   pauseProject: async (id) => {
     await getApiClient().projects.pause(id);
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === id ? { ...p, status: "paused" as const, updatedAt: Date.now() } : p,
+      ),
+    }));
   },
 
   resumeProject: async (id) => {
