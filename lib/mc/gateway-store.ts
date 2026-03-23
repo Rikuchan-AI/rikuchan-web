@@ -114,6 +114,62 @@ function mkLogId(seq: number) {
   return `log-${Date.now()}-${seq}`;
 }
 
+const ONLINE_THRESHOLD_MS = 10 * 60 * 1000;
+const IDLE_THRESHOLD_MS = 60 * 60 * 1000;
+
+function toMs(ts: number): number {
+  return ts < 4_102_444_800 ? ts * 1000 : ts;
+}
+
+/** Map raw OpenClaw agent data to our Agent type */
+export function mapGatewayAgent(raw: Record<string, unknown>): Agent {
+  const agentId = (raw.agentId ?? raw.id ?? raw.name) as string;
+  const heartbeat = raw.heartbeat as Record<string, unknown> | undefined;
+  const sessions = raw.sessions as { count?: number; recent?: Array<{ age?: number | null; updatedAt?: number | null }> } | undefined;
+
+  const recentSession = sessions?.recent?.[0];
+  const sessionAge = recentSession?.age ?? null;
+
+  let status: Agent["status"] = "offline";
+  let lastActivityAt = Date.now();
+
+  if (sessionAge !== null) {
+    lastActivityAt = Date.now() - sessionAge;
+    if (sessionAge < ONLINE_THRESHOLD_MS) status = "online";
+    else if (sessionAge < IDLE_THRESHOLD_MS) status = "idle";
+  } else if (recentSession?.updatedAt) {
+    const age = Date.now() - toMs(recentSession.updatedAt);
+    lastActivityAt = Date.now() - age;
+    if (age < ONLINE_THRESHOLD_MS) status = "online";
+    else if (age < IDLE_THRESHOLD_MS) status = "idle";
+  }
+
+  // Override with heartbeat state if available
+  if (heartbeat) {
+    const state = heartbeat.state as string | undefined;
+    if (state === "error") status = "error";
+    else if (state === "degraded") status = "degraded";
+    else if ((heartbeat.consecutiveFailures as number) > 0) status = "degraded";
+  }
+
+  const heartbeatModel = heartbeat ? (heartbeat.model as string) ?? "" : "";
+
+  return {
+    id: agentId,
+    name: (raw.name as string) ?? agentId,
+    role: (raw.isDefault as boolean) ? "Lead Agent" : "Agent",
+    status,
+    capabilities: [],
+    permissions: { read: true, write: true, exec: true, web_search: true, sessions_send: true, sessions_spawn: true },
+    sessionCountToday: sessions?.count ?? 0,
+    avgResponseMs: 0,
+    lastActivityAt,
+    heartbeat: heartbeat ? { lastSuccessAt: status !== "offline" ? lastActivityAt : 0, failures: 0, model: heartbeatModel } : undefined,
+    model: heartbeatModel || undefined,
+    uptime: sessionAge !== null ? Math.floor(sessionAge / 1000) : 0,
+  };
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useGatewayStore = create<GatewayStore>((set, get) => ({
@@ -208,7 +264,8 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       set({ status: "connecting" });
       await getApiClient().gateway.connect(gatewayUrl, gatewayToken);
       // Fetch agents now that gateway is connected
-      const agents = await getApiClient().agents.list();
+      const rawAgents = await getApiClient().agents.list();
+      const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
       set({
         status: "connected",
         connectedAt: Date.now(),

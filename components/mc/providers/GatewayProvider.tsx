@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { useGatewayStore } from "@/lib/mc/gateway-store";
+import { useGatewayStore, mapGatewayAgent } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useNotificationsStore } from "@/lib/mc/notifications-store";
 import { initApiClient, getApiClient } from "@/lib/mc/api-client";
@@ -170,7 +170,8 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
               ["active", "activating"].includes(String((p as unknown as Record<string, unknown>).status ?? "")),
             );
             if (hasActive) {
-              const agents = await api.agents.list();
+              const rawAgents = await api.agents.list();
+            const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
               useGatewayStore.setState({ agents, registeredAgents: agents });
             }
           } catch { /* best-effort */ }
@@ -185,7 +186,8 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
         try {
           const gwStatus = await api.gateway.status();
           if (gwStatus.connected) {
-            const agents = await api.agents.list();
+            const rawAgents = await api.agents.list();
+            const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
             useGatewayStore.setState({
               status: "connected",
               connectedAt: Date.now(),
