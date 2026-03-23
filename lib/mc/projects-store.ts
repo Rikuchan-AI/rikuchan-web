@@ -13,6 +13,7 @@ import type {
   ProjectTrigger,
 } from "./types-project";
 import { getApiClient } from "./api-client";
+import { useGatewayStore } from "./gateway-store";
 
 interface ProjectsStore {
   groups: BoardGroup[];
@@ -327,7 +328,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   // ─── Lifecycle Actions (backend handles the orchestration) ────────
 
   activateProject: async (id) => {
-    await getApiClient().projects.activate(id);
+    const gwConfig = useGatewayStore.getState().config;
+    const gateway = gwConfig.url && gwConfig.token
+      ? { url: gwConfig.url, token: gwConfig.token }
+      : undefined;
+    await getApiClient().projects.activate(id, gateway);
     // SSE will send project status update
   },
 

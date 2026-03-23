@@ -120,9 +120,10 @@ class McApiClient {
       this.request<void>(`/api/projects/${id}`, { method: "DELETE" }),
 
     // Lifecycle
-    activate: (id: string) =>
+    activate: (id: string, gateway?: { url: string; token: string }) =>
       this.request<{ sessionId: string }>(`/api/projects/${id}/activate`, {
         method: "POST",
+        body: gateway ? JSON.stringify({ gatewayUrl: gateway.url, gatewayToken: gateway.token }) : undefined,
       }),
     pause: (id: string) =>
       this.request<void>(`/api/projects/${id}/pause`, { method: "POST" }),
