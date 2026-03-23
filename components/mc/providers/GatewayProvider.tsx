@@ -89,7 +89,8 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
     useGatewayStore.getState().hydrateConfig();
 
     async function boot() {
-      useGatewayStore.setState({ status: "connecting" });
+      // Don't set "connecting" here — the backend auto-connects the gateway.
+      // We'll check the actual status after hydration completes.
 
       try {
         const api = getApiClient();

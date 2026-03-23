@@ -245,23 +245,11 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
         }
       }
 
-      // 3. Check if backend already has an active gateway connection
-      const gwStatus = await getApiClient().gateway.status();
-      if (gwStatus?.connected) {
-        // Backend is already connected — sync frontend state
-        const rawAgents = await getApiClient().agents.list();
-        const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
-        set({
-          status: "connected",
-          connectedAt: Date.now(),
-          agents,
-          registeredAgents: agents,
-          agentsLoaded: true,
-        });
-      }
     } catch {
       // Backend not reachable — localStorage cache is fine
     }
+    // Note: gateway connection status is checked by GatewayProvider.boot()
+    // which runs after API client is initialized. Don't check here to avoid races.
   },
 
   // ─── Connection ───
