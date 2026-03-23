@@ -10,6 +10,7 @@ import { useProjectsStore } from "@/lib/mc/projects-store";
 import { ActionOverlay } from "@/components/shared/action-overlay";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway } from "@/lib/mc/agent-files";
+import { useGatewayGate } from "@/hooks/use-gateway-gate";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ProjectStatusBadge } from "@/components/mc/projects/ProjectStatusBadge";
 import type { BoardGroup } from "@/lib/mc/types-project";
@@ -318,7 +319,8 @@ export default function GroupsPage() {
   const createGroup = useProjectsStore((s) => s.createGroup);
   const updateGroup = useProjectsStore((s) => s.updateGroup);
   const deleteGroup = useProjectsStore((s) => s.deleteGroup);
-  const isConnected = useGatewayStore((s) => s.status === "connected");
+  const { connected, GatewayOfflineBanner } = useGatewayGate();
+  const isConnected = connected;
   const stateDir = useGatewayStore((s) => s.stateDir);
 
   const [draftGroup, setDraftGroup] = useState<BoardGroup | null>(null);
@@ -367,6 +369,7 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-6">
+      {!isConnected && <GatewayOfflineBanner message="Criação de agentes para grupos requer conexão com o gateway." />}
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

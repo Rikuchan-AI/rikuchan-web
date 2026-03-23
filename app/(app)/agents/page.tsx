@@ -7,6 +7,7 @@ import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentGrid } from "@/components/mc/agents/AgentGrid";
 import { GatewayStatus } from "@/components/mc/gateway/GatewayStatus";
 import { LivePulse } from "@/components/mc/ui/LivePulse";
+import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 export default function AgentsPage() {
   const agents = useGatewayStore((s) => s.agents);
@@ -14,8 +15,11 @@ export default function AgentsPage() {
   const status = useGatewayStore((s) => s.status);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
   const configUrl = useGatewayStore((s) => s.config.url);
+  const { connected, GatewayRequiredScreen } = useGatewayGate();
 
   const isConnected = status === "connected";
+
+  if (!connected) return <GatewayRequiredScreen feature="Agentes" />;
   const [gatewayExpanded, setGatewayExpanded] = useState(!isConnected);
 
   // Collapse when connected, expand when disconnected

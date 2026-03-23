@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, FolderKanban } from "lucide-react";
 import { useProjectsStore } from "@/lib/mc/projects-store";
-import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { ProjectCard } from "@/components/mc/projects/ProjectCard";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useGatewayGate } from "@/hooks/use-gateway-gate";
 import type { ProjectStatus } from "@/lib/mc/types-project";
 
 type Filter = "all" | ProjectStatus;
@@ -14,7 +14,7 @@ type Filter = "all" | ProjectStatus;
 export default function ProjectsPage() {
   const groups = useProjectsStore((s) => s.groups);
   const projects = useProjectsStore((s) => s.projects);
-  const isConnected = useGatewayStore((s) => s.status === "connected");
+  const { connected: isConnected, GatewayOfflineBanner } = useGatewayGate();
 
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -52,6 +52,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
+      {!isConnected && <GatewayOfflineBanner message="Criação de projetos e execução de agentes requerem conexão com o gateway." />}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1

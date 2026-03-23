@@ -4,9 +4,13 @@ import { useState } from "react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { SessionCard } from "@/components/mc/sessions/SessionCard";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 export default function SessionsPage() {
+  const { connected, GatewayRequiredScreen } = useGatewayGate();
   const sessions = useGatewayStore((s) => s.sessions);
+
+  if (!connected) return <GatewayRequiredScreen feature="Sessões" />;
   const agents = useGatewayStore((s) => s.agents);
   const [filterAgent, setFilterAgent] = useState("");
   const [filterStatus, setFilterStatus] = useState("");

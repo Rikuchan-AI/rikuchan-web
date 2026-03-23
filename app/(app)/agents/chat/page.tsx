@@ -6,6 +6,7 @@ import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -24,10 +25,13 @@ export default function ChatListPageWrapper() {
 }
 
 function ChatListPage() {
+  const { connected, GatewayRequiredScreen } = useGatewayGate();
   const conversations = useDirectChatStore((s) => s.conversations);
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);
   const hydrate = useDirectChatStore((s) => s._hydrate);
+
+  if (!connected) return <GatewayRequiredScreen feature="Chat" />;
   const agents = useGatewayStore((s) => s.agents);
   const router = useRouter();
   const searchParams = useSearchParams();
