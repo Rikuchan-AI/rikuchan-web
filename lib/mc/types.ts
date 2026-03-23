@@ -90,6 +90,13 @@ export interface GatewayConfig {
   permissionMode: "allow-all" | "approve-all" | "custom";
 }
 
+export interface SavedGateway {
+  id: string;
+  name: string;
+  url: string;
+  token: string;
+}
+
 // ─── Heartbeat Types ──────────────────────────────────────────────────────────
 
 export interface HeartbeatConfig {

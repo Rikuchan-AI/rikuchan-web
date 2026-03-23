@@ -5,7 +5,7 @@ import type { RosterMember } from "@/lib/mc/types-project";
 
 interface AgentRosterPanelProps {
   roster: RosterMember[];
-  tasks: Array<{ id: string; title: string; assignedAgentId: string | null; status: string }>;
+  tasks: Array<{ id: string; title: string; assignedAgentId: string | null; status: string; subagentSessionKey?: string }>;
   onSelectTask: (taskId: string) => void;
 }
 
@@ -18,20 +18,20 @@ function formatTimeSince(timestamp: number): string {
   return `${hours}h ago`;
 }
 
-function AgentCard({
+// ─── Lead Agent Card ─────────────────────────────────────────────────────────
+
+function LeadAgentCard({
   member,
   agentStatus,
-  currentTask,
-  assignedCount,
   onSelectTask,
   loading,
+  activeTasks,
 }: {
   member: RosterMember;
   agentStatus?: { status: string; lastActivityAt: number };
-  currentTask?: { id: string; title: string };
-  assignedCount: number;
   onSelectTask: (taskId: string) => void;
   loading?: boolean;
+  activeTasks: Array<{ id: string; title: string }>;
 }) {
   const status = agentStatus?.status ?? "offline";
   const isOnline = status === "online" || status === "idle" || status === "thinking";
@@ -43,13 +43,9 @@ function AgentCard({
       ? "bg-emerald-400 animate-pulse"
       : status === "idle"
         ? "bg-zinc-400"
-        : status === "degraded"
-          ? "bg-amber-400"
-          : status === "error" || status === "offline"
-            ? "bg-red-400"
-            : isOnline
-              ? "bg-emerald-400"
-              : "bg-red-400";
+        : isOnline
+          ? "bg-emerald-400"
+          : "bg-red-400";
 
   const initials = member.agentName
     .split(/\s+/)
@@ -59,53 +55,102 @@ function AgentCard({
     .toUpperCase();
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-3 space-y-2">
-      {/* Header */}
+    <div className="rounded-lg border border-accent/20 bg-surface p-3 space-y-2">
       <div className="flex items-center gap-2">
         <div className="relative">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-strong text-[10px] font-semibold text-foreground-soft">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">
             {initials}
           </div>
           <span className={`absolute -bottom-0.5 -right-0.5 h-[8px] w-[8px] rounded-full border-2 border-surface ${statusDot}`} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold text-foreground">{member.agentName}</p>
+          <p className="mono text-[9px] uppercase tracking-wider text-accent">Lead</p>
+        </div>
+      </div>
+
+      <p className="mono text-[9px] text-foreground-muted/60">
+        {loading ? "..." : agentStatus ? (isOnline ? formatTimeSince(agentStatus.lastActivityAt) : status) : "offline"}
+      </p>
+
+      {activeTasks.length > 0 && (
+        <div className="space-y-1">
+          {activeTasks.slice(0, 2).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => onSelectTask(t.id)}
+              className="w-full truncate rounded border border-line bg-surface-muted px-2 py-1 text-left text-[10px] text-foreground-soft hover:border-accent/30 hover:text-foreground transition-colors"
+            >
+              {t.title}
+            </button>
+          ))}
+          {activeTasks.length > 2 && (
+            <p className="text-[9px] text-foreground-muted px-1">+{activeTasks.length - 2} more</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Template Agent Card ─────────────────────────────────────────────────────
+
+function TemplateAgentCard({
+  member,
+  activeSubagents,
+  onSelectTask,
+}: {
+  member: RosterMember;
+  activeSubagents: Array<{ id: string; title: string }>;
+  onSelectTask: (taskId: string) => void;
+}) {
+  const initials = member.agentName
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div className="rounded-lg border border-dashed border-line bg-surface/60 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-strong text-[10px] font-semibold text-foreground-muted">
+            {initials}
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 h-[8px] w-[8px] rounded-full border-2 border-surface bg-zinc-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold text-foreground-soft">{member.agentName}</p>
           <p className="mono text-[9px] uppercase tracking-wider text-foreground-muted">
             {member.customRoleLabel ?? member.role}
           </p>
         </div>
       </div>
 
-      {/* Heartbeat */}
-      <p className="mono text-[9px] text-foreground-muted/60">
-        {loading ? "…" : agentStatus ? (isOnline ? formatTimeSince(agentStatus.lastActivityAt) : status) : "offline"}
-      </p>
-
-      {/* Current task */}
-      {currentTask && (
-        <button
-          onClick={() => onSelectTask(currentTask.id)}
-          className="w-full truncate rounded border border-line bg-surface-muted px-2 py-1 text-left text-[10px] text-foreground-soft hover:border-accent/30 hover:text-foreground transition-colors"
-        >
-          {currentTask.title}
-        </button>
-      )}
-
-      {/* Capacity bar */}
-      <div className="flex items-center gap-2">
-        <div className="h-1 flex-1 rounded-full bg-surface-strong overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              assignedCount >= 3 ? "bg-red-400" : assignedCount >= 2 ? "bg-amber-400" : "bg-emerald-400"
-            }`}
-            style={{ width: `${Math.min((assignedCount / 3) * 100, 100)}%` }}
-          />
+      {activeSubagents.length > 0 ? (
+        <div className="space-y-1">
+          <p className="mono text-[9px] text-emerald-400">
+            {activeSubagents.length} active subagent{activeSubagents.length > 1 ? "s" : ""}
+          </p>
+          {activeSubagents.slice(0, 2).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => onSelectTask(t.id)}
+              className="w-full truncate rounded border border-line bg-surface-muted px-2 py-1 text-left text-[10px] text-foreground-soft hover:border-accent/30 hover:text-foreground transition-colors"
+            >
+              {t.title}
+            </button>
+          ))}
         </div>
-        <span className="mono text-[9px] text-foreground-muted">{assignedCount}/3</span>
-      </div>
+      ) : (
+        <p className="mono text-[9px] text-foreground-muted/40">template</p>
+      )}
     </div>
   );
 }
+
+// ─── Panel ───────────────────────────────────────────────────────────────────
 
 export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPanelProps) {
   const agents = useGatewayStore((s) => s.agents);
@@ -119,12 +164,17 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
     );
   }
 
+  const leadMembers = roster.filter((m) => m.role === "lead");
+  const templateMembers = roster.filter((m) => m.role !== "lead");
+
   return (
     <div className="space-y-2 overflow-y-auto p-2">
       <p className="mono px-1 text-[9px] uppercase tracking-wider text-foreground-muted">
         Agents ({roster.length})
       </p>
-      {roster.map((member) => {
+
+      {/* Lead agents */}
+      {leadMembers.map((member) => {
         const gwAgent = agentsLoaded
           ? agents.find((a) =>
               a.id === member.agentId ||
@@ -132,13 +182,12 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
               member.agentId.includes(a.id)
             )
           : undefined;
-        const assignedTasks = tasks.filter(
-          (t) => t.assignedAgentId === member.agentId && t.status !== "done",
+        const activeTasks = tasks.filter(
+          (t) => t.status === "progress" || t.status === "blocked",
         );
-        const workingTask = assignedTasks.find((t) => t.status === "progress");
 
         return (
-          <AgentCard
+          <LeadAgentCard
             key={member.agentId}
             member={member}
             agentStatus={
@@ -146,13 +195,38 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
                 ? { status: gwAgent.status, lastActivityAt: gwAgent.lastActivityAt }
                 : undefined
             }
-            currentTask={workingTask}
-            assignedCount={assignedTasks.length}
             onSelectTask={onSelectTask}
             loading={!agentsLoaded}
+            activeTasks={activeTasks}
           />
         );
       })}
+
+      {/* Template agents */}
+      {templateMembers.length > 0 && (
+        <>
+          <p className="mono px-1 pt-1 text-[9px] uppercase tracking-wider text-foreground-muted/60">
+            Templates ({templateMembers.length})
+          </p>
+          {templateMembers.map((member) => {
+            const activeSubagents = tasks.filter(
+              (t) =>
+                t.assignedAgentId === member.agentId &&
+                t.subagentSessionKey &&
+                t.status !== "done",
+            );
+
+            return (
+              <TemplateAgentCard
+                key={member.agentId}
+                member={member}
+                activeSubagents={activeSubagents}
+                onSelectTask={onSelectTask}
+              />
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }

@@ -230,7 +230,7 @@ export const TASK_COLUMNS: { id: TaskStatus; label: string }[] = [
   { id: "done",     label: "Done" },
 ];
 
-export type TaskDelegationStatus = "idle" | "delegating" | "delegated" | "em-unavailable";
+export type TaskDelegationStatus = "idle" | "delegating" | "spawning" | "delegated" | "em-unavailable";
 
 export interface ExecutionMessage {
   role: "user" | "assistant" | "tool" | "system";
@@ -264,6 +264,9 @@ export interface Task {
   delegationStatus?: TaskDelegationStatus;
   emDecisionReason?: string;
   emDelegatedAt?: number;
+  // Subagent tracking
+  parentLeadSessionKey?: string;   // Lead session that received the delegation prompt
+  subagentSessionKey?: string;     // Subagent session spawned by the lead for this task
   // Execution
   executionLog?: ExecutionMessage[];
   timeoutMs?: number;

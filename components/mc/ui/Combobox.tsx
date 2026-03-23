@@ -209,6 +209,7 @@ export function Combobox({
       {open && filtered.length > 0 && typeof document !== "undefined" && createPortal(
         <div
           style={dropdownStyle}
+          onMouseDown={(e) => e.stopPropagation()}
           className="rounded-lg border border-line bg-surface shadow-xl max-h-52 overflow-y-auto py-1"
         >
           {renderOptions()}

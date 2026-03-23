@@ -12,7 +12,7 @@ interface BoardHeaderProps {
   agentsLoaded?: boolean;
   operationMode: OperationMode;
   onModeChange: (mode: OperationMode) => void;
-  onNewTask: () => void;
+  onNewTask?: () => void;
   onEMChat: () => void;
   onTeamChat: () => void;
   onHealth: () => void;
@@ -174,7 +174,8 @@ export function BoardHeader({
       {/* New task */}
       <button
         onClick={onNewTask}
-        className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep transition-colors"
+        disabled={!onNewTask}
+        className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         <Plus size={14} />
         New Task
