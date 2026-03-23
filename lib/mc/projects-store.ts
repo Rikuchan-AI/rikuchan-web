@@ -89,8 +89,9 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     let groups = await adapter.listGroups();
     let projects = await adapter.listProjects();
 
-    // Migration: if Supabase is empty but localStorage has data, migrate
-    if (groups.length === 0 && projects.length === 0 && typeof window !== "undefined") {
+    // One-time migration: localStorage → Supabase (skipped if already done)
+    const migrated = typeof window !== "undefined" && localStorage.getItem("rikuchan:migrated-to-supabase");
+    if (!migrated && groups.length === 0 && projects.length === 0 && typeof window !== "undefined") {
       try {
         const { LocalStorageAdapter } = await import("./storage/local-storage");
         const local = new LocalStorageAdapter();
@@ -104,35 +105,21 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
           for (const p of localProjects) {
             try { await adapter.createProject(p); } catch { /* skip duplicates */ }
           }
-          // Also migrate tasks for each project
           for (const p of localProjects) {
             const localTasks = await local.listTasks(p.id);
             for (const t of localTasks) {
               try { await adapter.createTask(p.id, t); } catch { /* skip */ }
             }
           }
-          // Re-read from Supabase after migration
           groups = await adapter.listGroups();
           projects = await adapter.listProjects();
           console.log(`[Projects] Migration complete: ${groups.length} groups, ${projects.length} projects`);
-          // Clear localStorage to prevent re-migration on next load
-          try {
-            localStorage.removeItem("rikuchan:projects:groups");
-            localStorage.removeItem("rikuchan:projects:list");
-            for (const p of localProjects) {
-              localStorage.removeItem(`rikuchan:projects:tasks:${p.id}`);
-              localStorage.removeItem(`rikuchan:projects:pipelines:${p.id}`);
-              localStorage.removeItem(`rikuchan:projects:memory:${p.id}`);
-              localStorage.removeItem(`rikuchan:projects:triggers:${p.id}`);
-            }
-            console.log("[Projects] localStorage cleared after migration");
-          } catch {
-            // ignore — localStorage may be unavailable
-          }
         }
       } catch (err) {
         console.warn("[Projects] Migration failed:", err);
       }
+      // Mark as migrated — never run again regardless of outcome
+      localStorage.setItem("rikuchan:migrated-to-supabase", "1");
     }
 
     set({ groups, projects, _hydrated: true });
