@@ -364,6 +364,13 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     const finalUrl = url ?? config.url;
     const finalToken = token ?? config.token;
 
+    // Don't attempt connection without valid URL
+    if (!finalUrl || !finalToken) {
+      console.warn("[Gateway] No URL or token — skipping connect");
+      set({ status: "disconnected" });
+      return;
+    }
+
     set({
       status: "connecting",
       connectedAt: undefined,
@@ -1166,9 +1173,10 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       console.warn(`[Gateway] Closed (code: ${event.code}, reason: "${event.reason}")`);
 
       if (wasAuthed) {
-        const shouldReconnect = cfg.autoReconnect || Boolean(get().expectedRestartReason);
+        const MAX_RECONNECT_ATTEMPTS = 5;
         const nextAttempt = get().reconnectAttempts + 1;
-        const delayMs = Math.min(2_000 * (2 ** Math.max(0, nextAttempt - 1)), 60_000);
+        const shouldReconnect = (cfg.autoReconnect || Boolean(get().expectedRestartReason)) && nextAttempt <= MAX_RECONNECT_ATTEMPTS;
+        const delayMs = Math.min(2_000 * (2 ** Math.max(0, nextAttempt - 1)), 30_000);
 
         set({
           status: "disconnected",
@@ -1178,20 +1186,21 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
           agentsLoaded: false,
           sessionsLoaded: false,
           modelsLoaded: false,
-          reconnectAttempts: shouldReconnect ? nextAttempt : 0,
+          reconnectAttempts: nextAttempt,
           reconnectAt: shouldReconnect ? Date.now() + delayMs : undefined,
         });
         pushLog(set, get, "WARN", `Disconnected (code: ${event.code})`);
 
         if (shouldReconnect) {
-          console.log(`[Gateway] Auto-reconnecting in ${Math.round(delayMs / 1000)}s...`);
-          pushLog(set, get, "INFO", `Auto-reconnecting in ${Math.round(delayMs / 1000)}s...`);
+          console.log(`[Gateway] Auto-reconnecting in ${Math.round(delayMs / 1000)}s (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS})...`);
           setTimeout(() => {
             if (get().status === "disconnected") get().connect();
           }, delayMs);
+        } else if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+          console.warn("[Gateway] Max reconnect attempts reached. Use Gateway page to reconnect manually.");
         }
       } else {
-        set({ status: "error", _ws: null, _pingInterval: null });
+        set({ status: "disconnected", _ws: null, _pingInterval: null });
       }
     };
 
