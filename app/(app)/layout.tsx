@@ -1,7 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import dynamic from "next/dynamic";
 import { AuthProvider } from "@/lib/mc/auth-provider";
 import { resolveTenantId, ensureTenant } from "@/lib/mc/tenant";
+
+// Render DashboardShell only on client to avoid hydration mismatch
+// caused by Clerk components (OrganizationSwitcher, UserButton)
+const DashboardShell = dynamic(
+  () => import("@/components/dashboard/dashboard-shell").then((m) => m.DashboardShell),
+  { ssr: false },
+);
 
 export default async function AppLayout({
   children,
