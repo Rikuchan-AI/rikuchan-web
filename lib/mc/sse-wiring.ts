@@ -17,6 +17,10 @@ export function wireSseToStores(): () => void {
   // ─── Gateway status ───
   cleanups.push(
     sse.on("gateway:status", (data) => {
+      // Only react to gateway connection events, not project lifecycle events
+      // Project lifecycle emits { projectId, state: "active"|"paused"|... }
+      // Gateway connection emits { status: "connected"|"disconnected" }
+      if (data.projectId) return; // Project lifecycle event — ignore for gateway store
       const connected = data.status === "connected" || data.status === "active";
       useGatewayStore.setState({
         status: connected ? "connected" : "disconnected",
