@@ -479,7 +479,7 @@ export default function GroupsPage() {
               key={group.id}
               group={group}
               groupProjects={projects.filter((p) => p.groupId === group.id)}
-              onDelete={() => deleteGroup(group.id)}
+              onDelete={() => { if (window.confirm(`Delete group "${group.name}"?`)) deleteGroup(group.id); }}
               onUpdate={(updates) => updateGroup(group.id, updates)}
             />
           ))}

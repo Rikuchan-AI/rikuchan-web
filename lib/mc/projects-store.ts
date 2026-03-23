@@ -161,7 +161,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
         p.groupId === id ? { ...p, groupId: undefined, updatedAt: Date.now() } : p
       )),
     }));
-    await getStorageAdapter().deleteGroup(id);
+    try {
+      await getStorageAdapter().deleteGroup(id);
+    } catch (err) {
+      console.error("[Projects] Failed to delete group:", err);
+    }
   },
 
   // ─── Project CRUD ───────────────────────────────────────────────────
@@ -196,7 +200,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
 
   deleteProject: async (id) => {
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
-    await getStorageAdapter().deleteProject(id);
+    try {
+      await getStorageAdapter().deleteProject(id);
+    } catch (err) {
+      console.error("[Projects] Failed to delete project:", err);
+    }
     get().sendProjectCommand({ type: "project_delete", projectId: id });
   },
 
@@ -216,7 +224,10 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     try {
       await getStorageAdapter().updateTask(projectId, taskId, { status: newStatus });
     } catch (err) {
-      console.error("[Projects] Failed to persist task move:", err instanceof Error ? err.message : err);
+      const is404 = err instanceof Error && err.message.includes("404");
+      if (!is404) {
+        console.error("[Projects] Failed to persist task move:", err instanceof Error ? err.message : err);
+      }
     }
     get().sendProjectCommand({ type: "task_move", taskId, newStatus, projectId });
   },
@@ -258,7 +269,11 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     try {
       await getStorageAdapter().updateTask(projectId, taskId, updates);
     } catch (err) {
-      console.error("[Projects] Failed to persist task update:", err);
+      // 404 is expected when task was already deleted (e.g. gateway event arrives after deletion)
+      const is404 = err instanceof Error && err.message.includes("404");
+      if (!is404) {
+        console.error("[Projects] Failed to persist task update:", err);
+      }
     }
   },
 

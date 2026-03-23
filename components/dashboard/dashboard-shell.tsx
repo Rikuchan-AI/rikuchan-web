@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { clerkAppearance } from "@/lib/clerk";
 import Link from "next/link";
@@ -117,6 +117,8 @@ function RoleBadge() {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <div className="flex h-full min-h-screen bg-background">
@@ -140,19 +142,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <RoleBadge />
-            <OrganizationSwitcher
-              appearance={clerkAppearance}
-              afterSelectOrganizationUrl="/dashboard"
-              afterSelectPersonalUrl="/dashboard"
-              hidePersonal={false}
-            />
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: "h-9 w-9",
-                },
-              }}
-            />
+            {mounted && (
+              <>
+                <OrganizationSwitcher
+                  appearance={clerkAppearance}
+                  afterSelectOrganizationUrl="/dashboard"
+                  afterSelectPersonalUrl="/dashboard"
+                  hidePersonal={false}
+                />
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "h-9 w-9",
+                    },
+                  }}
+                />
+              </>
+            )}
           </div>
         </header>
 
