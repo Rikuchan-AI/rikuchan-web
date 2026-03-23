@@ -1,23 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
+import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { clerkAppearance } from "@/lib/clerk";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronRight } from "lucide-react";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { usePermissions } from "@/hooks/use-permissions";
-
-// Dynamic imports to avoid hydration mismatch — Clerk components render differently on server vs client
-const OrganizationSwitcher = dynamic(
-  () => import("@clerk/nextjs").then((m) => m.OrganizationSwitcher),
-  { ssr: false },
-);
-const UserButton = dynamic(
-  () => import("@clerk/nextjs").then((m) => m.UserButton),
-  { ssr: false },
-);
 
 const segmentLabels: Record<string, string> = {
   dashboard: "Overview",
