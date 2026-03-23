@@ -1,18 +1,27 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { GettingStartedChecklist } from "@/components/onboarding/getting-started-checklist";
-import { getDashboardOverview, getWorkspace } from "@/lib/gateway";
 
-export default async function DashboardOverviewPage() {
-  let overview = { requests_today: 0, context_hit_rate_pct: 0, estimated_spend_usd: 0, active_providers: [] as string[] };
-  let workspace = { name: "Rikuchan", plan: "starter", providers_connected: 0, knowledge_sources: 0 };
+type Overview = { requests_today: number; context_hit_rate_pct: number; estimated_spend_usd: number; active_providers: string[] };
+type Workspace = { name: string; plan: string; providers_connected: number; knowledge_sources: number };
 
-  try {
-    overview = await getDashboardOverview();
-  } catch { /* gateway offline — show zeros */ }
+export default function DashboardOverviewPage() {
+  const [overview, setOverview] = useState<Overview>({ requests_today: 0, context_hit_rate_pct: 0, estimated_spend_usd: 0, active_providers: [] });
+  const [workspace, setWorkspace] = useState<Workspace>({ name: "Rikuchan", plan: "starter", providers_connected: 0, knowledge_sources: 0 });
 
-  try {
-    workspace = await getWorkspace();
-  } catch { /* fallback */ }
+  useEffect(() => {
+    fetch("/api/gateway/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (!cfg?.url) return;
+        const gwUrl = cfg.url.replace("ws://", "http://").replace("wss://", "https://");
+        fetch(`${gwUrl}/dashboard/api/overview`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setOverview(d); }).catch(() => {});
+        fetch(`${gwUrl}/v1/settings/workspace`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setWorkspace(d); }).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
 
   const metrics = [
     { label: "Requests today", value: String(overview.requests_today), helper: "Across people and agent workflows" },
