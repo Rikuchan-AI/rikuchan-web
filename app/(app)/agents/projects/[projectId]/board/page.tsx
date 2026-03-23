@@ -298,7 +298,8 @@ export default function BoardPage() {
   }
 
   // Banner state: only show after gateway status has been checked (not during initial boot)
-  const showGatewayBanner = configHydrated && gwStatus !== "connected";
+  // Don't show banner while status is indeterminate ("connecting" = boot in progress)
+  const showGatewayBanner = gwStatus === "disconnected" || gwStatus === "error";
   const gatewayBannerIsExpected = expectedRestartReason === "config-patch";
 
   return (

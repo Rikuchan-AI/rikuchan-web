@@ -253,7 +253,7 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           )}>
             <span className={cn(
               "h-2 w-2 shrink-0 rounded-full",
-              gatewayStatus === "connected" ? "bg-emerald-400 animate-pulse" : "bg-red-400",
+              gatewayStatus === "connected" ? "bg-emerald-400 animate-pulse" : gatewayStatus === "disconnected" ? "bg-red-400" : "bg-foreground-muted animate-pulse",
             )} />
             <span className={cn(
               "mono text-[10px] font-semibold uppercase tracking-wider truncate",

@@ -173,7 +173,7 @@ export function mapGatewayAgent(raw: Record<string, unknown>): Agent {
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useGatewayStore = create<GatewayStore>((set, get) => ({
-  status: "disconnected",
+  status: "connecting",  // Start as "connecting" (indeterminate) — boot() resolves to connected/disconnected
   latencyMs: 0,
   connectedAt: undefined,
   serverVersion: undefined,
