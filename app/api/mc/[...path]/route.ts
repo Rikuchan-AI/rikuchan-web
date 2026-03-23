@@ -68,7 +68,9 @@ const DELETE_PERMISSIONS: Record<string, string> = {
 // GET /api/mc/{resource}/{id} — get single item
 // GET /api/mc/tasks/{projectId} — list tasks for project
 export async function GET(req: NextRequest, { params }: Params) {
-  const { tenantId, userId } = await requireTenant();
+  let ctx;
+  try { ctx = await requireTenant(); } catch (res) { return res as NextResponse; }
+  const { tenantId, userId } = ctx;
   const segments = (await params).path;
   const resource = segments[0];
   const table = TABLE_MAP[resource];
@@ -137,7 +139,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 // POST /api/mc/{resource} — create item
 export async function POST(req: NextRequest, { params }: Params) {
-  const ctx = await requireTenant();
+  let ctx;
+  try { ctx = await requireTenant(); } catch (res) { return res as NextResponse; }
   const { tenantId, userId } = ctx;
   const segments = (await params).path;
   const resource = segments[0];
@@ -146,7 +149,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Granular permission check per resource
   const permission = POST_PERMISSIONS[resource] || "board.create_task";
-  await requirePermission(ctx, permission);
+  try { await requirePermission(ctx, permission); } catch (res) { return res as NextResponse; }
 
   const body = await req.json();
   const supabase = getSupabaseAdmin();
@@ -218,7 +221,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 // PATCH /api/mc/{resource}/{id} — update item
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const ctx = await requireTenant();
+  let ctx;
+  try { ctx = await requireTenant(); } catch (res) { return res as NextResponse; }
   const { tenantId } = ctx;
   const segments = (await params).path;
   const resource = segments[0];
@@ -228,7 +232,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   // Granular permission check per resource
   const permission = PATCH_PERMISSIONS[resource] || "board.move_task";
-  await requirePermission(ctx, permission);
+  try { await requirePermission(ctx, permission); } catch (res) { return res as NextResponse; }
 
   const body = await req.json();
   const supabase = getSupabaseAdmin();
@@ -276,7 +280,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 // DELETE /api/mc/{resource}/{id}
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const ctx = await requireTenant();
+  let ctx;
+  try {
+    ctx = await requireTenant();
+  } catch (res) {
+    return res as NextResponse;
+  }
   const { tenantId } = ctx;
   const segments = (await params).path;
   const resource = segments[0];
@@ -286,7 +295,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   // Granular permission check per resource
   const permission = DELETE_PERMISSIONS[resource] || "projects.delete";
-  await requirePermission(ctx, permission);
+  try {
+    await requirePermission(ctx, permission);
+  } catch (res) {
+    return res as NextResponse;
+  }
 
   const supabase = getSupabaseAdmin();
 
