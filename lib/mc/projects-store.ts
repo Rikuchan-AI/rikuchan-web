@@ -115,6 +115,17 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
           groups = await adapter.listGroups();
           projects = await adapter.listProjects();
           console.log(`[Projects] Migration complete: ${groups.length} groups, ${projects.length} projects`);
+          // Clear localStorage to prevent re-migration on next load
+          try {
+            localStorage.removeItem("rikuchan:board-groups");
+            localStorage.removeItem("rikuchan:projects");
+            for (const p of localProjects) {
+              localStorage.removeItem(`rikuchan:tasks:${p.id}`);
+            }
+            console.log("[Projects] localStorage cleared after migration");
+          } catch {
+            // ignore — localStorage may be unavailable
+          }
         }
       } catch (err) {
         console.warn("[Projects] Migration failed:", err);
