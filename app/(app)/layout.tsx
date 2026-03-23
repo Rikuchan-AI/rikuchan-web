@@ -1,27 +1,25 @@
-"use client";
-
-import { useEffect } from "react";
-import { AuthProvider, useAuthContext } from "@/lib/mc/auth-provider";
+import { auth } from "@clerk/nextjs/server";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { AuthProvider } from "@/lib/mc/auth-provider";
+import { resolveTenantId, ensureTenant } from "@/lib/mc/tenant";
 
-function TenantSetup() {
-  const { ready, userId } = useAuthContext();
-  useEffect(() => {
-    if (!ready || !userId) return;
-    // Fire-and-forget tenant provisioning (GET auto-provisions)
-    fetch("/api/mc/tenant").catch(() => {});
-  }, [ready, userId]);
-  return null;
-}
-
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth.protect();
+
+  // Ensure tenant exists (best-effort, don't block rendering)
+  try {
+    const { tenantId, userId } = await resolveTenantId();
+    await ensureTenant(tenantId, userId, session.orgId);
+  } catch {
+    // Tenant setup failed — continue rendering, will retry on next request
+  }
+
   return (
     <AuthProvider>
-      <TenantSetup />
       <DashboardShell>{children}</DashboardShell>
     </AuthProvider>
   );
