@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useProjectsStore } from "@/lib/mc/projects-store";
+import { ActionOverlay } from "@/components/shared/action-overlay";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway } from "@/lib/mc/agent-files";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -108,8 +109,6 @@ function GroupCard({
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description ?? "");
   const [icon, setIcon] = useState(group.icon ?? "");
@@ -284,45 +283,16 @@ function GroupCard({
         </div>
       )}
 
-      {/* Delete confirmation overlay */}
       {confirmDelete && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-surface/95 backdrop-blur-sm border border-danger/30 p-4 gap-3">
-          <Trash2 size={20} className="text-danger" />
-          <p className="text-sm font-medium text-foreground text-center">
-            Deletar <span className="text-danger">{group.name}</span>?
-          </p>
-          <p className="text-[11px] text-foreground-muted text-center">
-            O grupo, seus projetos e o agente associado serão removidos.
-          </p>
-          {deleteError && (
-            <p className="text-[11px] text-danger text-center">{deleteError}</p>
-          )}
-          <div className="flex gap-2 w-full max-w-[240px]">
-            <button
-              onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-              disabled={deleting}
-              className="flex-1 rounded-md border border-line px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={async () => {
-                setDeleting(true);
-                setDeleteError(null);
-                try {
-                  await onDelete();
-                } catch (err) {
-                  setDeleteError(err instanceof Error ? err.message : "Falha ao deletar");
-                  setDeleting(false);
-                }
-              }}
-              disabled={deleting}
-              className="flex-1 rounded-md bg-danger/10 border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
-            >
-              {deleting ? "Deletando..." : "Confirmar"}
-            </button>
-          </div>
-        </div>
+        <ActionOverlay
+          icon={<Trash2 size={20} />}
+          title={<>Deletar <span className="text-danger">{group.name}</span>?</>}
+          description="O grupo, seus projetos e o agente associado serão removidos."
+          confirmLabel="Deletar"
+          loadingLabel="Deletando grupo..."
+          onConfirm={onDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
       )}
     </div>
   );
