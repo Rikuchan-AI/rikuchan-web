@@ -215,8 +215,8 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   // ─── Config Hydration ───
   // In the new architecture, config comes from backend settings API.
   // We mark as hydrated immediately — GatewayProvider handles the real boot.
-  hydrateConfig: () => {
-    // Load cached config from localStorage for backwards compat with sidebar display
+  hydrateConfig: async () => {
+    // 1. Load localStorage cache for instant display
     let cached: Partial<GatewayConfig> = {};
     if (typeof window !== "undefined") {
       try {
@@ -226,10 +226,28 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
         // ignore
       }
     }
-    set({
-      config: { ...DEFAULT_CONFIG, ...cached },
-      _configHydrated: true,
-    });
+    set({ config: { ...DEFAULT_CONFIG, ...cached }, _configHydrated: true });
+
+    // 2. Hydrate from backend (source of truth) — async, non-blocking
+    try {
+      const settings = await getApiClient().settings.get();
+      if (settings) {
+        const prefs = settings.preferences as Record<string, unknown> | null;
+        const backendConfig: Partial<GatewayConfig> = {};
+        if (settings.gatewayUrl) backendConfig.url = settings.gatewayUrl;
+        if (prefs?.gatewayToken) backendConfig.token = prefs.gatewayToken as string;
+        if (backendConfig.url || backendConfig.token) {
+          const merged = { ...DEFAULT_CONFIG, ...cached, ...backendConfig };
+          set({ config: merged });
+          // Sync localStorage with backend values
+          if (typeof window !== "undefined") {
+            localStorage.setItem("rikuchan:gateway-config", JSON.stringify(merged));
+          }
+        }
+      }
+    } catch {
+      // Backend not reachable — localStorage cache is fine
+    }
   },
 
   // ─── Connection ───
@@ -247,14 +265,17 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     const config = { ...state.config, url: gatewayUrl, token: gatewayToken };
     set({ config, status: "connecting" });
 
-    // Persist to localStorage
+    // Persist to localStorage (cache for fast hydration)
     if (typeof window !== "undefined") {
       localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
     }
 
-    // Persist gateway URL to backend settings (don't overwrite preferences)
+    // Persist gateway URL + token to backend settings (source of truth)
     try {
-      await getApiClient().settings.update({ gatewayUrl });
+      await getApiClient().settings.update({
+        gatewayUrl,
+        preferences: { gatewayToken },
+      });
     } catch {
       // apiClient not initialized yet
     }
@@ -304,7 +325,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   updateConfig: (partial) => {
     set((s) => {
       const config = { ...s.config, ...partial };
-      // Persist to localStorage for sidebar display
+      // Persist to localStorage (cache for fast hydration)
       if (typeof window !== "undefined") {
         localStorage.setItem("rikuchan:gateway-config", JSON.stringify(config));
       }
@@ -313,7 +334,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
         getApiClient()
           .settings.update({
             gatewayUrl: config.url,
-            preferences: { token: config.token },
+            preferences: { gatewayToken: config.token },
           })
           .catch(() => {});
       } catch {
