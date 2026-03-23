@@ -203,14 +203,30 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       // apiClient not initialized yet
     }
 
-    // Config saved. Gateway connection happens server-side when a project
-    // is activated with this URL. Mark as "disconnected" with config ready.
-    // Status will change to "connected" when a project activates successfully.
-    set({ status: "disconnected", _configHydrated: true });
+    // Connect to gateway via backend
+    try {
+      set({ status: "connecting" });
+      await getApiClient().gateway.connect(gatewayUrl, gatewayToken);
+      // Fetch agents now that gateway is connected
+      const agents = await getApiClient().agents.list();
+      set({
+        status: "connected",
+        connectedAt: Date.now(),
+        agents,
+        registeredAgents: agents,
+        agentsLoaded: true,
+      });
+    } catch {
+      // Connection failed — config saved but gateway not reachable
+      set({ status: "disconnected", _configHydrated: true });
+    }
   },
 
   disconnect: () => {
-    set({ status: "disconnected", connectedAt: undefined });
+    set({ status: "disconnected", connectedAt: undefined, agents: [], registeredAgents: [] });
+    try {
+      getApiClient().gateway.disconnect().catch(() => {});
+    } catch { /* apiClient not initialized */ }
   },
 
   // ─── Commands (no-op: all actions go through REST API now) ───

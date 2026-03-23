@@ -181,23 +181,25 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
           console.error("[mc] SSE connect failed:", err);
         });
 
-        // Status: "connected" only when backend has active gateway connection.
-        // Test by checking if agents.list works (requires gateway connected server-side).
-        let gatewayActive = false;
+        // Check gateway connection status from backend
         try {
-          const agents = await api.agents.list();
-          useGatewayStore.setState({ agents, registeredAgents: agents, agentsLoaded: true });
-          gatewayActive = true;
+          const gwStatus = await api.gateway.status();
+          if (gwStatus.connected) {
+            const agents = await api.agents.list();
+            useGatewayStore.setState({
+              status: "connected",
+              connectedAt: Date.now(),
+              agents,
+              registeredAgents: agents,
+              agentsLoaded: true,
+              _configHydrated: true,
+            });
+          } else {
+            useGatewayStore.setState({ status: "disconnected", agentsLoaded: true, _configHydrated: true });
+          }
         } catch {
-          // Gateway not connected server-side — normal when no project activated
-          useGatewayStore.setState({ agentsLoaded: true });
+          useGatewayStore.setState({ status: "disconnected", agentsLoaded: true, _configHydrated: true });
         }
-
-        useGatewayStore.setState({
-          status: gatewayActive ? "connected" : "disconnected",
-          connectedAt: gatewayActive ? Date.now() : undefined,
-          _configHydrated: true,
-        });
 
         cleanupRef.current = () => {
           sse.disconnect();

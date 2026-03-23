@@ -178,7 +178,22 @@ class McApiClient {
     list: () => this.request<Agent[]>("/api/agents"),
   };
 
-  // ─── Gateway RPC Proxy ───
+  // ─── Gateway ───
+
+  gateway = {
+    connect: (url?: string, token?: string) =>
+      this.request<{ status: string; connId?: string }>("/api/gateway/connect", {
+        method: "POST",
+        body: JSON.stringify({ url, token }),
+      }),
+    disconnect: () =>
+      this.request<{ status: string }>("/api/gateway/disconnect", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    status: () =>
+      this.request<{ connected: boolean; connId?: string; serverVersion?: string }>("/api/gateway/status"),
+  };
 
   gatewayRpc = (method: string, params: Record<string, unknown> = {}) =>
     this.request<Record<string, unknown>>("/api/gateway/rpc", {
