@@ -117,10 +117,13 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
           console.log(`[Projects] Migration complete: ${groups.length} groups, ${projects.length} projects`);
           // Clear localStorage to prevent re-migration on next load
           try {
-            localStorage.removeItem("rikuchan:board-groups");
-            localStorage.removeItem("rikuchan:projects");
+            localStorage.removeItem("rikuchan:projects:groups");
+            localStorage.removeItem("rikuchan:projects:list");
             for (const p of localProjects) {
-              localStorage.removeItem(`rikuchan:tasks:${p.id}`);
+              localStorage.removeItem(`rikuchan:projects:tasks:${p.id}`);
+              localStorage.removeItem(`rikuchan:projects:pipelines:${p.id}`);
+              localStorage.removeItem(`rikuchan:projects:memory:${p.id}`);
+              localStorage.removeItem(`rikuchan:projects:triggers:${p.id}`);
             }
             console.log("[Projects] localStorage cleared after migration");
           } catch {
