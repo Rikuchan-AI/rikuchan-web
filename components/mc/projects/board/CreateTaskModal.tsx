@@ -134,7 +134,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
     }
 
     const task: Task = {
-      id: `task-${now}-${Math.random().toString(16).slice(2, 6)}`,
+      id: crypto.randomUUID(),
       projectId,
       title: title.trim(),
       description: fullDescription,
