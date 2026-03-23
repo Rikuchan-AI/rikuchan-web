@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle, Circle, X } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -17,23 +17,23 @@ function useAdminItems(): ChecklistItem[] {
   const gatewayStatus = useGatewayStore((s) => s.status);
   const agentCount = useGatewayStore((s) => s.agents.length);
 
-  return [
+  return useMemo(() => [
     { id: "account", label: "Create account", href: "#", autoDetect: () => true },
     { id: "gateway", label: "Connect gateway", href: "/agents/gateway", autoDetect: () => gatewayStatus === "connected" },
     { id: "project", label: "Create your first project", href: "/agents/projects" },
     { id: "board_lead", label: "Designate a board lead", href: "/agents/projects" },
     { id: "task", label: "Create your first task", href: "/agents/projects" },
     { id: "aha", label: "Watch the board lead in action", href: "/agents/projects", autoDetect: () => agentCount > 0 },
-  ];
+  ], [gatewayStatus, agentCount]);
 }
 
 function useOperatorItems(): ChecklistItem[] {
-  return [
+  return useMemo(() => [
     { id: "account", label: "Accept invite", href: "#", autoDetect: () => true },
     { id: "explore", label: "Explore the board", href: "/agents/projects" },
     { id: "task", label: "Create your first task", href: "/agents/projects" },
     { id: "chat", label: "Chat with an agent", href: "/agents/chat" },
-  ];
+  ], []);
 }
 
 export function GettingStartedChecklist() {

@@ -28,7 +28,7 @@ export async function GET() {
     const gw = config.gateway;
 
     if (!gw) {
-      return NextResponse.json({ error: "No gateway config found" }, { status: 404 });
+      return NextResponse.json({ url: "", token: "", port: 0, mode: "remote" });
     }
 
     const port = gw.port ?? 18789;

@@ -325,19 +325,12 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
       loadPersistedConfigFromServer()
         .then((serverConfig) => {
           if (serverConfig.url && serverConfig.token) {
-            // Found in Supabase — restore to localStorage and use
+            // Found in Supabase — restore to localStorage but don't auto-connect
             const restored = { url: serverConfig.url, token: serverConfig.token };
             set((s) => ({ config: { ...s.config, ...restored } }));
             if (typeof window !== "undefined") {
               localStorage.setItem("rikuchan:gateway-config", JSON.stringify({ ...get().config, ...restored }));
             }
-            // Auto-connect with restored config
-            setTimeout(() => {
-              const s = get();
-              if (s.status === "disconnected" && s.config.url && s.config.token) {
-                s.connect();
-              }
-            }, 100);
             return;
           }
           // Nothing in Supabase either — try local openclaw.json

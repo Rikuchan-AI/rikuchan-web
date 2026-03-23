@@ -94,13 +94,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-connect if saved credentials exist
-  useEffect(() => {
-    if (hydrated && status === "disconnected" && config.token && config.url) {
-      connect();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  // No auto-connect on mount — user connects manually via /agents/gateway
 
   // Show non-blocking banner when gateway disconnects (not on first load)
   const showDisconnectedBanner = status !== "connected" && connectedAt !== undefined;
