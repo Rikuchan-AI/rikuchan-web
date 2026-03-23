@@ -102,11 +102,14 @@ function GroupCard({
 }: {
   group: BoardGroup;
   groupProjects: ReturnType<typeof useProjectsStore.getState>["projects"];
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
   onUpdate: (updates: Partial<BoardGroup>) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description ?? "");
   const [icon, setIcon] = useState(group.icon ?? "");
@@ -126,7 +129,7 @@ function GroupCard({
   const iconDisplay = group.icon || group.name.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="rounded-xl border border-line bg-surface overflow-hidden">
+    <div className="relative rounded-xl border border-line bg-surface overflow-hidden">
       {/* Header */}
       <div className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
@@ -189,7 +192,7 @@ function GroupCard({
                 <Pencil size={12} />
               </button>
               <button
-                onClick={onDelete}
+                onClick={() => setConfirmDelete(true)}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-danger/10 hover:text-danger transition-colors"
               >
                 <Trash2 size={12} />
@@ -278,6 +281,47 @@ function GroupCard({
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Delete confirmation overlay */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-surface/95 backdrop-blur-sm border border-danger/30 p-4 gap-3">
+          <Trash2 size={20} className="text-danger" />
+          <p className="text-sm font-medium text-foreground text-center">
+            Deletar <span className="text-danger">{group.name}</span>?
+          </p>
+          <p className="text-[11px] text-foreground-muted text-center">
+            O grupo, seus projetos e o agente associado serão removidos.
+          </p>
+          {deleteError && (
+            <p className="text-[11px] text-danger text-center">{deleteError}</p>
+          )}
+          <div className="flex gap-2 w-full max-w-[240px]">
+            <button
+              onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
+              disabled={deleting}
+              className="flex-1 rounded-md border border-line px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  await onDelete();
+                } catch (err) {
+                  setDeleteError(err instanceof Error ? err.message : "Falha ao deletar");
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+              className="flex-1 rounded-md bg-danger/10 border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
+            >
+              {deleting ? "Deletando..." : "Confirmar"}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -479,7 +523,7 @@ export default function GroupsPage() {
               key={group.id}
               group={group}
               groupProjects={projects.filter((p) => p.groupId === group.id)}
-              onDelete={() => { if (window.confirm(`Delete group "${group.name}"?`)) deleteGroup(group.id); }}
+              onDelete={() => deleteGroup(group.id)}
               onUpdate={(updates) => updateGroup(group.id, updates)}
             />
           ))}

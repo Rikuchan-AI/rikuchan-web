@@ -155,17 +155,36 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   },
 
   deleteGroup: async (id) => {
+    const group = get().groups.find((g) => g.id === id);
+
+    // 1. Delete from Supabase first — only remove from UI if successful
+    await getStorageAdapter().deleteGroup(id);
+
+    // 2. If group had an agent in OpenClaw, delete it via gateway
+    if (group?.agentId) {
+      try {
+        const { deleteAgentViaGateway } = await import("./agent-files");
+        await deleteAgentViaGateway(group.agentId);
+      } catch {
+        // Gateway may be offline — agent cleanup is best-effort
+      }
+    }
+
+    // 3. Delete all projects belonging to this group
+    const groupProjects = get().projects.filter((p) => p.groupId === id);
+    for (const p of groupProjects) {
+      try {
+        await getStorageAdapter().deleteProject(p.id);
+      } catch {
+        // best-effort cascade
+      }
+    }
+
+    // 4. Only now update UI
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
-      projects: s.projects.map((p) => (
-        p.groupId === id ? { ...p, groupId: undefined, updatedAt: Date.now() } : p
-      )),
+      projects: s.projects.filter((p) => p.groupId !== id),
     }));
-    try {
-      await getStorageAdapter().deleteGroup(id);
-    } catch (err) {
-      console.error("[Projects] Failed to delete group:", err);
-    }
   },
 
   // ─── Project CRUD ───────────────────────────────────────────────────
@@ -199,12 +218,10 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   },
 
   deleteProject: async (id) => {
+    // Delete from Supabase first (cascades tasks/pipelines/etc via API)
+    await getStorageAdapter().deleteProject(id);
+    // Only remove from UI after confirmed deletion
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
-    try {
-      await getStorageAdapter().deleteProject(id);
-    } catch (err) {
-      console.error("[Projects] Failed to delete project:", err);
-    }
     get().sendProjectCommand({ type: "project_delete", projectId: id });
   },
 
