@@ -25,6 +25,12 @@ export type ApiKeyCreated = {
   expires_at: string | null;
 };
 
+export type ProviderConnectResult = {
+  status: string;
+  provider: string;
+  auth_kind: string;
+};
+
 export async function clientCreateApiKey(
   token: string,
   body: { name: string; scopes?: string[]; rate_limit_rpm?: number; expires_at?: string | null },
@@ -54,7 +60,7 @@ export async function clientConnectProvider(
   token: string,
   provider: string,
   apiKey: string,
-): Promise<void> {
+): Promise<ProviderConnectResult> {
   return clientFetch("/v1/settings/providers", {
     method: "POST",
     body: JSON.stringify({ provider, api_key: apiKey }),

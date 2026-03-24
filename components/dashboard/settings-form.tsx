@@ -44,9 +44,13 @@ export function SettingsForm({
     try {
       const token = await getToken();
       if (!token) return;
-      await clientConnectProvider(token, provider, connectKey.trim());
+      const result = await clientConnectProvider(token, provider, connectKey.trim());
       setProviders((prev) =>
-        prev.map((p) => (p.provider === provider ? { ...p, connected: true, auth_kind: "api_key" } : p)),
+        prev.map((p) =>
+          p.provider === provider
+            ? { ...p, connected: true, auth_kind: result.auth_kind }
+            : p,
+        ),
       );
       setConnectProvider(null);
       setConnectKey("");
@@ -92,7 +96,7 @@ export function SettingsForm({
 
       <section className="rounded-lg border border-line bg-surface p-6">
         <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Provider connections</p>
-        <p className="mt-3 text-sm text-foreground-soft">Connect your own provider API keys for direct access.</p>
+        <p className="mt-3 text-sm text-foreground-soft">Connect your own provider credentials for direct access, including Claude setup tokens on Anthropic.</p>
         <div className="mt-6 space-y-3">
           {providers.map((p) => (
             <div key={p.provider}>
@@ -125,7 +129,11 @@ export function SettingsForm({
                     type="password"
                     value={connectKey}
                     onChange={(e) => setConnectKey(e.target.value)}
-                    placeholder={`${PROVIDER_LABELS[p.provider] || p.provider} API key`}
+                    placeholder={
+                      p.provider === "anthropic"
+                        ? "Anthropic API key or Claude setup token"
+                        : `${PROVIDER_LABELS[p.provider] || p.provider} API key`
+                    }
                     className="flex-1 rounded-md border border-line-strong bg-surface-muted px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
                     autoFocus
                     onKeyDown={(e) => e.key === "Enter" && handleConnect(p.provider)}

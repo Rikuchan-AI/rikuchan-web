@@ -119,6 +119,12 @@ export type ProviderStatus = {
   last_validated_at: string | null;
 };
 
+export type ProviderConnectResult = {
+  status: string;
+  provider: string;
+  auth_kind: string;
+};
+
 export type Workspace = {
   name: string;
   plan: string;
@@ -130,7 +136,7 @@ export async function listProviders(): Promise<ProviderStatus[]> {
   return gatewayFetch("/v1/settings/providers");
 }
 
-export async function connectProvider(provider: string, apiKey: string): Promise<void> {
+export async function connectProvider(provider: string, apiKey: string): Promise<ProviderConnectResult> {
   return gatewayFetch("/v1/settings/providers", {
     method: "POST",
     body: JSON.stringify({ provider, api_key: apiKey }),
