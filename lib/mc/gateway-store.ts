@@ -13,6 +13,7 @@ import type {
   ModelGroup,
 } from "./types";
 import { getApiClient } from "./api-client";
+import { MODEL_GROUPS, gatewayModelsToGroups } from "./models";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -286,15 +287,29 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     try {
       set({ status: "connecting" });
       await getApiClient().gateway.connect(gatewayUrl, gatewayToken);
-      // Fetch agents now that gateway is connected
+      // Fetch agents and models now that gateway is connected
       const rawAgents = await getApiClient().agents.list();
       const agents = (rawAgents as unknown as Record<string, unknown>[]).map(mapGatewayAgent);
+
+      // Fetch available models from gateway
+      let availableModels: ModelGroup[] = MODEL_GROUPS; // fallback
+      try {
+        const modelsResult = await getApiClient().gatewayRpc("models.list");
+        const rawModels = (modelsResult as Record<string, unknown>)?.models ?? modelsResult;
+        if (Array.isArray(rawModels) && rawModels.length > 0) {
+          availableModels = gatewayModelsToGroups(rawModels);
+        }
+      } catch {
+        // Gateway doesn't support models.list — use fallback
+      }
+
       set({
         status: "connected",
         connectedAt: Date.now(),
         agents,
         registeredAgents: agents,
         agentsLoaded: true,
+        availableModels,
       });
     } catch {
       // Connection failed — config saved but gateway not reachable
