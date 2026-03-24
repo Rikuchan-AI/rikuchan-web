@@ -119,6 +119,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const gwStatus = useGatewayStore((s) => s.status);
+  const gwAgents = useGatewayStore((s) => s.agents);
   const { elapsed, isOvertime } = useElapsedTime(task.status === "progress" ? task.startedAt : undefined);
 
   const [showMenu, setShowMenu] = useState(false);
@@ -451,15 +452,48 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                     <BlockedResolvePanel task={task} project={project} />
                   )}
 
+                  {/* Delegation failure banner */}
+                  {task.delegationStatus === "em-unavailable" && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5 mb-3">
+                      <p className="text-sm text-red-400 font-medium">Delegation failed</p>
+                      <p className="text-xs text-red-400/70 mt-0.5">Agent was unavailable after multiple retries. Move task back to backlog to retry.</p>
+                    </div>
+                  )}
+
                   {/* Log entries */}
                   {task.executionLog && task.executionLog.length > 0 ? (
-                    consolidateLog(task.executionLog).map((msg, i) => (
-                      <ExecutionLogEntry key={i} msg={msg} />
-                    ))
+                    <>
+                      {consolidateLog(task.executionLog).map((msg, i) => (
+                        <ExecutionLogEntry key={i} msg={msg} />
+                      ))}
+                      {/* Stale task warning: in progress 60s+ with only system logs */}
+                      {task.status === "progress" && task.startedAt && Date.now() - task.startedAt > 60_000 && (
+                        task.executionLog.every((m) => m.role === "system") && (
+                          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 mt-2">
+                            <p className="text-xs text-amber-400">Agent has not started working. Task may need re-delegation.</p>
+                          </div>
+                        )
+                      )}
+                    </>
                   ) : gwStatus !== "connected" ? (
                     <RikuInlineLoader message="Connecting to gateway..." />
                   ) : task.status === "progress" ? (
-                    <RikuInlineLoader message="Starting agent execution..." />
+                    (() => {
+                      const assignedGwAgent = gwAgents.find((a) => a.name === task.assignedAgentName);
+                      const agentOnline = assignedGwAgent?.status === "online" || assignedGwAgent?.status === "idle" || assignedGwAgent?.status === "thinking";
+                      if (assignedGwAgent && !agentOnline) {
+                        return (
+                          <div className="flex flex-col items-center gap-2 py-8">
+                            <div className="h-2 w-2 rounded-full bg-red-400" />
+                            <p className="text-sm text-foreground-muted text-center">
+                              Agent <span className="text-foreground font-medium">{task.assignedAgentName}</span> is offline
+                            </p>
+                            <p className="text-xs text-foreground-muted/60">Task will resume when the agent comes back online</p>
+                          </div>
+                        );
+                      }
+                      return <RikuInlineLoader message="Starting agent execution..." />;
+                    })()
                   ) : (
                     <p className="text-sm text-foreground-muted text-center py-8">No execution data yet</p>
                   )}

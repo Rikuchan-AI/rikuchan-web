@@ -5,6 +5,7 @@ import { useGatewayStore } from "./gateway-store";
 import { useProjectsStore } from "./projects-store";
 import { useNotificationsStore } from "./notifications-store";
 import type { Task } from "./types-project";
+import { toast } from "@/components/shared/toast";
 
 /**
  * Wire SSE events from the backend to Zustand stores.
@@ -104,12 +105,32 @@ export function wireSseToStores(): () => void {
   );
 
   // ─── Tasks ───
+
+  // Backend SSE emits raw DB status values (e.g. "in_progress", "assigned")
+  // but frontend columns use "progress". Normalize before merging.
+  const BACKEND_STATUS_MAP: Record<string, string> = {
+    in_progress: "progress",
+    assigned: "progress",
+  };
+
   cleanups.push(
     sse.on("task:updated", (data) => {
       const ps = useProjectsStore.getState();
       const tasks = ps.tasks[data.projectId] ?? [];
       // Extract only known Task fields from SSE data to avoid type widening
       const { projectId: _pid, taskId: _tid, ...updates } = data;
+      // Normalize backend status to frontend status
+      if (typeof updates.status === "string" && BACKEND_STATUS_MAP[updates.status]) {
+        updates.status = BACKEND_STATUS_MAP[updates.status];
+      }
+      // Toast when task is reset due to agent going offline
+      if (updates.reason === "agent_offline" && updates.status === "backlog") {
+        const resetTask = tasks.find((t) => t.id === data.taskId);
+        if (resetTask) {
+          toast("info", `Task "${resetTask.title}" reset to backlog (agent offline)`);
+        }
+      }
+
       useProjectsStore.setState({
         tasks: {
           ...ps.tasks,
