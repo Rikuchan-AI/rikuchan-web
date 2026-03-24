@@ -150,7 +150,8 @@ export default function BoardPage() {
   const [activityCollapsed, setActivityCollapsed] = useState(true);
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskColumn, setNewTaskColumn] = useState<TaskStatus | undefined>();
-  const [operationMode, setOperationMode] = useState<OperationMode>("supervised");
+  const updateProject = useProjectsStore((s) => s.updateProject);
+  const operationMode: OperationMode = project?.operationMode ?? "supervised";
   const [search, setSearch] = useState("");
   const [blockedOnly, setBlockedOnly] = useState(false);
   const [showHealth, setShowHealth] = useState(false);
@@ -222,6 +223,10 @@ export default function BoardPage() {
       return true;
     });
   }, [tasks, search, blockedOnly]);
+
+  const handleModeChange = useCallback(async (mode: OperationMode) => {
+    if (project) await updateProject(project.id, { operationMode: mode });
+  }, [project, updateProject]);
 
   const handleDragEnd = useCallback(
     async (result: DropResult) => {
@@ -347,7 +352,7 @@ export default function BoardPage() {
         leadAgentOnline={leadAgentOnline}
         agentsLoaded={agentsLoaded}
         operationMode={operationMode}
-        onModeChange={setOperationMode}
+        onModeChange={handleModeChange}
         onNewTask={gwConnected ? () => setShowCreateModal(true) : undefined}
         onEMChat={() => setShowEMChat(true)}
         onTeamChat={() => setShowTeamChat(true)}

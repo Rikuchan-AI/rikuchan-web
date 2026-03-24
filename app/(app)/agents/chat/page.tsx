@@ -30,8 +30,6 @@ function ChatListPage() {
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);
   const hydrate = useDirectChatStore((s) => s._hydrate);
-
-  if (!connected) return <GatewayRequiredScreen feature="Chat" />;
   const agents = useGatewayStore((s) => s.agents);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,6 +51,8 @@ function ChatListPage() {
     const id = createConversation(model, agentParam, agent?.name);
     router.replace(`/agents/chat/${id}`);
   }, [searchParams, agents, createConversation, router]);
+
+  if (!connected) return <GatewayRequiredScreen feature="Chat" />;
 
   const handleNew = () => {
     const id = createConversation();
@@ -93,10 +93,13 @@ function ChatListPage() {
       ) : (
         <div className="space-y-2">
           {conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
+              role="button"
+              tabIndex={0}
               onClick={() => router.push(`/agents/chat/${conv.id}`)}
-              className="group flex w-full items-center justify-between rounded-lg border border-line bg-surface p-4 text-left transition-colors hover:border-accent/30 hover:bg-surface-strong"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/agents/chat/${conv.id}`); }}
+              className="group flex w-full cursor-pointer items-center justify-between rounded-lg border border-line bg-surface p-4 text-left transition-colors hover:border-accent/30 hover:bg-surface-strong"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">
@@ -130,7 +133,7 @@ function ChatListPage() {
               >
                 <Trash2 size={14} />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       )}

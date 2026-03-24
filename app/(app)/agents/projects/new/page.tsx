@@ -20,6 +20,7 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
   ROLE_DEFAULT_HEARTBEAT,
 } from "@/lib/mc/types-project";
+import { deduplicateModelOptions } from "@/lib/mc/models";
 
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
@@ -530,9 +531,9 @@ function StepConfig({
           value={modelConfig.preferred}
           onChange={(v) => onModelChange({ ...modelConfig, preferred: v })}
           placeholder="Gateway routing (auto)"
-          options={modelGroups.flatMap((g) =>
+          options={deduplicateModelOptions(modelGroups.flatMap((g) =>
             g.models.map((m) => ({ id: m.id, label: m.label + (m.recommended ? " ★" : ""), sub: g.provider }))
-          )}
+          ))}
         />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
           <input
@@ -552,9 +553,9 @@ function StepConfig({
               value={modelConfig.fallback ?? ""}
               onChange={(v) => onModelChange({ ...modelConfig, fallback: v || undefined })}
               placeholder="None"
-              options={allModels
+              options={deduplicateModelOptions(allModels
                 .filter((m) => m.id !== modelConfig.preferred)
-                .map((m) => ({ id: m.id, label: m.label, sub: m.provider }))}
+                .map((m) => ({ id: m.id, label: m.label, sub: m.provider })))}
             />
           </div>
         )}

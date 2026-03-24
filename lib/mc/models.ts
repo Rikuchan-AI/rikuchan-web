@@ -169,6 +169,21 @@ export function findModelProvider(modelId: string): string {
   return HEARTBEAT_PROVIDER_LABELS[modelId] ?? "Custom";
 }
 
+/**
+ * Deduplicate Combobox options by id.
+ * When the same model id appears under multiple providers (e.g. a gateway proxy
+ * re-exposes models from native providers), keep the last occurrence — the catalog
+ * is sorted alphabetically by provider, so native providers (zai, openrouter, etc.)
+ * come after proxy providers (anthropic) and take precedence.
+ */
+export function deduplicateModelOptions<T extends { id: string }>(options: T[]): T[] {
+  const seen = new Map<string, T>();
+  for (const o of options) {
+    seen.set(o.id, o);
+  }
+  return Array.from(seen.values());
+}
+
 export function isPremiumModel(modelId: string): boolean {
   const premiumIds = ["claude-opus-4-6", "gpt-4o", "gemini-1.5-pro"];
   return premiumIds.includes(modelId);

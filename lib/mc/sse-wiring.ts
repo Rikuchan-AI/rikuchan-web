@@ -246,8 +246,19 @@ export function wireSseToStores(): () => void {
 
   // ─── Health tick ───
   cleanups.push(
-    sse.on("health:tick", () => {
+    sse.on("health:tick", (data) => {
       useGatewayStore.setState({ _lastTickAt: Date.now() });
+
+      // Update agent statuses from gateway health data
+      const healthAgents = (data as { agents?: Array<{ id: string; name: string; status: string }> }).agents;
+      if (healthAgents?.length) {
+        const store = useGatewayStore.getState();
+        const updated = store.agents.map((a) => {
+          const match = healthAgents.find((h) => h.name === a.name || h.id === a.id);
+          return match ? { ...a, status: match.status as typeof a.status } : a;
+        });
+        useGatewayStore.setState({ agents: updated });
+      }
     }),
   );
 

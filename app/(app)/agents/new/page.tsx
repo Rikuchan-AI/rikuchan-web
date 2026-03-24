@@ -9,6 +9,7 @@ import {
   ChevronDown, X, Upload,
 } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { deduplicateModelOptions } from "@/lib/mc/models";
 import JSZip from "jszip";
 import Link from "next/link";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -672,11 +673,9 @@ function StepModel({
           value={model}
           onChange={(v) => onChange("model", v)}
           placeholder="Gateway routing (auto)"
-          options={[
-            ...modelGroups.flatMap((g) =>
-              g.models.map((m) => ({ id: m.id, label: m.label + (m.recommended ? " ★" : ""), sub: g.provider }))
-            ),
-          ]}
+          options={deduplicateModelOptions(modelGroups.flatMap((g) =>
+            g.models.map((m) => ({ id: m.id, label: m.label + (m.recommended ? " ★" : ""), sub: g.provider }))
+          ))}
           mono
         />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -704,12 +703,12 @@ function StepModel({
             value={modelFallback}
             onChange={(v) => onChange("modelFallback", v)}
             placeholder="None"
-            options={allModels
+            options={deduplicateModelOptions(allModels
               .filter((m) => m.id !== model)
               .map((m) => {
                 const group = modelGroups.find((g) => g.models.some((gm) => gm.id === m.id));
                 return { id: m.id, label: m.label, sub: group?.provider };
-              })}
+              }))}
             mono
           />
         </div>
@@ -1044,9 +1043,9 @@ function SubAgentCombobox({ value, onChange }: { value: string; onChange: (v: st
 
 function ModelCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const gatewayModels = useGatewayStore((s) => s.availableModels);
-  const options = gatewayModels.flatMap((g) =>
+  const options = deduplicateModelOptions(gatewayModels.flatMap((g) =>
     g.models.map((m) => ({ id: m.id, label: m.label, sub: g.provider }))
-  );
+  ));
   return <SimpleCombobox value={value} onChange={onChange} options={options} placeholder="Inherit global model..." mono />;
 }
 

@@ -6,6 +6,7 @@ import Markdown from "react-markdown";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
 import { ArrowLeft, Send, Pencil, Check, X, BookOpen, Copy } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { deduplicateModelOptions } from "@/lib/mc/models";
 import type { DirectChatMessage, GatewayMeta } from "@/lib/mc/direct-chat-store";
 import { gatewayFetch } from "@/lib/mc/gateway-api";
 import { RikuLoader } from "@/components/shared/riku-loader";
@@ -209,9 +210,9 @@ function ModelSelector({
       <Combobox
         value={currentModel}
         onChange={onChange}
-        options={Object.entries(grouped).flatMap(([provider, providerModels]) =>
+        options={deduplicateModelOptions(Object.entries(grouped).flatMap(([provider, providerModels]) =>
           providerModels.map((m) => ({ id: m.id, label: m.id, group: provider }))
-        )}
+        ))}
         placeholder="Select model"
         mono
       />

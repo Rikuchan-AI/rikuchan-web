@@ -7,6 +7,7 @@ import {
   Shield, Bell, Wrench, Cpu, Activity, Settings, Zap, DollarSign,
 } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { deduplicateModelOptions } from "@/lib/mc/models";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import {
@@ -279,13 +280,13 @@ function SectionModel({ projectId }: { projectId: string }) {
           onChange={(v) => setConfig({ ...config, preferred: v })}
           options={[
             { id: "", label: "Gateway routing (auto)" },
-            ...modelGroups.flatMap((group) =>
+            ...deduplicateModelOptions(modelGroups.flatMap((group) =>
               group.models.map((m) => ({
                 id: m.id,
                 label: `${m.label}${m.recommended ? " ★" : ""}`,
                 group: group.provider,
               }))
-            ),
+            )),
           ]}
           placeholder="Select model"
           mono
@@ -318,10 +319,10 @@ function SectionModel({ projectId }: { projectId: string }) {
             onChange={(v) => setConfig({ ...config, fallback: v || undefined })}
             options={[
               { id: "", label: "None" },
-              ...allModels.filter((m) => m.id !== config.preferred).map((m) => ({
+              ...deduplicateModelOptions(allModels.filter((m) => m.id !== config.preferred).map((m) => ({
                 id: m.id,
                 label: m.label,
-              })),
+              }))),
             ]}
             placeholder="Select fallback"
             mono
