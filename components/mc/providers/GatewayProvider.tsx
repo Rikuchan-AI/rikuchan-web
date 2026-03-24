@@ -7,6 +7,7 @@ import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useNotificationsStore } from "@/lib/mc/notifications-store";
 import { initApiClient, getApiClient } from "@/lib/mc/api-client";
 import { initSseClient, getSseClient } from "@/lib/mc/sse-client";
+import { gatewayModelsToGroups, MODEL_GROUPS } from "@/lib/mc/models";
 import { wireSseToStores } from "@/lib/mc/sse-wiring";
 import { CommandPalette } from "@/components/mc/CommandPalette";
 import { RefreshCw, WifiOff } from "lucide-react";
@@ -197,6 +198,35 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
               agentsLoaded: true,
               _configHydrated: true,
             });
+
+            // Fetch available models from OpenClaw config
+            try {
+              const configResult = await api.gatewayRpc("config.get", {}) as Record<string, unknown>;
+              const config = configResult?.config as Record<string, unknown> | undefined;
+              const modelsConfig = config?.models as Record<string, unknown> | undefined;
+              const providers = modelsConfig?.providers as Record<string, { models?: Array<{ id: string; name?: string; contextWindow?: number; reasoning?: boolean; cost?: { input?: number; output?: number } }> }> | undefined;
+
+              if (providers) {
+                const allModels = Object.entries(providers).flatMap(([providerKey, providerCfg]) =>
+                  (providerCfg.models ?? []).map((m) => ({
+                    id: m.id,
+                    name: m.name ?? m.id,
+                    provider: providerKey,
+                    contextWindow: m.contextWindow,
+                    reasoning: m.reasoning,
+                    cost: m.cost,
+                    freeTier: m.cost != null && m.cost.input === 0 && m.cost.output === 0,
+                  }))
+                );
+                const groups = gatewayModelsToGroups(allModels);
+                useGatewayStore.setState({ availableModels: groups, modelsLoaded: true });
+              } else {
+                useGatewayStore.setState({ availableModels: MODEL_GROUPS, modelsLoaded: true });
+              }
+            } catch {
+              // Fallback to hardcoded models
+              useGatewayStore.setState({ availableModels: MODEL_GROUPS, modelsLoaded: true });
+            }
           } else {
             useGatewayStore.setState({ status: "disconnected", agentsLoaded: true, _configHydrated: true });
           }
