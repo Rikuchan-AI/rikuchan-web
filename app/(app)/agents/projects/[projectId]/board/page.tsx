@@ -318,8 +318,8 @@ export default function BoardPage() {
             <span className="font-medium">
               {gatewayBannerIsExpected
                 ? "Applying configurations, gateway restarting..."
-                : gwStatus === "connecting"
-                  ? gwConnectedAt ? "Reconnecting to gateway..." : "Connecting to gateway..."
+                : gwStatus === "error"
+                  ? "Gateway error, task creation disabled"
                   : "Gateway offline, task creation disabled"}
             </span>
           </div>
