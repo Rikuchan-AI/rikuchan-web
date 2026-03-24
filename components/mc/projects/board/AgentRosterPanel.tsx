@@ -97,13 +97,22 @@ function LeadAgentCard({
 
 function TemplateAgentCard({
   member,
-  activeSubagents,
+  activeTasks,
   onSelectTask,
 }: {
   member: RosterMember;
-  activeSubagents: Array<{ id: string; title: string }>;
+  activeTasks: Array<{ id: string; title: string; status: string }>;
   onSelectTask: (taskId: string) => void;
 }) {
+  const isWorking = activeTasks.some((t) => t.status === "progress");
+  const hasBlocked = activeTasks.some((t) => t.status === "blocked");
+
+  const statusDot = isWorking
+    ? "bg-emerald-400 animate-pulse"
+    : hasBlocked
+      ? "bg-amber-400"
+      : "bg-zinc-600";
+
   const initials = member.agentName
     .split(/\s+/)
     .map((w) => w[0])
@@ -112,28 +121,28 @@ function TemplateAgentCard({
     .toUpperCase();
 
   return (
-    <div className="rounded-lg border border-dashed border-line bg-surface/60 p-3 space-y-2">
+    <div className={`rounded-lg border p-3 space-y-2 ${isWorking ? "border-accent/20 bg-surface" : "border-dashed border-line bg-surface/60"}`}>
       <div className="flex items-center gap-2">
         <div className="relative">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-strong text-[10px] font-semibold text-foreground-muted">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold ${isWorking ? "bg-accent-soft text-accent" : "bg-surface-strong text-foreground-muted"}`}>
             {initials}
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 h-[8px] w-[8px] rounded-full border-2 border-surface bg-zinc-600" />
+          <span className={`absolute -bottom-0.5 -right-0.5 h-[8px] w-[8px] rounded-full border-2 border-surface ${statusDot}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-foreground-soft">{member.agentName}</p>
+          <p className={`truncate text-xs font-semibold ${isWorking ? "text-foreground" : "text-foreground-soft"}`}>{member.agentName}</p>
           <p className="mono text-[9px] uppercase tracking-wider text-foreground-muted">
             {member.customRoleLabel ?? member.role}
           </p>
         </div>
       </div>
 
-      {activeSubagents.length > 0 ? (
+      {activeTasks.length > 0 ? (
         <div className="space-y-1">
-          <p className="mono text-[9px] text-emerald-400">
-            {activeSubagents.length} active subagent{activeSubagents.length > 1 ? "s" : ""}
+          <p className={`mono text-[9px] ${isWorking ? "text-emerald-400" : "text-amber-400"}`}>
+            {isWorking ? "working" : "blocked"}
           </p>
-          {activeSubagents.slice(0, 2).map((t) => (
+          {activeTasks.slice(0, 2).map((t) => (
             <button
               key={t.id}
               onClick={() => onSelectTask(t.id)}
@@ -144,7 +153,7 @@ function TemplateAgentCard({
           ))}
         </div>
       ) : (
-        <p className="mono text-[9px] text-foreground-muted/40">template</p>
+        <p className="mono text-[9px] text-foreground-muted/40">idle</p>
       )}
     </div>
   );
@@ -209,18 +218,17 @@ export function AgentRosterPanel({ roster, tasks, onSelectTask }: AgentRosterPan
             Templates ({templateMembers.length})
           </p>
           {templateMembers.map((member) => {
-            const activeSubagents = tasks.filter(
+            const activeTasks = tasks.filter(
               (t) =>
                 t.assignedAgentId === member.agentId &&
-                t.subagentSessionKey &&
-                t.status !== "done",
+                (t.status === "progress" || t.status === "blocked"),
             );
 
             return (
               <TemplateAgentCard
                 key={member.agentId}
                 member={member}
-                activeSubagents={activeSubagents}
+                activeTasks={activeTasks}
                 onSelectTask={onSelectTask}
               />
             );
