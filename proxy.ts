@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/login(.*)",
   "/signup(.*)",
   "/api/webhook(.*)",
+  "/api/mc/proxy(.*)",
 ]);
 
 const isAdminOnlyRoute = createRouteMatcher([
