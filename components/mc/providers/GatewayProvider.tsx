@@ -14,6 +14,9 @@ import { RefreshCw, WifiOff } from "lucide-react";
 
 const MC_BACKEND_URL = process.env.NEXT_PUBLIC_MC_BACKEND_URL ?? "";
 
+// Use local proxy to avoid HTTP/2 issues with Railway CDN + SSE
+const MC_PROXY_URL = "/api/mc/proxy";
+
 function DisconnectedBanner() {
   const status = useGatewayStore((s) => s.status);
   const [dismissed, setDismissed] = useState(false);
@@ -82,9 +85,9 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
 
     const tokenGetter = () => getToken();
 
-    // Initialize clients
-    initApiClient(MC_BACKEND_URL, tokenGetter);
-    initSseClient(MC_BACKEND_URL, tokenGetter);
+    // Initialize clients — use local proxy to avoid HTTP/2 + CDN issues with SSE
+    initApiClient(MC_PROXY_URL, tokenGetter);
+    initSseClient(MC_PROXY_URL, tokenGetter);
 
     // Hydrate gateway config from localStorage cache
     useGatewayStore.getState().hydrateConfig();
