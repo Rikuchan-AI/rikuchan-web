@@ -69,6 +69,14 @@ export type SseEventMap = {
     [k: string]: unknown;
   };
   "health:tick": Record<string, unknown>;
+  "chat:message": {
+    sessionKey: string;
+    message: { id: string; role: string; content: string; timestamp: number };
+  };
+  "chat:thinking": {
+    sessionKey: string;
+    thinking: boolean;
+  };
   ping: Record<string, unknown>;
 };
 

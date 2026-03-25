@@ -5,6 +5,7 @@ import { useGatewayStore } from "./gateway-store";
 import { useProjectsStore } from "./projects-store";
 import { useNotificationsStore } from "./notifications-store";
 import type { Task } from "./types-project";
+import { useChatStore } from "./chat-store";
 import { toast } from "@/components/shared/toast";
 
 /**
@@ -241,6 +242,28 @@ export function wireSseToStores(): () => void {
         title: data.title,
         message: data.body ?? "",
       });
+    }),
+  );
+
+  // ─── Chat (agent replies) ───
+  cleanups.push(
+    sse.on("chat:message", (data) => {
+      if (data.sessionKey && data.message) {
+        useChatStore.getState().receiveMessage(data.sessionKey, {
+          id: data.message.id,
+          role: data.message.role as "agent",
+          content: data.message.content,
+          timestamp: data.message.timestamp,
+        });
+      }
+    }),
+  );
+
+  cleanups.push(
+    sse.on("chat:thinking", (data) => {
+      if (data.sessionKey) {
+        useChatStore.getState().setThinking(data.sessionKey, data.thinking);
+      }
     }),
   );
 
