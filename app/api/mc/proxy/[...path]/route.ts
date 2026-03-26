@@ -14,7 +14,7 @@ const BACKEND_URL = process.env.MC_BACKEND_URL
  */
 async function proxy(req: Request) {
   const url = new URL(req.url);
-  const backendPath = url.pathname.replace(/^\/api\/mc\/proxy/, "/api");
+  const backendPath = url.pathname.replace(/^\/api\/mc\/proxy/, "");
   const target = `${BACKEND_URL}${backendPath}${url.search}`;
 
   const headers = new Headers();
@@ -26,6 +26,8 @@ async function proxy(req: Request) {
   if (authHeader) headers.set("Authorization", authHeader);
 
   const isSSE = backendPath === "/api/events";
+
+  console.log(`[proxy] ${req.method} ${backendPath} → ${target}`);
 
   const body = req.method !== "GET" && req.method !== "HEAD"
     ? await req.arrayBuffer()
