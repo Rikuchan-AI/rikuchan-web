@@ -245,6 +245,7 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
+  taskType?: "execution" | "organization";
   assignedAgentId: string | null;
   assignedAgentName?: string;
   createdBy: "user" | "lead-agent" | "pipeline";

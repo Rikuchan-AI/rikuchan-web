@@ -46,6 +46,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
   const [title, setTitle] = useState("");
   const [titlePlaceholder, setTitlePlaceholder] = useState("Task title");
   const [taskType, setTaskType] = useState<TaskType>("task");
+  const [executionMode, setExecutionMode] = useState<"execution" | "organization">("execution");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [description, setDescription] = useState("");
   const [assignedAgentId, setAssignedAgentId] = useState<string>("");
@@ -140,6 +141,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
       description: fullDescription,
       status: "backlog",
       priority,
+      taskType: executionMode,
       assignedAgentId: assignedMember?.agentId ?? null,
       assignedAgentName: assignedMember?.agentName,
       createdBy: "user",
@@ -248,6 +250,40 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Execution Mode */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">Execution Mode</label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setExecutionMode("execution")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    executionMode === "execution"
+                      ? "bg-accent-soft text-accent border border-accent/15"
+                      : "text-foreground-muted hover:text-foreground hover:bg-surface-strong border border-transparent"
+                  }`}
+                >
+                  Execution
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExecutionMode("organization")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    executionMode === "organization"
+                      ? "bg-amber-500/10 text-amber-400 border border-amber-400/15"
+                      : "text-foreground-muted hover:text-foreground hover:bg-surface-strong border border-transparent"
+                  }`}
+                >
+                  Organization
+                </button>
+              </div>
+              {executionMode === "organization" && (
+                <p className="mt-1.5 text-[11px] text-amber-400/70">
+                  Lead will plan and create subtasks instead of delegating to workers.
+                </p>
+              )}
             </div>
 
             {/* Description */}
