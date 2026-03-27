@@ -46,15 +46,14 @@ export function GettingStartedChecklist() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
-  // Load dismiss state from settings
+  // Load dismiss state from localStorage
   useEffect(() => {
-    fetch("/api/mc/settings/getting_started_dismissed")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((value) => {
-        if (value === true) setDismissed(true);
-      })
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+    try {
+      if (localStorage.getItem("rikuchan_getting_started_dismissed") === "true") {
+        setDismissed(true);
+      }
+    } catch {}
+    setLoaded(true);
   }, []);
 
   // Auto-detect completed items
@@ -70,11 +69,7 @@ export function GettingStartedChecklist() {
 
   function handleDismiss() {
     setDismissed(true);
-    fetch("/api/mc/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "getting_started_dismissed", value: true }),
-    });
+    try { localStorage.setItem("rikuchan_getting_started_dismissed", "true"); } catch {}
   }
 
   if (!loaded || dismissed) return null;

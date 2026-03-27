@@ -15,11 +15,12 @@ export default function DashboardOverviewPage() {
   const [workspace, setWorkspace] = useState<Workspace>({ name: "Rikuchan", plan: "starter", providers_connected: 0, knowledge_sources: 0 });
 
   useEffect(() => {
-    if (gatewayStatus !== "connected" || !gatewayConfig.url) return;
-    const gwUrl = gatewayConfig.url.replace("ws://", "http://").replace("wss://", "https://");
+    if (gatewayStatus !== "connected") return;
+    // Dashboard API calls go to ai-gateway (HTTP), not OpenClaw (WebSocket)
+    const gwUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:4000";
     fetch(`${gwUrl}/dashboard/api/overview`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setOverview(d); }).catch(() => {});
     fetch(`${gwUrl}/v1/settings/workspace`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setWorkspace(d); }).catch(() => {});
-  }, [gatewayStatus, gatewayConfig.url]);
+  }, [gatewayStatus]);
 
   const metrics = [
     { label: "Requests today", value: String(overview.requests_today), helper: "Across people and agent workflows" },
