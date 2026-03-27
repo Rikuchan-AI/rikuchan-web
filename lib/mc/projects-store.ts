@@ -239,7 +239,9 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       await getApiClient().tasks.move(projectId, taskId, {
         status: newStatus,
       });
-    } catch (err) {
+    } catch (err: unknown) {
+      // "Same status" means backend already has this status (stale frontend state) — not a real error
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "TRANSITION_DENIED") return;
       console.error("[projects] Failed to move task:", err);
     }
   },
