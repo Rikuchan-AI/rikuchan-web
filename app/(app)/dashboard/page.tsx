@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { GettingStartedChecklist } from "@/components/onboarding/getting-started-checklist";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -10,17 +11,22 @@ type Workspace = { name: string; plan: string; providers_connected: number; know
 
 export default function DashboardOverviewPage() {
   const gatewayStatus = useGatewayStore((s) => s.status);
-  const gatewayConfig = useGatewayStore((s) => s.config);
+  const { getToken } = useAuth();
   const [overview, setOverview] = useState<Overview>({ requests_today: 0, context_hit_rate_pct: 0, estimated_spend_usd: 0, active_providers: [] });
   const [workspace, setWorkspace] = useState<Workspace>({ name: "Rikuchan", plan: "starter", providers_connected: 0, knowledge_sources: 0 });
 
   useEffect(() => {
     if (gatewayStatus !== "connected") return;
-    // Dashboard API calls go to ai-gateway (HTTP), not OpenClaw (WebSocket)
     const gwUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:4000";
-    fetch(`${gwUrl}/dashboard/api/overview`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setOverview(d); }).catch(() => {});
-    fetch(`${gwUrl}/v1/settings/workspace`).then((r) => r.ok ? r.json() : null).then((d) => { if (d) setWorkspace(d); }).catch(() => {});
-  }, [gatewayStatus]);
+    const fetchWithAuth = async (path: string) => {
+      const token = await getToken();
+      return fetch(`${gwUrl}${path}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    };
+    fetchWithAuth("/dashboard/api/overview").then((r) => r.ok ? r.json() : null).then((d) => { if (d) setOverview(d); }).catch(() => {});
+    fetchWithAuth("/v1/settings/workspace").then((r) => r.ok ? r.json() : null).then((d) => { if (d) setWorkspace(d); }).catch(() => {});
+  }, [gatewayStatus, getToken]);
 
   const metrics = [
     { label: "Requests today", value: String(overview.requests_today), helper: "Across people and agent workflows" },
