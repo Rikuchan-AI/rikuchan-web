@@ -15,19 +15,33 @@ export default function OnboardingModelPage() {
   const params = useSearchParams();
   const intent = params.get("intent") || "personal";
   const [selected, setSelected] = useState("claude-sonnet-4-6");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleFinish() {
-    // Mark onboarding as completed on the tenant
-    await fetch("/api/mc/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        completed: true,
-        intent,
-        default_model: selected === "skip" ? null : selected,
-      }),
-    });
-    router.push("/dashboard");
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/mc/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          completed: true,
+          intent,
+          default_model: selected === "skip" ? null : selected,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Failed (${res.status})`);
+        setLoading(false);
+        return;
+      }
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setLoading(false);
+    }
   }
 
   function handleSkip() {
@@ -89,11 +103,16 @@ export default function OnboardingModelPage() {
         ))}
       </div>
 
+      {error && (
+        <p className="text-sm text-red-400">{error}</p>
+      )}
+
       <button
         onClick={handleFinish}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition"
+        disabled={loading}
+        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition disabled:opacity-50"
       >
-        Get started
+        {loading ? "Setting up…" : "Get started"}
       </button>
     </div>
   );

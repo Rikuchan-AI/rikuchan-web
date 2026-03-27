@@ -43,7 +43,18 @@ export default function OnboardingGatewayPage() {
     }
   }
 
-  function handleContinue() {
+  async function handleContinue() {
+    // Save gateway config if provided
+    if (gatewayUrl) {
+      await fetch("/api/mc/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gateway_url: gatewayUrl,
+          gateway_token: authToken || undefined,
+        }),
+      });
+    }
     router.push(`/onboarding/model?intent=${intent}`);
   }
 
