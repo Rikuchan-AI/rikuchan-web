@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { SessionCard } from "@/components/mc/sessions/SessionCard";
 import { Combobox } from "@/components/mc/ui/Combobox";
@@ -8,10 +9,10 @@ import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 export default function SessionsPage() {
   const { connected, GatewayRequiredScreen } = useGatewayGate();
-  const sessions = useGatewayStore((s) => s.sessions);
+  const sessions = useGatewayStore(useShallow((s) => s.sessions));
 
   if (!connected) return <GatewayRequiredScreen feature="Sessões" />;
-  const agents = useGatewayStore((s) => s.agents);
+  const agents = useGatewayStore(useShallow((s) => s.agents));
   const [filterAgent, setFilterAgent] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 

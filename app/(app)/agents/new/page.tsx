@@ -12,6 +12,7 @@ import { Combobox } from "@/components/mc/ui/Combobox";
 import { deduplicateModelOptions } from "@/lib/mc/models";
 import JSZip from "jszip";
 import Link from "next/link";
+import { useShallow } from "zustand/react/shallow";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { createAgentViaGateway, setAgentFileViaGateway, patchAgentDefaults, listWorkspacesViaGateway } from "@/lib/mc/agent-files";
 import type { ExistingWorkspace } from "@/lib/mc/agent-files";
@@ -652,7 +653,7 @@ function StepModel({
   sandboxMode: SandboxMode;
   onChange: (field: string, value: string | boolean | number) => void;
 }) {
-  const gatewayModels = useGatewayStore((s) => s.availableModels);
+  const gatewayModels = useGatewayStore(useShallow((s) => s.availableModels));
   const modelGroups = gatewayModels;
   const allModels = modelGroups.flatMap((g) => g.models);
 
@@ -1030,7 +1031,7 @@ function SimpleCombobox({
 }
 
 function SubAgentCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const agents = useGatewayStore((s) => s.agents);
+  const agents = useGatewayStore(useShallow((s) => s.agents));
   const options = [
     { id: "*", label: "* — allow any" },
     ...agents.map((a) => ({ id: a.id, label: a.name || a.id, sub: a.id })),
@@ -1039,7 +1040,7 @@ function SubAgentCombobox({ value, onChange }: { value: string; onChange: (v: st
 }
 
 function ModelCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const gatewayModels = useGatewayStore((s) => s.availableModels);
+  const gatewayModels = useGatewayStore(useShallow((s) => s.availableModels));
   const options = deduplicateModelOptions(gatewayModels.flatMap((g) =>
     g.models.map((m) => ({ id: m.id, label: m.label, sub: g.provider }))
   ));

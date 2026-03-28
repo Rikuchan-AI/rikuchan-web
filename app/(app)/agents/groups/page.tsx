@@ -6,6 +6,7 @@ import {
   Check, X, ChevronDown, ChevronRight, Layers,
 } from "lucide-react";
 import Link from "next/link";
+import { useShallow } from "zustand/react/shallow";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { ActionOverlay } from "@/components/shared/action-overlay";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -314,8 +315,8 @@ function emptyGroup(): BoardGroup {
 }
 
 export default function GroupsPage() {
-  const groups = useProjectsStore((s) => s.groups);
-  const projects = useProjectsStore((s) => s.projects);
+  const groups = useProjectsStore(useShallow((s) => s.groups));
+  const projects = useProjectsStore(useShallow((s) => s.projects));
   const createGroup = useProjectsStore((s) => s.createGroup);
   const updateGroup = useProjectsStore((s) => s.updateGroup);
   const deleteGroup = useProjectsStore((s) => s.deleteGroup);

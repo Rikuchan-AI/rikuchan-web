@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Markdown from "react-markdown";
 import { MonacoMarkdownEditor } from "@/components/mc/editors/MonacoMarkdownEditor";
+import { useShallow } from "zustand/react/shallow";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { toast } from "@/components/shared/toast";
 import { Mascot } from "@/components/shared/mascot";
@@ -233,7 +234,7 @@ function TabIdentity({
   onSaveFile: (fileName: string, summary?: string) => void;
   onRevertFile: (fileName: string, version: FileVersion) => void;
 }) {
-  const agent = useGatewayStore((s) => s.agents.find((a) => a.id === agentId));
+  const agent = useGatewayStore(useShallow((s) => s.agents.find((a) => a.id === agentId)));
 
   return (
     <div className="space-y-6">
@@ -400,8 +401,8 @@ function TabTools({
 // ─── Tab: Model ───────────────────────────────────────────────────────────────
 
 function TabModel({ agentId }: { agentId: string }) {
-  const agent = useGatewayStore((s) => s.agents.find((a) => a.id === agentId));
-  const gatewayModels = useGatewayStore((s) => s.availableModels);
+  const agent = useGatewayStore(useShallow((s) => s.agents.find((a) => a.id === agentId)));
+  const gatewayModels = useGatewayStore(useShallow((s) => s.availableModels));
   const sendRpc = useGatewayStore((s) => s.sendRpc);
   const modelGroups = gatewayModels;
 
@@ -496,7 +497,7 @@ function TabModel({ agentId }: { agentId: string }) {
 // ─── Tab: Logs ────────────────────────────────────────────────────────────────
 
 function TabLogs({ agentId }: { agentId: string }) {
-  const allLogs = useGatewayStore((s) => s.logs);
+  const allLogs = useGatewayStore(useShallow((s) => s.logs));
   const logs = allLogs.filter((l) => !l.agentId || l.agentId === agentId);
 
   const LEVEL_STYLES: Record<string, string> = {
@@ -533,11 +534,11 @@ function TabLogs({ agentId }: { agentId: string }) {
 
 export default function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
-  const agents = useGatewayStore((s) => s.agents);
+  const agents = useGatewayStore(useShallow((s) => s.agents));
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   const status = useGatewayStore((s) => s.status);
-  const sessions = useGatewayStore((s) => s.sessions);
-  const projects = useProjectsStore((s) => s.projects);
+  const sessions = useGatewayStore(useShallow((s) => s.sessions));
+  const projects = useProjectsStore(useShallow((s) => s.projects));
 
   const agent = agents.find((a) => a.id === agentId);
   const agentSessions = sessions.filter((s) => s.agentId === agentId);

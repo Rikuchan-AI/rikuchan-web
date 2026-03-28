@@ -6,6 +6,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
 import { Plus } from "lucide-react";
 
+import { useShallow } from "zustand/react/shallow";
 import { useProjectsStore, useProjectTasks, selectProjectById } from "@/lib/mc/projects-store";
 import { RikuPageLoader } from "@/components/shared/riku-loader";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -139,7 +140,7 @@ function NewTaskForm({
 
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const project = useProjectsStore(selectProjectById(projectId));
+  const project = useProjectsStore(useShallow(selectProjectById(projectId)));
   const hydrated = useProjectsStore((s) => s._hydrated);
   const tasks = useProjectTasks(projectId);
   const moveTask = useProjectsStore((s) => s.moveTask);
@@ -168,10 +169,10 @@ export default function BoardPage() {
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
 
   const router = useRouter();
-  const gwAgents = useGatewayStore((s) => s.agents);
+  const gwAgents = useGatewayStore(useShallow((s) => s.agents));
   const gwConnected = useGatewayStore((s) => s.status === "connected");
   const gwStatus = useGatewayStore((s) => s.status);
-  const gwConfig = useGatewayStore((s) => s.config);
+  const gwConfig = useGatewayStore(useShallow((s) => s.config));
   const gwConnect = useGatewayStore((s) => s.connect);
   const gwConnectedAt = useGatewayStore((s) => s.connectedAt);
   const expectedRestartReason = useGatewayStore((s) => s.expectedRestartReason);

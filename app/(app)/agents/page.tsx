@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import Link from "next/link";
+import { useShallow } from "zustand/react/shallow";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentGrid } from "@/components/mc/agents/AgentGrid";
 import { GatewayStatus } from "@/components/mc/gateway/GatewayStatus";
@@ -10,7 +11,7 @@ import { LivePulse } from "@/components/mc/ui/LivePulse";
 import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 export default function AgentsPage() {
-  const agents = useGatewayStore((s) => s.agents);
+  const agents = useGatewayStore(useShallow((s) => s.agents));
   const agentsLoaded = useGatewayStore((s) => s.agentsLoaded);
   const status = useGatewayStore((s) => s.status);
   const latencyMs = useGatewayStore((s) => s.latencyMs);

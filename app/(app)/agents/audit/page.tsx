@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Download, Trash2, Filter } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { useShallow } from "zustand/react/shallow";
 import { useAuditStore } from "@/lib/mc/audit-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import type { AuditActorType, AuditResourceType } from "@/lib/mc/audit-store";
@@ -26,7 +27,7 @@ const RESOURCE_COLORS: Record<AuditResourceType, string> = {
 
 export default function AuditLogPage() {
   const { events, hydrate, clear, export: exportLog } = useAuditStore();
-  const activityEvents = useGatewayStore((s) => s.activity);
+  const activityEvents = useGatewayStore(useShallow((s) => s.activity));
 
   useEffect(() => {
     hydrate();
