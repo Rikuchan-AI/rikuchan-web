@@ -286,7 +286,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
           </button>
           <div className="flex items-center gap-1">
             <div className="relative">
-              <button onClick={() => setShowMenu(!showMenu)} className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors">
+              <button aria-label="Task options" onClick={() => setShowMenu(!showMenu)} className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors">
                 <MoreHorizontal size={14} />
               </button>
               {showMenu && (
@@ -304,7 +304,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                 </div>
               )}
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors">
+            <button aria-label="Close task drawer" onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors">
               <X size={14} />
             </button>
           </div>

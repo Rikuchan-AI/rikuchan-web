@@ -124,7 +124,7 @@ export default function MembersPage() {
       {error && (
         <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2 text-sm text-red-400">
           {error}
-          <button onClick={() => setError("")}><X size={14} /></button>
+          <button aria-label="Dismiss" onClick={() => setError("")}><X size={14} /></button>
         </div>
       )}
 
@@ -133,7 +133,7 @@ export default function MembersPage() {
         <div className="rounded-lg border border-line bg-surface p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-foreground">Invite a new member</p>
-            <button onClick={() => setShowInvite(false)} className="text-foreground-muted hover:text-foreground"><X size={16} /></button>
+            <button aria-label="Close" onClick={() => setShowInvite(false)} className="text-foreground-muted hover:text-foreground"><X size={16} /></button>
           </div>
           <div className="flex gap-2">
             <input

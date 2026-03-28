@@ -91,7 +91,7 @@ export default function OnboardingInvitePage() {
               placeholder="Select role"
             />
             {invites.length > 1 && (
-              <button onClick={() => removeRow(i)} className="text-foreground-muted hover:text-foreground transition">
+              <button aria-label="Remove invite" onClick={() => removeRow(i)} className="text-foreground-muted hover:text-foreground transition">
                 <X size={16} />
               </button>
             )}

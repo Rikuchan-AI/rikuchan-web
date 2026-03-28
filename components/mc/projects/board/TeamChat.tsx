@@ -86,6 +86,7 @@ export function TeamChat({ projectId, onClose }: TeamChatProps) {
             </div>
           </div>
           <button
+            aria-label="Close"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
           >

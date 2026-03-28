@@ -138,6 +138,7 @@ export function ChatInput({
               <span className="max-w-[140px] truncate">{file.name}</span>
               <button
                 type="button"
+                aria-label="Remove file"
                 onClick={() => removeFile(i)}
                 className="text-foreground-muted/60 hover:text-danger transition-colors"
               >
@@ -187,6 +188,7 @@ export function ChatInput({
         {/* Send button */}
         <button
           type="button"
+          aria-label="Send message"
           onClick={handleSend}
           disabled={!hasContent || sending || disabled}
           className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-accent text-accent-foreground hover:bg-accent-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

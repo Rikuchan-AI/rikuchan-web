@@ -173,6 +173,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
             New Task
           </h2>
           <button
+            aria-label="Close"
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
           >

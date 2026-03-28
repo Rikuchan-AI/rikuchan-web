@@ -306,6 +306,7 @@ export default function ConversationPage() {
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-line px-1 py-3">
         <button
+          aria-label="Back to conversations"
           onClick={() => router.push("/agents/chat")}
           className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-strong hover:text-foreground"
         >
@@ -321,10 +322,10 @@ export default function ConversationPage() {
               onChange={(e) => setEditTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleSaveTitle(); if (e.key === "Escape") setEditing(false); }}
             />
-            <button onClick={handleSaveTitle} className="text-accent hover:text-accent-deep">
+            <button aria-label="Save" onClick={handleSaveTitle} className="text-accent hover:text-accent-deep">
               <Check size={14} />
             </button>
-            <button onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground">
+            <button aria-label="Cancel" onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground">
               <X size={14} />
             </button>
           </div>
@@ -334,6 +335,7 @@ export default function ConversationPage() {
               {conversation.title}
             </h2>
             <button
+              aria-label="Edit title"
               onClick={() => { setEditTitle(conversation.title); setEditing(true); }}
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors"
             >
@@ -401,6 +403,7 @@ export default function ConversationPage() {
             }}
           />
           <button
+            aria-label="Send message"
             onClick={() => handleSend()}
             disabled={!input.trim() || sending}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40"

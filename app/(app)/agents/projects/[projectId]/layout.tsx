@@ -98,6 +98,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         {/* Actions menu */}
         <div className="relative mt-8 shrink-0" ref={menuRef}>
           <button
+            aria-label="Project actions"
             onClick={() => setMenuOpen((v) => !v)}
             className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
           >

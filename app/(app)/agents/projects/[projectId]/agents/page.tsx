@@ -173,6 +173,7 @@ function RosterMemberCard({
           )}
           <button
             type="button"
+            aria-label="Toggle details"
             onClick={() => setExpanded((v) => !v)}
             className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-strong hover:text-foreground transition-colors"
           >

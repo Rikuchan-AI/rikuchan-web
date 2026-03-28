@@ -163,8 +163,8 @@ function GroupCard({
                     className="w-full rounded-md border border-line bg-surface-strong px-3 py-1.5 text-sm text-foreground focus:border-accent/40 focus:outline-none resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleSave} className="text-accent hover:text-accent-deep"><Check size={14} /></button>
-                    <button onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground"><X size={14} /></button>
+                    <button aria-label="Save" onClick={handleSave} className="text-accent hover:text-accent-deep"><Check size={14} /></button>
+                    <button aria-label="Cancel" onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground"><X size={14} /></button>
                   </div>
                 </div>
               ) : (

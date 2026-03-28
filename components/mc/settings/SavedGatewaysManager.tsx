@@ -174,6 +174,7 @@ export function SavedGatewaysManager() {
                 />
                 <button
                   type="button"
+                  aria-label="Toggle token visibility"
                   onClick={() => setShowTokenField((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
                 >

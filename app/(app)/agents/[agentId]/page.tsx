@@ -436,7 +436,7 @@ function TabModel({ agentId }: { agentId: string }) {
             placeholder="Buscar modelo..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-foreground-muted focus:outline-none"
           />
-          {search && <button type="button" onClick={() => setSearch("")} className="text-foreground-muted hover:text-foreground"><X size={13} /></button>}
+          {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="text-foreground-muted hover:text-foreground"><X size={13} /></button>}
         </div>
         {filteredGroups.length === 0 && (
           <p className="px-4 py-6 text-sm text-foreground-muted text-center">Nenhum modelo encontrado.</p>

@@ -194,6 +194,7 @@ export function BoardHeader({
       </button>
       <button
         onClick={onHealth}
+        aria-label="Agent health"
         className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
         title="Agent Health"
       >
@@ -201,6 +202,7 @@ export function BoardHeader({
       </button>
       <button
         onClick={onApprovals}
+        aria-label="Approval queue"
         className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
         title="Approval Queue"
       >
@@ -208,6 +210,7 @@ export function BoardHeader({
       </button>
       <button
         onClick={onSprintPlanning}
+        aria-label="Sprint planning"
         className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-foreground-soft transition-colors hover:border-accent/30 hover:text-foreground"
         title="Sprint Planning"
       >

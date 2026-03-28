@@ -97,6 +97,17 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
+/* Global focus-visible ring for keyboard navigation (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Remove focus outline for mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 input[type="number"] {
   -moz-appearance: textfield;
 }

@@ -90,6 +90,7 @@ export function GatewayLogs() {
 
         <div className="flex items-center gap-1">
           <button
+            aria-label="Toggle auto-scroll"
             onClick={() => setAutoScroll((v) => !v)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
             title={autoScroll ? "Pausar scroll" : "Retomar scroll"}
@@ -97,6 +98,7 @@ export function GatewayLogs() {
             {autoScroll ? <PauseCircle size={12} /> : <PlayCircle size={12} />}
           </button>
           <button
+            aria-label="Export logs"
             onClick={exportLogs}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-foreground-soft hover:text-foreground hover:bg-surface-strong transition-colors"
             title="Export logs"
@@ -104,6 +106,7 @@ export function GatewayLogs() {
             <Download size={12} />
           </button>
           <button
+            aria-label="Clear logs"
             onClick={clearLogs}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-foreground-soft hover:text-danger hover:bg-danger-soft transition-colors"
             title="Clear logs"
