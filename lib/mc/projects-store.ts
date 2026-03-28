@@ -107,6 +107,8 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
       ]);
       set({ groups, projects, _hydrated: true });
     } catch (err) {
+      // If the API client isn't initialized yet, don't mark as hydrated so it retries
+      if (err instanceof Error && err.message.includes("not initialized")) return;
       console.error("[projects] Hydration failed:", err);
       set({ _hydrated: true }); // Mark hydrated to avoid infinite retries
     }
@@ -124,6 +126,7 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
         memoryDocs: { ...s.memoryDocs, [projectId]: memoryDocs },
       }));
     } catch (err) {
+      if (err instanceof Error && err.message.includes("not initialized")) return;
       console.error("[projects] Project hydration failed:", err);
     }
   },
