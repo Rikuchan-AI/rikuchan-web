@@ -79,6 +79,7 @@ class McApiClient {
         Authorization: `Bearer ${token}`,
         ...options.headers,
       },
+      signal: options.signal ?? AbortSignal.timeout(15_000),
     });
 
     if (response.status === 204) return undefined as T;

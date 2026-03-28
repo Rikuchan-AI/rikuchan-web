@@ -21,6 +21,7 @@ export async function gatewayFetch<T>(path: string, options?: RequestInit): Prom
     ...options,
     headers: { ...headers, ...options?.headers },
     cache: "no-store",
+    signal: options?.signal ?? AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

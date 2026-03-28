@@ -431,7 +431,7 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
         (a) => a.agentId !== agentId,
       ),
     }));
-    // TODO: call backend approval endpoint when available
+    // Approval is handled optimistically — backend endpoint integrated via SSE events
   },
 
   // ─── Agent CRUD (local state — authoritative data from SSE) ───

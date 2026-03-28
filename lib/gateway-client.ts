@@ -7,6 +7,7 @@ async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { "Content-Type": "application/json", ...options?.headers },
     credentials: "include",
+    signal: options?.signal ?? AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

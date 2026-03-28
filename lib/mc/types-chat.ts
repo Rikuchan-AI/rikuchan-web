@@ -39,6 +39,7 @@ export function chatSessionKey(opts:
     case "task":   return `task:${opts.taskId}`;
     case "direct": return `direct:${opts.projectId}:${opts.agentId}`;
     case "em":     return `em:${opts.projectId}`;
+    default: { const _exhaustive: never = opts; return _exhaustive; }
   }
 }
 

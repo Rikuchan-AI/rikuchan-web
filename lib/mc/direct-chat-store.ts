@@ -81,7 +81,7 @@ const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:400
 
 async function getClerkToken(): Promise<string | null> {
   try {
-    const clerk = (window as any).Clerk;
+    const clerk = window.Clerk;
     if (clerk?.session) {
       return await clerk.session.getToken();
     }

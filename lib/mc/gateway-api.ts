@@ -5,7 +5,7 @@ const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:400
 async function getClerkToken(): Promise<string | null> {
   // Dynamic import to avoid SSR issues
   try {
-    const clerk = (window as any).Clerk;
+    const clerk = window.Clerk;
     if (clerk?.session) {
       return await clerk.session.getToken();
     }
@@ -21,6 +21,7 @@ export async function gatewayFetch<T>(path: string, opts?: RequestInit): Promise
   const res = await fetch(`${GATEWAY_URL}${path}`, {
     ...opts,
     headers: { ...headers, ...opts?.headers },
+    signal: opts?.signal ?? AbortSignal.timeout(15_000),
   });
 
   if (!res.ok) {

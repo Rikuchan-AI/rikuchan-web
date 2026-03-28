@@ -19,7 +19,7 @@ export function useOnboarding(): OnboardingState {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch("/api/mc/onboarding")
+    fetch("/api/mc/onboarding", { signal: AbortSignal.timeout(10_000) })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data) {
@@ -39,6 +39,7 @@ export function useOnboarding(): OnboardingState {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completed: true, intent: onboardingIntent }),
+      signal: AbortSignal.timeout(10_000),
     });
     setCompleted(true);
     if (onboardingIntent) setIntent(onboardingIntent);

@@ -17,7 +17,7 @@ export function useTenantPlan(): TenantPlan {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch("/api/mc/tenant")
+    fetch("/api/mc/tenant", { signal: AbortSignal.timeout(10_000) })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data) setPlan(data);

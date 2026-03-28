@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
+import type { AgentStatus } from "@/lib/mc/types";
 import type { RosterMember, RosterContextFile, RosterRole } from "@/lib/mc/types-project";
 import { ROLE_DEFAULT_PERMISSIONS, ROLE_DEFAULT_HEARTBEAT } from "@/lib/mc/types-project";
 import { FileDropzone } from "@/components/shared/file-dropzone";
@@ -141,8 +142,7 @@ function RosterMemberCard({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* @ts-ignore – AgentStatus type is compatible */}
-          {agentStatus && <AgentStatusBadge status={agentStatus as any} />}
+          {agentStatus && <AgentStatusBadge status={agentStatus as AgentStatus} />}
 
           {hasContext && (
             <span className="inline-flex items-center gap-1 rounded-md bg-accent-soft border border-accent/15 px-1.5 py-0.5 text-[10px] text-accent">

@@ -11,6 +11,7 @@ import {
 import Markdown from "react-markdown";
 import { MonacoMarkdownEditor } from "@/components/mc/editors/MonacoMarkdownEditor";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
+import { toast } from "@/components/shared/toast";
 import { Mascot } from "@/components/shared/mascot";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { AgentStatusBadge } from "@/components/mc/agents/AgentStatusBadge";
@@ -706,8 +707,8 @@ export default function AgentDetailPage() {
           }
           await loadFiles();
         }
-      } catch {
-        // TODO: show error toast
+      } catch (err) {
+        toast("error", err instanceof Error ? err.message : "File upload failed");
       }
     };
     input.click();
