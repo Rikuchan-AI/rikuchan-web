@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Combobox } from "@/components/mc/ui/Combobox";
+import { toast } from "@/components/shared/toast";
 
 interface TenantActionsProps {
   tenantId: string;
@@ -18,12 +19,16 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
   async function handleAction(action: string, body: Record<string, unknown> = {}) {
     setLoading(true);
     try {
-      await fetch(`/api/admin/tenants/${tenantId}`, {
+      const res = await fetch(`/api/admin/tenants/${tenantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...body }),
+        signal: AbortSignal.timeout(10_000),
       });
+      if (!res.ok) throw new Error(`Action failed: ${res.status}`);
       router.refresh();
+    } catch {
+      toast("error", `Failed to ${action} tenant`);
     } finally {
       setLoading(false);
     }
@@ -32,8 +37,10 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
   async function handleExport() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/export`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/admin/tenants/${tenantId}/export`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -41,6 +48,8 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
       a.download = `gdpr-export-${tenantId}-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      toast("error", "Failed to export tenant data");
     } finally {
       setLoading(false);
     }
@@ -49,13 +58,17 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
   async function handleDelete() {
     setLoading(true);
     try {
-      await fetch(`/api/admin/tenants/${tenantId}/delete`, {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: tenantId }),
+        signal: AbortSignal.timeout(15_000),
       });
+      if (!res.ok) throw new Error("Delete failed");
       setShowDeleteConfirm(false);
       router.push("/admin/tenants");
+    } catch {
+      toast("error", "Failed to delete tenant");
     } finally {
       setLoading(false);
     }

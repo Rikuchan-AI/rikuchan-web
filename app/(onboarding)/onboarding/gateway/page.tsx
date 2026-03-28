@@ -16,6 +16,7 @@ export default function OnboardingGatewayPage() {
   const [state, setState] = useState<ConnectionState>("idle");
   const [latency, setLatency] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function testConnection() {
     if (!gatewayUrl) return;
@@ -44,18 +45,26 @@ export default function OnboardingGatewayPage() {
   }
 
   async function handleContinue() {
-    // Save gateway config if provided
-    if (gatewayUrl) {
-      await fetch("/api/mc/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gateway_url: gatewayUrl,
-          gateway_token: authToken || undefined,
-        }),
-      });
+    setSaving(true);
+    try {
+      // Save gateway config if provided
+      if (gatewayUrl) {
+        await fetch("/api/mc/onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gateway_url: gatewayUrl,
+            gateway_token: authToken || undefined,
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+      }
+      router.push(`/onboarding/model?intent=${intent}`);
+    } catch {
+      setErrorMsg("Failed to save gateway configuration");
+      setState("error");
+      setSaving(false);
     }
-    router.push(`/onboarding/model?intent=${intent}`);
   }
 
   function handleSkip() {
@@ -127,9 +136,10 @@ export default function OnboardingGatewayPage() {
 
       <button
         onClick={handleContinue}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition"
+        disabled={saving}
+        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition disabled:opacity-50"
       >
-        Continue
+        {saving ? "Saving..." : "Continue"}
       </button>
 
       <p className="text-xs text-foreground-muted text-center">

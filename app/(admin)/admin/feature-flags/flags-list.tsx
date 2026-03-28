@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "@/components/shared/toast";
 
 interface Flag {
   key: string;
@@ -15,35 +16,64 @@ export function FlagsList({ initialFlags }: { initialFlags: Flag[] }) {
   const router = useRouter();
   const [newKey, setNewKey] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [loading, setLoading] = useState<string | null>(null);
 
   async function toggleGlobal(key: string, enabled: boolean) {
-    await fetch("/api/admin/feature-flags", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, enabled_globally: enabled }),
-    });
-    router.refresh();
+    setLoading(key);
+    try {
+      const res = await fetch("/api/admin/feature-flags", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, enabled_globally: enabled }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error("Failed to toggle flag");
+      router.refresh();
+    } catch {
+      toast("error", "Failed to toggle feature flag");
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function createFlag() {
     if (!newKey.trim()) return;
-    await fetch("/api/admin/feature-flags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: newKey.trim(), description: newDesc.trim() || null }),
-    });
-    setNewKey("");
-    setNewDesc("");
-    router.refresh();
+    setLoading("create");
+    try {
+      const res = await fetch("/api/admin/feature-flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: newKey.trim(), description: newDesc.trim() || null }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error("Failed to create flag");
+      setNewKey("");
+      setNewDesc("");
+      router.refresh();
+    } catch {
+      toast("error", "Failed to create feature flag");
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function deleteFlag(key: string) {
-    await fetch("/api/admin/feature-flags", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
-    });
-    router.refresh();
+    if (!confirm(`Delete feature flag "${key}"? This cannot be undone.`)) return;
+    setLoading(key);
+    try {
+      const res = await fetch("/api/admin/feature-flags", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error("Failed to delete flag");
+      router.refresh();
+    } catch {
+      toast("error", "Failed to delete feature flag");
+    } finally {
+      setLoading(null);
+    }
   }
 
   return (
@@ -65,9 +95,10 @@ export function FlagsList({ initialFlags }: { initialFlags: Flag[] }) {
         />
         <button
           onClick={createFlag}
-          className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition"
+          disabled={loading === "create" || !newKey.trim()}
+          className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition disabled:opacity-50"
         >
-          Add
+          {loading === "create" ? "Adding..." : "Add"}
         </button>
       </div>
 
@@ -90,13 +121,14 @@ export function FlagsList({ initialFlags }: { initialFlags: Flag[] }) {
                 <td className="px-4 py-3">
                   <button
                     onClick={() => toggleGlobal(flag.key, !flag.enabled_globally)}
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase transition ${
+                    disabled={loading === flag.key}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase transition disabled:opacity-50 ${
                       flag.enabled_globally
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                         : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
                     }`}
                   >
-                    {flag.enabled_globally ? "ON" : "OFF"}
+                    {loading === flag.key ? "..." : flag.enabled_globally ? "ON" : "OFF"}
                   </button>
                 </td>
                 <td className="px-4 py-3 text-xs text-foreground-muted">
@@ -105,9 +137,10 @@ export function FlagsList({ initialFlags }: { initialFlags: Flag[] }) {
                 <td className="px-4 py-3">
                   <button
                     onClick={() => deleteFlag(flag.key)}
-                    className="text-xs text-red-400 hover:text-red-300 transition"
+                    disabled={loading === flag.key}
+                    className="text-xs text-red-400 hover:text-red-300 transition disabled:opacity-50"
                   >
-                    Delete
+                    {loading === flag.key ? "..." : "Delete"}
                   </button>
                 </td>
               </tr>
