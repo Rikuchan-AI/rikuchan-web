@@ -141,8 +141,8 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
   const [showReassign, setShowReassign] = useState(false);
   const [reassignAgentId, setReassignAgentId] = useState("");
 
-  const taskChatMessages = useChatStore((s) => s.taskChatMessages[task.id] ?? []);
-  const chatUnread = taskChatMessages.length > 0 && taskChatMessages[taskChatMessages.length - 1]?.senderType === "agent";
+  const taskChatMessages = useChatStore((s) => s.taskChatMessages[task.id]);
+  const chatUnread = (taskChatMessages?.length ?? 0) > 0 && taskChatMessages?.[taskChatMessages.length - 1]?.senderType === "agent";
 
   const assignedMember = project?.roster.find((m) => m.agentId === task.assignedAgentId);
   const roster = project?.roster.filter((m) => m.role !== "lead") ?? [];

@@ -22,10 +22,9 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const messages = useChatStore((s) => s.taskChatMessages[task.id] ?? []);
-  const isLoading = useChatStore((s) => s.taskChatLoading[task.id] ?? false);
-  const thinkingAgents = useChatStore((s) => s.thinkingAgents);
-  const isThinking = task.assignedAgentId ? thinkingAgents.has(task.assignedAgentId) : false;
+  const messages = useChatStore((s) => s.taskChatMessages[task.id]);
+  const isLoading = useChatStore((s) => s.taskChatLoading[task.id]);
+  const isThinking = useChatStore((s) => task.assignedAgentId ? s.thinkingAgents.has(task.assignedAgentId) : false);
 
   // Fetch chat history on mount
   useEffect(() => {
@@ -64,7 +63,7 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
   // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages?.length]);
 
   const handleSend = useCallback(async (content: string) => {
     if (!task.assignedAgentId) return;
@@ -124,14 +123,14 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-        {messages.length === 0 && (
+        {(!messages || messages.length === 0) && (
           <p className="text-center text-xs text-foreground-muted italic mt-8">
             {task.assignedAgentId
               ? `Messages from ${task.assignedAgentName ?? "the agent"} will appear here`
               : "Assign an agent to start chatting"}
           </p>
         )}
-        {messages.map((msg) => {
+        {messages?.map((msg) => {
           const isHuman = msg.senderType === "human";
           return (
             <div key={msg.id} className={`flex flex-col ${isHuman ? "items-end" : "items-start"}`}>
