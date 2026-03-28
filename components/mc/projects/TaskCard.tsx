@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip } from "lucide-react";
+import { Paperclip, GitBranch, RefreshCw, AlertTriangle } from "lucide-react";
 import type { Task } from "@/lib/mc/types-project";
 import { TaskPriorityBadge } from "./TaskPriorityBadge";
 import { LivePulse } from "@/components/mc/ui/LivePulse";
@@ -11,14 +11,6 @@ const priorityBorderColor: Record<string, string> = {
   high:     "var(--warm)",
   medium:   "var(--accent)",
   low:      "#52525b",
-};
-
-const statusDotClass: Record<string, string> = {
-  backlog:  "bg-[#52525b]",
-  progress: "bg-accent",
-  review:   "bg-warm",
-  blocked:  "bg-danger",
-  done:     "bg-[#3f3f46]",
 };
 
 interface TaskCardProps {
@@ -34,6 +26,7 @@ export function TaskCard({ task, agentName, onClick, isDragging }: TaskCardProps
   const isDelegating = task.delegationStatus === "delegating";
   const isLeadUnavailable = task.delegationStatus === "em-unavailable";
   const { elapsed, isOvertime } = useElapsedTime(task.status === "progress" ? task.startedAt : undefined);
+  const displayName = agentName ?? task.assignedAgentName;
 
   const borderColor = isDelegating
     ? "var(--warm)"
@@ -46,98 +39,141 @@ export function TaskCard({ task, agentName, onClick, isDragging }: TaskCardProps
     onClick?.();
   };
 
+  // Subtask progress
+  const subtaskCount = task.subtasks?.length ?? 0;
+  const subtaskDone = task.subtasks?.filter((s) => s.status === "done").length ?? 0;
+  const subtaskProgress = subtaskCount > 0 ? (subtaskDone / subtaskCount) * 100 : 0;
+
   return (
     <div
-      className={`rounded-lg border p-3.5 transition-all duration-200 cursor-pointer hover:border-line-strong ${
+      className={`group rounded-lg border transition-all duration-150 cursor-pointer ${
         isBlocked
-          ? "bg-danger-soft border-danger/25"
-          : "bg-surface border-line"
+          ? "bg-danger-soft/40 border-danger/20 hover:border-danger/40"
+          : isDragging
+            ? "bg-surface-strong border-accent/30 shadow-lg shadow-accent/5"
+            : "bg-surface-strong/80 border-line/60 hover:border-line-strong hover:bg-surface-strong"
       } ${isDelegating ? "animate-pulse" : ""}`}
       style={{ borderLeftWidth: "3px", borderLeftColor: borderColor }}
       onClick={handleClick}
       title={task.description || task.title}
     >
-      {/* Header: title + badges */}
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <h4 className="text-sm font-medium text-foreground leading-snug truncate">
+      {/* Main content area */}
+      <div className="px-3 pt-3 pb-2.5">
+        {/* Header: title + priority */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h4 className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">
             {task.title}
           </h4>
-          {task.subtasks && task.subtasks.length > 0 && (
-            <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[0.55rem] text-foreground-muted font-semibold flex-shrink-0">
-              {task.subtasks.length} sub
-            </span>
-          )}
+          <TaskPriorityBadge priority={task.priority} />
         </div>
-        <TaskPriorityBadge priority={task.priority} />
-      </div>
 
-      {/* Description */}
-      {task.description && (
-        <p className="text-xs text-foreground-muted leading-snug line-clamp-2 mb-2">
-          {task.description}
-        </p>
-      )}
+        {/* Description — compact */}
+        {task.description && (
+          <p className="text-[11px] text-foreground-muted leading-snug line-clamp-1 mb-2">
+            {task.description}
+          </p>
+        )}
 
-      {/* Tags */}
-      {task.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {task.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md bg-surface-strong border border-line-strong px-2 py-0.5 text-[0.6rem] text-foreground-muted"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+        {/* Tags — inline */}
+        {task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {task.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded bg-surface-muted px-1.5 py-0.5 text-[0.55rem] text-foreground-muted font-medium"
+              >
+                {tag}
+              </span>
+            ))}
+            {task.tags.length > 3 && (
+              <span className="text-[0.55rem] text-foreground-muted/60">+{task.tags.length - 3}</span>
+            )}
+          </div>
+        )}
 
-      {/* Attachments */}
-      {task.attachments && task.attachments.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-2">
-          <Paperclip size={10} className="text-foreground-muted" />
-          <span className="mono text-[0.6rem] text-foreground-muted">
-            {task.attachments.length} file{task.attachments.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-      )}
-
-      {/* Footer: agent */}
-      <div className="mt-1">
-        {isDelegating ? (
-          <span className="text-xs text-warning italic">Lead deciding...</span>
-        ) : isLeadUnavailable ? (
-          <span className="text-xs text-foreground-muted">Lead unavailable — assign manually</span>
-        ) : agentName || task.assignedAgentName ? (
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-foreground text-[0.5rem] font-bold">
-                {(agentName ?? task.assignedAgentName ?? "")
+        {/* Metadata row: agent + attachments + deps */}
+        <div className="flex items-center gap-2 mt-1">
+          {isDelegating ? (
+            <span className="text-[11px] text-warning italic">Lead deciding...</span>
+          ) : isLeadUnavailable ? (
+            <span className="text-[11px] text-foreground-muted">Lead unavailable</span>
+          ) : displayName ? (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/15 text-accent text-[0.5rem] font-bold flex-shrink-0">
+                {displayName
                   .split(/[\s-]+/)
                   .map((w) => w[0])
                   .join("")
                   .toUpperCase()
                   .slice(0, 2)}
               </span>
-              <span className="mono text-xs text-foreground-muted">{agentName ?? task.assignedAgentName}</span>
+              <span className="mono text-[11px] text-foreground-muted truncate">{displayName}</span>
             </div>
-            {task.emDecisionReason && (
-              <p className="mt-1 text-[11px] text-foreground-muted italic line-clamp-1">
-                Lead: &ldquo;{task.emDecisionReason}&rdquo;
-              </p>
+          ) : (
+            <span className="text-[11px] text-foreground-muted/50">Unassigned</span>
+          )}
+
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+            {/* Retry count */}
+            {(task.retryCount ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-amber-400" title={`Retry ${task.retryCount}/3`}>
+                <RefreshCw size={9} />
+                <span className="mono text-[9px]">{task.retryCount}</span>
+              </span>
+            )}
+            {/* Escalated */}
+            {task.escalatedAt && (
+              <span className="text-red-400" title="Escalated">
+                <AlertTriangle size={9} />
+              </span>
+            )}
+            {/* Attachment count */}
+            {task.attachments && task.attachments.length > 0 && (
+              <span className="flex items-center gap-0.5 text-foreground-muted/60">
+                <Paperclip size={9} />
+                <span className="mono text-[9px]">{task.attachments.length}</span>
+              </span>
+            )}
+            {/* Dependencies */}
+            {task.dependsOn && task.dependsOn.length > 0 && (
+              <span className="flex items-center gap-0.5 text-foreground-muted/60" title={`Depends on ${task.dependsOn.length} task(s)`}>
+                <GitBranch size={9} />
+                <span className="mono text-[9px]">{task.dependsOn.length}</span>
+              </span>
             )}
           </div>
-        ) : (
-          <span className="text-xs text-foreground-muted">Unassigned</span>
+        </div>
+
+        {/* EM Rationale — compact */}
+        {task.emDecisionReason && !isDelegating && (
+          <p className="mt-1.5 text-[10px] text-foreground-muted/70 italic line-clamp-1">
+            &ldquo;{task.emDecisionReason}&rdquo;
+          </p>
         )}
       </div>
 
-      {/* Status bar: timer + running */}
+      {/* Subtask progress bar */}
+      {subtaskCount > 0 && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 rounded-full bg-surface-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent/60 transition-all duration-300"
+                style={{ width: `${subtaskProgress}%` }}
+              />
+            </div>
+            <span className="mono text-[9px] text-foreground-muted tabular-nums">
+              {subtaskDone}/{subtaskCount}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Running status bar */}
       {(isRunning || (task.status === "progress" && task.startedAt)) && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-line/50">
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-line/30 bg-surface-muted/30 rounded-b-lg">
           {task.status === "progress" && task.startedAt && (
-            <span className={`mono text-[11px] ${isOvertime ? "text-warning animate-pulse" : "text-foreground-muted"}`}>
+            <span className={`mono text-[10px] tabular-nums ${isOvertime ? "text-warning animate-pulse" : "text-foreground-muted"}`}>
               {elapsed}
             </span>
           )}
@@ -148,30 +184,6 @@ export function TaskCard({ task, agentName, onClick, isDragging }: TaskCardProps
                 Running
               </span>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Subtasks */}
-      {task.subtasks && task.subtasks.length > 0 && (
-        <div className="mt-3 border-t border-line pt-3 space-y-1.5">
-          {task.subtasks.slice(0, 4).map((sub) => (
-            <div
-              key={sub.id}
-              className="flex items-center gap-2 rounded px-2 py-1.5 bg-surface-muted hover:bg-surface-strong transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDotClass[sub.status] ?? "bg-foreground-muted"}`} />
-              <span className="text-xs text-foreground-soft truncate">{sub.title}</span>
-              {sub.assignedAgentName && (
-                <span className="ml-auto text-[10px] text-foreground-muted mono flex-shrink-0">
-                  {sub.assignedAgentName}
-                </span>
-              )}
-            </div>
-          ))}
-          {task.subtasks.length > 4 && (
-            <p className="text-[10px] text-foreground-muted pl-2">+{task.subtasks.length - 4} more</p>
           )}
         </div>
       )}

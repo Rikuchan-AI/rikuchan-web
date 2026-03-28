@@ -13,6 +13,7 @@ interface TenantActionsProps {
 export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   async function handleAction(action: string, body: Record<string, unknown> = {}) {
     setLoading(true);
@@ -23,6 +24,38 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
         body: JSON.stringify({ action, ...body }),
       });
       router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/export`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gdpr-export-${tenantId}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    setLoading(true);
+    try {
+      await fetch(`/api/admin/tenants/${tenantId}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: tenantId }),
+      });
+      setShowDeleteConfirm(false);
+      router.push("/admin/tenants");
     } finally {
       setLoading(false);
     }
@@ -53,6 +86,40 @@ export function TenantActions({ tenantId, suspended, plan }: TenantActionsProps)
       >
         {suspended ? "Unsuspend" : "Suspend"}
       </button>
+
+      <button
+        onClick={handleExport}
+        disabled={loading}
+        className="rounded-md px-3 py-1.5 text-sm font-medium border border-line bg-surface-strong text-foreground-muted hover:text-foreground transition"
+      >
+        Export
+      </button>
+
+      {!showDeleteConfirm ? (
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={loading}
+          className="rounded-md px-3 py-1.5 text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition"
+        >
+          Delete
+        </button>
+      ) : (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="rounded-md px-3 py-1.5 text-sm font-bold bg-red-600 text-white hover:bg-red-700 transition"
+          >
+            Confirm Delete
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(false)}
+            className="rounded-md px-2 py-1.5 text-sm text-foreground-muted hover:text-foreground transition"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }

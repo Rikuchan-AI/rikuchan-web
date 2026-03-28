@@ -27,6 +27,7 @@ import {
 } from "@/lib/mc/agent-files";
 import { gatewayModelsToGroups } from "@/lib/mc/models";
 import { SOUL_TEMPLATES, applyTemplateName } from "@/lib/mc/soul-templates";
+import { MonacoMarkdownEditor } from "@/components/mc/editors/MonacoMarkdownEditor";
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
@@ -450,21 +451,17 @@ function SoulEditor({
 
       {/* Editors */}
       {tab === "soul" && (
-        <textarea
+        <MonacoMarkdownEditor
           value={soulMd}
-          onChange={(e) => onSoulChange(e.target.value)}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-none min-h-[320px]"
-          placeholder="# Soul — Agent Name&#10;&#10;## Core Truths&#10;..."
-          spellCheck={false}
+          onChange={onSoulChange}
+          minHeight={320}
         />
       )}
       {tab === "agents" && (
-        <textarea
+        <MonacoMarkdownEditor
           value={agentsMd}
-          onChange={(e) => onAgentsChange(e.target.value)}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-none min-h-[320px]"
-          placeholder="# Agent Name — Workspace&#10;&#10;## Every Session&#10;..."
-          spellCheck={false}
+          onChange={onAgentsChange}
+          minHeight={320}
         />
       )}
       {tab === "preview" && (

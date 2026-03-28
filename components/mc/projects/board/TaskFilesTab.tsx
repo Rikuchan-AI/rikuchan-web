@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Paperclip, Upload, X } from "lucide-react";
+import { Paperclip, Upload, X, Download, Loader2, FileText } from "lucide-react";
 import type { Task, FileAttachment } from "@/lib/mc/types-project";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { formatRelativeTime } from "@/lib/mc/mc-utils";
+import { toast } from "@/components/shared/toast";
+import { DetectedFilesSection } from "./DetectedFilesSection";
+import { detectFilePaths } from "@/lib/mc/file-detection";
+import { useMemo } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,26 +23,59 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
   const updateTask = useProjectsStore((s) => s.updateTask);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const attachments = task.attachments ?? [];
 
+  // Detected files from execution log
+  const detectedFiles = useMemo(() => {
+    const allText = (task.executionLog ?? []).filter((m) => m.role === "assistant").map((m) => m.content).join("\n");
+    return detectFilePaths(allText);
+  }, [task.executionLog]);
+
   const handleFilesSelected = useCallback(
-    (files: FileList | null) => {
+    async (files: FileList | null) => {
       if (!files || files.length === 0) return;
 
+      setUploading(true);
       const now = Date.now();
-      const newAttachments: FileAttachment[] = Array.from(files).map((file, i) => ({
-        id: `file-${now}-${i}-${Math.random().toString(16).slice(2, 6)}`,
-        path: file.name,
-        label: file.name,
-        addedAt: now,
-      }));
+      const newAttachments: FileAttachment[] = [];
 
-      updateTask(projectId, task.id, {
-        attachments: [...attachments, ...newAttachments],
-      });
+      for (const file of Array.from(files)) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("projectId", projectId);
+          formData.append("taskId", task.id);
 
-      // Reset file input
+          const res = await fetch("/api/mc/files", { method: "POST", body: formData });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: "Upload failed" }));
+            toast("error", `Failed to upload ${file.name}: ${err.error}`);
+            continue;
+          }
+
+          const data = await res.json();
+          newAttachments.push({
+            id: `file-${now}-${Math.random().toString(16).slice(2, 6)}`,
+            path: data.path,
+            label: data.name ?? file.name,
+            addedAt: now,
+          });
+        } catch {
+          toast("error", `Failed to upload ${file.name}`);
+        }
+      }
+
+      if (newAttachments.length > 0) {
+        updateTask(projectId, task.id, {
+          attachments: [...attachments, ...newAttachments],
+        });
+        toast("success", `${newAttachments.length} file${newAttachments.length !== 1 ? "s" : ""} uploaded`);
+      }
+
+      setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [attachments, projectId, task.id, updateTask],
@@ -52,6 +89,20 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
     },
     [attachments, projectId, task.id, updateTask],
   );
+
+  const handleDownloadFile = useCallback(async (file: FileAttachment) => {
+    try {
+      const res = await fetch(`/api/mc/files?path=${encodeURIComponent(file.path)}`);
+      if (!res.ok) {
+        toast("error", "Could not generate download link");
+        return;
+      }
+      const { url } = await res.json();
+      window.open(url, "_blank");
+    } catch {
+      toast("error", "Download failed");
+    }
+  }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -73,7 +124,6 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
     }
   }, []);
 
-  // Truncate long filenames
   const truncateName = (name: string, max: number = 40) => {
     if (name.length <= max) return name;
     const ext = name.lastIndexOf(".");
@@ -90,6 +140,9 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
       {/* File list */}
       {attachments.length > 0 ? (
         <div className="space-y-2 flex-1 overflow-y-auto">
+          <p className="mono text-[9px] uppercase tracking-wider text-foreground-muted mb-2">
+            Attachments ({attachments.length})
+          </p>
           {attachments.map((file) => (
             <div
               key={file.id}
@@ -107,42 +160,70 @@ export function TaskFilesTab({ task, projectId }: TaskFilesTabProps) {
               <span className="mono text-[10px] text-foreground-muted/60 flex-shrink-0">
                 {formatRelativeTime(file.addedAt)}
               </span>
-              <button
-                onClick={() => handleRemoveFile(file.id)}
-                className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted/40 hover:text-danger hover:bg-danger-soft transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-              >
-                <X size={12} />
-              </button>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button
+                  onClick={() => handleDownloadFile(file)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted/60 hover:text-accent hover:bg-accent-soft transition-colors"
+                  title="Download"
+                >
+                  <Download size={12} />
+                </button>
+                <button
+                  onClick={() => handleRemoveFile(file.id)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted/40 hover:text-danger hover:bg-danger-soft transition-colors"
+                  title="Remove"
+                >
+                  <X size={12} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-2">
+          <FileText size={20} className="text-foreground-muted/30" />
           <p className="text-sm text-foreground-muted">No files attached</p>
+          <p className="text-[11px] text-foreground-muted/50">Upload files or drop them below</p>
         </div>
+      )}
+
+      {/* Detected files from execution */}
+      {detectedFiles.length > 0 && (
+        <DetectedFilesSection files={detectedFiles} agentId={task.assignedAgentId ?? undefined} />
       )}
 
       {/* Upload zone */}
       <div
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => !uploading && fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 cursor-pointer transition-colors flex-shrink-0 ${
-          dragging
-            ? "border-accent/60 bg-accent/5"
-            : "border-line hover:border-accent/40 bg-surface-muted/50 hover:bg-accent-soft/10"
+        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 transition-colors flex-shrink-0 ${
+          uploading
+            ? "border-accent/40 bg-accent/5 cursor-wait"
+            : dragging
+              ? "border-accent/60 bg-accent/5 cursor-copy"
+              : "border-line hover:border-accent/40 bg-surface-muted/50 hover:bg-accent-soft/10 cursor-pointer"
         }`}
       >
-        <Upload size={20} className={dragging ? "text-accent" : "text-foreground-muted"} />
-        <p className="text-xs text-foreground-muted">
-          {dragging ? (
-            <span className="text-accent font-medium">Release to attach</span>
-          ) : (
-            <>Drop files or <span className="text-accent">browse</span></>
-          )}
-        </p>
-        <p className="text-[10px] text-foreground-muted/60">Multiple files supported</p>
+        {uploading ? (
+          <>
+            <Loader2 size={20} className="text-accent animate-spin" />
+            <p className="text-xs text-accent font-medium">Uploading...</p>
+          </>
+        ) : (
+          <>
+            <Upload size={20} className={dragging ? "text-accent" : "text-foreground-muted"} />
+            <p className="text-xs text-foreground-muted">
+              {dragging ? (
+                <span className="text-accent font-medium">Release to attach</span>
+              ) : (
+                <>Drop files or <span className="text-accent">browse</span></>
+              )}
+            </p>
+            <p className="text-[10px] text-foreground-muted/60">Max 10 MB per file</p>
+          </>
+        )}
         <input
           ref={fileInputRef}
           type="file"

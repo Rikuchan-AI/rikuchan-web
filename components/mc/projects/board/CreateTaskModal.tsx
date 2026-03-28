@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Plus } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
-import type { Task, TaskPriority, RosterMember, RosterContextFile } from "@/lib/mc/types-project";
+import type { Task, TaskPriority, WorkType, RosterMember, RosterContextFile } from "@/lib/mc/types-project";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { FileDropzone } from "@/components/shared/file-dropzone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type TaskType = "task" | "bug" | "spike" | "story" | "tech_debt";
+type TaskType = WorkType;
 
 interface CreateTaskModalProps {
   projectId: string;
@@ -142,6 +142,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
       status: "backlog",
       priority,
       taskType: executionMode,
+      workType: taskType,
       assignedAgentId: assignedMember?.agentId ?? null,
       assignedAgentName: assignedMember?.agentName,
       createdBy: "user",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { AlertTriangle, Paperclip, Send, RefreshCw, Users, Crown, Loader2 } from "lucide-react";
+import { AlertTriangle, Paperclip, Send, RefreshCw, Users, Crown, Loader2, XCircle, Unlock } from "lucide-react";
 import { Combobox } from "@/components/mc/ui/Combobox";
 import { useProjectsStore, selectProjectById } from "@/lib/mc/projects-store";
 import { toast } from "@/components/shared/toast";
@@ -14,6 +14,8 @@ interface BlockedResolvePanelProps {
 
 export function BlockedResolvePanel({ task, project }: BlockedResolvePanelProps) {
   const updateTask = useProjectsStore((s) => s.updateTask);
+  const unblockTask = useProjectsStore((s) => s.unblockTask);
+  const cancelTask = useProjectsStore((s) => s.cancelTask);
 
   const [context, setContext] = useState("");
   const [fileInput, setFileInput] = useState("");
@@ -159,12 +161,43 @@ Respond with your decision and action.`,
         <h3 className="text-sm font-semibold text-danger">Blocked</h3>
       </div>
 
+      {/* Retry/nudge/escalation indicators */}
+      {((task.retryCount ?? 0) > 0 || (task.nudgeCount ?? 0) > 0 || task.escalatedAt) && (
+        <div className="flex flex-wrap gap-2">
+          {(task.retryCount ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[0.65rem] font-medium text-amber-400">
+              <RefreshCw size={10} />
+              Retry {task.retryCount}/3
+            </span>
+          )}
+          {(task.nudgeCount ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[0.65rem] font-medium text-blue-400">
+              Nudge {task.nudgeCount}/2
+            </span>
+          )}
+          {task.escalatedAt && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-[0.65rem] font-medium text-red-400">
+              <AlertTriangle size={10} />
+              Escalated
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Block reason */}
       <div className="rounded-md bg-surface-muted border border-line p-3">
         <p className="mono text-[0.65rem] uppercase text-foreground-muted mb-1" style={{ letterSpacing: "0.12em" }}>
           Agent reported
         </p>
         <p className="text-sm text-foreground-soft leading-relaxed">{blockReason}</p>
+        {task.blockedNeeds && (
+          <div className="mt-2 pt-2 border-t border-line">
+            <p className="mono text-[0.65rem] uppercase text-foreground-muted mb-1" style={{ letterSpacing: "0.12em" }}>
+              Needs
+            </p>
+            <p className="text-sm text-foreground-soft leading-relaxed">{task.blockedNeeds}</p>
+          </div>
+        )}
       </div>
 
       {/* Resolution section */}
@@ -266,6 +299,40 @@ Respond with your decision and action.`,
               {resolving === "lead" ? "Lead analyzing..." : "Ask Lead to resolve"}
             </button>
           )}
+
+          {/* Unblock + Cancel */}
+          <div className="flex gap-2 pt-1 border-t border-line/50">
+            <button
+              onClick={async () => {
+                setResolving("retry");
+                try {
+                  await unblockTask(project.id, task.id, context.trim() || undefined);
+                  toast("success", `"${task.title}" unblocked`);
+                } catch { toast("error", "Failed to unblock"); }
+                setResolving(null);
+              }}
+              disabled={resolving !== null}
+              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-md border border-emerald-500/30 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+            >
+              <Unlock size={11} />
+              Unblock
+            </button>
+            <button
+              onClick={async () => {
+                setResolving("retry");
+                try {
+                  await cancelTask(project.id, task.id, context.trim() || "Cancelled from blocked state");
+                  toast("info", `"${task.title}" cancelled`);
+                } catch { toast("error", "Failed to cancel"); }
+                setResolving(null);
+              }}
+              disabled={resolving !== null}
+              className="flex items-center justify-center gap-1.5 px-3 h-8 rounded-md border border-line text-xs font-medium text-foreground-muted hover:text-danger hover:border-danger/30 transition-colors disabled:opacity-50"
+            >
+              <XCircle size={11} />
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
 

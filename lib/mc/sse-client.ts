@@ -77,6 +77,37 @@ export type SseEventMap = {
     sessionKey: string;
     thinking: boolean;
   };
+  // Phase 2: Nudge events
+  "task:nudged": {
+    projectId: string;
+    taskId: string;
+    stage: number;
+    nudgeCount: number;
+    [k: string]: unknown;
+  };
+  // Phase 5: Alert events
+  "alert:blocked": {
+    projectId: string;
+    taskId: string;
+    taskTitle: string;
+    reason?: string;
+    [k: string]: unknown;
+  };
+  "alert:escalation": {
+    projectId: string;
+    taskId: string;
+    taskTitle: string;
+    blockedSinceMs?: number;
+    [k: string]: unknown;
+  };
+  "alert:resolved": {
+    projectId: string;
+    taskId: string;
+    taskTitle: string;
+    previousStatus: string;
+    newStatus: string;
+    [k: string]: unknown;
+  };
   ping: Record<string, unknown>;
 };
 

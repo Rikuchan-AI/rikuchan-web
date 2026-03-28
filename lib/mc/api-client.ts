@@ -170,6 +170,33 @@ class McApiClient {
         `/api/projects/${projectId}/tasks/${taskId}/delegate`,
         { method: "POST" },
       ),
+
+    // Semantic endpoints (Phase 1+2)
+    approve: (projectId: string, taskId: string) =>
+      this.request<Task>(
+        `/api/projects/${projectId}/tasks/${taskId}/approve`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    requestChanges: (projectId: string, taskId: string, feedback?: string) =>
+      this.request<Task>(
+        `/api/projects/${projectId}/tasks/${taskId}/request-changes`,
+        { method: "POST", body: JSON.stringify({ feedback }) },
+      ),
+    reject: (projectId: string, taskId: string, reason?: string) =>
+      this.request<Task>(
+        `/api/projects/${projectId}/tasks/${taskId}/reject`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+    unblock: (projectId: string, taskId: string, resolution?: string) =>
+      this.request<Task>(
+        `/api/projects/${projectId}/tasks/${taskId}/unblock`,
+        { method: "POST", body: JSON.stringify({ resolution }) },
+      ),
+    cancel: (projectId: string, taskId: string, reason?: string) =>
+      this.request<Task>(
+        `/api/projects/${projectId}/tasks/${taskId}/cancel`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
   };
 
   // ─── Agents ───

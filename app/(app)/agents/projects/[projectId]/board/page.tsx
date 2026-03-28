@@ -25,6 +25,7 @@ import { ActivityStream } from "@/components/mc/projects/board/ActivityStream";
 import { AgentHealthPanel } from "@/components/mc/projects/board/AgentHealthPanel";
 import { ApprovalQueue } from "@/components/mc/projects/board/ApprovalQueue";
 import { SprintPlanning } from "@/components/mc/projects/board/SprintPlanning";
+import { toast } from "@/components/shared/toast";
 
 const COLUMN_COLORS: Record<string, string> = {
   backlog: "border-t-zinc-500",
@@ -142,6 +143,8 @@ export default function BoardPage() {
   const hydrated = useProjectsStore((s) => s._hydrated);
   const tasks = useProjectTasks(projectId);
   const moveTask = useProjectsStore((s) => s.moveTask);
+  const approveTask = useProjectsStore((s) => s.approveTask);
+  const rejectTask = useProjectsStore((s) => s.rejectTask);
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showEMChat, setShowEMChat] = useState(false);
@@ -241,8 +244,7 @@ export default function BoardPage() {
 
       const transitionResult = canTransition(task.status, toStatus, operationMode, "human", task);
       if (!transitionResult.allowed) {
-        // TODO: replace with toast
-        console.warn("[Board] Transition denied:", transitionResult.reason);
+        toast("error", transitionResult.reason ?? "Transition not allowed");
         return;
       }
 
@@ -379,9 +381,9 @@ export default function BoardPage() {
         />
       )}
 
-      {/* 3-panel layout */}
-      <div className="mt-4 flex flex-1 gap-3 overflow-hidden">
-        {/* Left: Agent Roster */}
+      {/* 3-panel layout — Level 1: board background */}
+      <div className="mt-4 flex flex-1 gap-3 overflow-hidden rounded-xl bg-surface-muted/40 p-2">
+        {/* Left: Agent Roster — Level 2 */}
         <div className="hidden w-56 shrink-0 overflow-y-auto rounded-lg border border-line bg-surface lg:block">
           <AgentRosterPanel
             roster={project.roster}
@@ -403,14 +405,14 @@ export default function BoardPage() {
               {TASK_COLUMNS.map((col) => {
                 const columnTasks = filteredTasks.filter((t) => t.status === col.id);
                 return (
-                  <div key={col.id} className={`flex min-h-0 flex-col border-t-2 ${COLUMN_COLORS[col.id] ?? "border-t-zinc-600"} rounded-t-lg`}>
-                    {/* Column header */}
-                    <div className="mb-3 flex items-center justify-between pt-2.5 px-1">
+                  <div key={col.id} className={`flex min-h-0 flex-col border-t-2 ${COLUMN_COLORS[col.id] ?? "border-t-zinc-600"} rounded-lg bg-surface/50`}>
+                    {/* Column header — Level 2 */}
+                    <div className="mb-2 flex items-center justify-between pt-2.5 px-2.5">
                       <div className="flex items-center gap-2">
                         <h3 className={`mono text-[10px] font-semibold uppercase tracking-wider ${COLUMN_TEXT_COLORS[col.id] ?? "text-foreground-muted"}`}>
                           {col.label}
                         </h3>
-                        <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[9px] font-medium text-foreground-muted">
+                        <span className="rounded-full bg-surface-strong/80 px-2 py-0.5 text-[9px] font-medium text-foreground-muted tabular-nums">
                           {columnTasks.length}
                         </span>
                       </div>
@@ -440,7 +442,7 @@ export default function BoardPage() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex-1 space-y-2 overflow-y-auto rounded-lg p-1.5 transition-colors ${
+                          className={`flex-1 space-y-2 overflow-y-auto rounded-lg px-2 pb-2 transition-colors ${
                             snapshot.isDraggingOver
                               ? "bg-accent/5 ring-1 ring-accent/20"
                               : ""
@@ -448,8 +450,16 @@ export default function BoardPage() {
                           style={{ minHeight: "100px" }}
                         >
                           {columnTasks.length === 0 && !snapshot.isDraggingOver ? (
-                            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-line">
-                              <p className="text-[10px] text-foreground-muted">No tasks</p>
+                            <div className="flex h-24 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-line/50">
+                              <p className="text-[10px] text-foreground-muted/60">No tasks</p>
+                              {gwConnected && col.id === "backlog" && (
+                                <button
+                                  onClick={() => handleNewTaskInColumn("backlog")}
+                                  className="text-[10px] text-accent hover:text-accent-deep transition-colors"
+                                >
+                                  + Add task
+                                </button>
+                              )}
                             </div>
                           ) : (
                             columnTasks.map((task, index) => (
@@ -530,11 +540,17 @@ export default function BoardPage() {
           tasks={tasks}
           operationMode={operationMode}
           onApprove={async (taskId) => {
-            await moveTask(projectId, taskId, "done");
+            try {
+              await approveTask(projectId, taskId);
+              toast("success", "Task approved");
+            } catch { toast("error", "Failed to approve"); }
             setShowApprovals(false);
           }}
           onReject={async (taskId) => {
-            await moveTask(projectId, taskId, "progress");
+            try {
+              await rejectTask(projectId, taskId);
+              toast("info", "Task rejected, back to backlog");
+            } catch { toast("error", "Failed to reject"); }
           }}
           onClose={() => setShowApprovals(false)}
         />

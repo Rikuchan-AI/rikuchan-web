@@ -221,6 +221,7 @@ export interface FileAttachment {
 
 export type TaskStatus = "backlog" | "progress" | "review" | "blocked" | "done" | "paused";
 export type TaskPriority = "low" | "medium" | "high" | "critical";
+export type WorkType = "task" | "bug" | "spike" | "story" | "tech_debt" | "review";
 
 export const TASK_COLUMNS: { id: TaskStatus; label: string }[] = [
   { id: "backlog",  label: "Backlog" },
@@ -246,6 +247,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   taskType?: "execution" | "organization";
+  workType?: WorkType;
   assignedAgentId: string | null;
   assignedAgentName?: string;
   createdBy: "user" | "lead-agent" | "pipeline";
@@ -270,7 +272,19 @@ export interface Task {
   subagentSessionKey?: string;     // Subagent session spawned by the lead for this task
   // Execution
   executionLog?: ExecutionMessage[];
+  executionOutput?: string;
   timeoutMs?: number;
+  // Blocked
+  blockedReason?: string;
+  blockedAt?: number;
+  // Phase 2: Nudge + retry tracking
+  nudgeCount?: number;
+  lastNudgedAt?: number;
+  retryCount?: number;
+  lastOutputAt?: number;
+  blockedNeeds?: string;
+  escalatedAt?: number;
+  archivedAt?: number;
   // Dependencies
   dependsOn?: string[];         // task IDs that must complete before this starts
 }

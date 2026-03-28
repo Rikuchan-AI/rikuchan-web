@@ -13,6 +13,7 @@
     "@clerk/themes": "^2.4.57",
     "@hello-pangea/dnd": "^18.0.1",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.99.3",
     "framer-motion": "^12.37.0",
     "jszip": "^3.10.1",

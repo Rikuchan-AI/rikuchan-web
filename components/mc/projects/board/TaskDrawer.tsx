@@ -20,7 +20,9 @@ import { useChatStore } from "@/lib/mc/chat-store";
 import { BlockedAlert } from "./BlockedAlert";
 import { BlockedResolvePanel } from "./BlockedResolvePanel";
 import { TaskActions } from "./TaskActions";
-import { collapseTimelineEvents, detectTimelineInsight } from "@/lib/mc/timeline-utils";
+import { TaskFilesTab } from "./TaskFilesTab";
+import { TaskDetailsTab } from "./TaskDetailsTab";
+import { collapseTimelineEvents, detectTimelineInsight, classifyLogEvent, TIMELINE_COLORS } from "@/lib/mc/timeline-utils";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -124,7 +126,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
 
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "log" | "timeline">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "log" | "timeline" | "files" | "details">("chat");
   const [descExpanded, setDescExpanded] = useState(false);
   const [showReassign, setShowReassign] = useState(false);
   const [reassignAgentId, setReassignAgentId] = useState("");
@@ -164,8 +166,15 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
     if (task.executionLog) {
       for (const msg of task.executionLog) {
         if (msg.role === "system") {
-          if (msg.content.includes("blocked")) events.push({ label: "Blocked", time: msg.timestamp, detail: "Missing data or access issues", color: "bg-danger" });
-          if (msg.content.includes("completed")) events.push({ label: "Done", time: msg.timestamp, color: "bg-accent" });
+          // Try Phase 2 classification first (nudge, retry, escalation, unblock, etc.)
+          const classified = classifyLogEvent(msg.content);
+          if (classified) {
+            events.push({ label: classified.label, time: msg.timestamp, detail: msg.content, color: classified.color });
+          } else if (msg.content.includes("blocked")) {
+            events.push({ label: "Blocked", time: msg.timestamp, detail: "Missing data or access issues", color: "bg-danger" });
+          } else if (msg.content.includes("completed")) {
+            events.push({ label: "Done", time: msg.timestamp, color: "bg-accent" });
+          }
         }
       }
     }
@@ -391,19 +400,28 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
 
           {/* 3c. Tabs + content */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Tab bar */}
-            <div className="flex gap-6 px-5 pt-3 border-b border-line flex-shrink-0">
-              {(["chat", "log", "timeline"] as const).map((tab) => (
+            {/* Tab bar — 5 tabs */}
+            <div className="flex gap-1 px-5 pt-3 border-b border-line flex-shrink-0 overflow-x-auto">
+              {([
+                { id: "chat" as const, label: "Chat", badge: chatUnread },
+                { id: "log" as const, label: "Log" },
+                { id: "files" as const, label: "Files", count: (task.attachments?.length ?? 0) + detectedFiles.length },
+                { id: "details" as const, label: "Details" },
+                { id: "timeline" as const, label: "Timeline" },
+              ]).map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab ? "text-accent border-accent" : "text-foreground-muted border-transparent hover:text-foreground"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`pb-2 px-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    activeTab === tab.id ? "text-accent border-accent" : "text-foreground-muted border-transparent hover:text-foreground"
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    {tab === "chat" ? "Chat" : tab === "log" ? "Execution Log" : "Timeline"}
-                    {tab === "chat" && chatUnread && <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
+                    {tab.label}
+                    {tab.badge && <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
+                    {tab.count != null && tab.count > 0 && (
+                      <span className="rounded-full bg-surface-strong px-1.5 text-[9px] font-semibold text-foreground-muted tabular-nums">{tab.count}</span>
+                    )}
                   </span>
                 </button>
               ))}
@@ -506,6 +524,16 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Files */}
+              {activeTab === "files" && (
+                <TaskFilesTab task={task} projectId={projectId} />
+              )}
+
+              {/* Details */}
+              {activeTab === "details" && project && (
+                <TaskDetailsTab task={task} projectId={projectId} roster={project.roster} />
               )}
 
               {/* Timeline */}

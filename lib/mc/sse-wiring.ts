@@ -166,6 +166,60 @@ export function wireSseToStores(): () => void {
     }),
   );
 
+  // ─── Task nudged (Phase 2) ───
+  cleanups.push(
+    sse.on("task:nudged", (data) => {
+      const ps = useProjectsStore.getState();
+      const tasks = ps.tasks[data.projectId] ?? [];
+      useProjectsStore.setState({
+        tasks: {
+          ...ps.tasks,
+          [data.projectId]: tasks.map((t) =>
+            t.id === data.taskId
+              ? { ...t, nudgeCount: data.nudgeCount, lastNudgedAt: Date.now(), updatedAt: Date.now() }
+              : t,
+          ),
+        },
+      });
+      const task = tasks.find((t) => t.id === data.taskId);
+      toast("info", `Nudge ${data.stage}/2 sent to "${task?.title ?? data.taskId}"`);
+    }),
+  );
+
+  // ─── Alert events (Phase 5) ───
+  cleanups.push(
+    sse.on("alert:blocked", (data) => {
+      useNotificationsStore.getState().push({
+        type: "warning",
+        title: "Task Blocked",
+        message: `"${data.taskTitle}" is blocked${data.reason ? `: ${data.reason}` : ""}`,
+        projectId: data.projectId,
+      });
+    }),
+  );
+
+  cleanups.push(
+    sse.on("alert:escalation", (data) => {
+      useNotificationsStore.getState().push({
+        type: "error",
+        title: "Escalation",
+        message: `"${data.taskTitle}" blocked for over 1 hour, escalating`,
+        projectId: data.projectId,
+      });
+    }),
+  );
+
+  cleanups.push(
+    sse.on("alert:resolved", (data) => {
+      useNotificationsStore.getState().push({
+        type: "success",
+        title: "Alert Resolved",
+        message: `"${data.taskTitle}" unblocked (${data.previousStatus} -> ${data.newStatus})`,
+        projectId: data.projectId,
+      });
+    }),
+  );
+
   // ─── Execution logs ───
   cleanups.push(
     sse.on("execution:log", (data) => {

@@ -5,7 +5,7 @@
  * and validations. The board enforces these before allowing drag-and-drop moves.
  */
 
-import type { Task, TaskStatus } from "./types-project";
+import type { Task, TaskStatus, WorkType } from "./types-project";
 
 export type OperationMode = "manual" | "supervised" | "autonomous";
 export type ActorRole = "human" | "lead" | "agent";
@@ -209,6 +209,52 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   done: "text-emerald-400",
   paused: "text-foreground-muted",
 };
+
+// ─── Phase 1: Stuck thresholds + auto-approve ──────────────────────────────
+
+/** Default stale thresholds in minutes, per work type. */
+export const DEFAULT_STALE_THRESHOLDS: Record<string, number> = {
+  task: 15,
+  bug: 10,
+  spike: 30,
+  story: 20,
+  tech_debt: 20,
+  review: 20,
+  organization: 20,
+  default: 15,
+};
+
+/**
+ * Resolve the stale threshold for a task based on its workType and tags.
+ * Tags take priority (most specific), then workType, then default.
+ */
+export function resolveStaleThreshold(
+  workType: WorkType | string = "task",
+  tags: string[] = [],
+  overrides: Record<string, number> = {},
+): number {
+  const thresholds = { ...DEFAULT_STALE_THRESHOLDS, ...overrides };
+  // Tags first (most specific)
+  for (const tag of tags) {
+    const lower = tag.toLowerCase();
+    if (thresholds[lower] !== undefined) return thresholds[lower];
+  }
+  // Work type
+  if (thresholds[workType] !== undefined) return thresholds[workType];
+  // Default
+  return thresholds.default ?? 15;
+}
+
+/**
+ * Determine if a task in review should be auto-approved (skip human review).
+ * Autonomous mode + medium/low priority = auto-approve.
+ */
+export function shouldAutoApproveReview(
+  mode: OperationMode,
+  priority: string,
+): boolean {
+  return mode === "autonomous" && (priority === "medium" || priority === "low");
+}
 
 export const STATUS_BG: Record<TaskStatus, string> = {
   backlog: "bg-foreground-muted/10",

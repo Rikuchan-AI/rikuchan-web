@@ -58,6 +58,13 @@ interface ProjectsStore {
   delegateTask: (projectId: string, taskId: string) => Promise<void>;
   chatWithLead: (projectId: string, message: string) => Promise<void>;
 
+  // Semantic task actions (Phase 1+2)
+  approveTask: (projectId: string, taskId: string) => Promise<void>;
+  requestChangesTask: (projectId: string, taskId: string, feedback?: string) => Promise<void>;
+  rejectTask: (projectId: string, taskId: string, reason?: string) => Promise<void>;
+  unblockTask: (projectId: string, taskId: string, resolution?: string) => Promise<void>;
+  cancelTask: (projectId: string, taskId: string, reason?: string) => Promise<void>;
+
   // Pipelines
   setPipelines: (projectId: string, pipelines: Pipeline[]) => void;
   updatePipelineStep: (pipelineId: string, step: PipelineStep) => void;
@@ -373,6 +380,127 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
   chatWithLead: async (projectId, message) => {
     await getApiClient().projects.chat(projectId, message);
     // Response comes via SSE execution:log
+  },
+
+  // ─── Semantic Task Actions (Phase 1+2) ─────────────────────────
+
+  approveTask: async (projectId, taskId) => {
+    // Optimistic: move to done
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: "done" as const, updatedAt: Date.now() } : t,
+        ),
+      },
+    }));
+    try {
+      await getApiClient().tasks.approve(projectId, taskId);
+    } catch (err) {
+      // Revert on failure
+      set((s) => ({
+        tasks: {
+          ...s.tasks,
+          [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+            t.id === taskId ? { ...t, status: "review" as const, updatedAt: Date.now() } : t,
+          ),
+        },
+      }));
+      console.error("[projects] Failed to approve task:", err);
+      throw err;
+    }
+  },
+
+  requestChangesTask: async (projectId, taskId, feedback) => {
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: "backlog" as const, updatedAt: Date.now() } : t,
+        ),
+      },
+    }));
+    try {
+      await getApiClient().tasks.requestChanges(projectId, taskId, feedback);
+    } catch (err) {
+      set((s) => ({
+        tasks: {
+          ...s.tasks,
+          [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+            t.id === taskId ? { ...t, status: "review" as const, updatedAt: Date.now() } : t,
+          ),
+        },
+      }));
+      console.error("[projects] Failed to request changes:", err);
+      throw err;
+    }
+  },
+
+  rejectTask: async (projectId, taskId, reason) => {
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: "backlog" as const, updatedAt: Date.now() } : t,
+        ),
+      },
+    }));
+    try {
+      await getApiClient().tasks.reject(projectId, taskId, reason);
+    } catch (err) {
+      set((s) => ({
+        tasks: {
+          ...s.tasks,
+          [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+            t.id === taskId ? { ...t, status: "review" as const, updatedAt: Date.now() } : t,
+          ),
+        },
+      }));
+      console.error("[projects] Failed to reject task:", err);
+      throw err;
+    }
+  },
+
+  unblockTask: async (projectId, taskId, resolution) => {
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: "backlog" as const, updatedAt: Date.now() } : t,
+        ),
+      },
+    }));
+    try {
+      await getApiClient().tasks.unblock(projectId, taskId, resolution);
+    } catch (err) {
+      set((s) => ({
+        tasks: {
+          ...s.tasks,
+          [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+            t.id === taskId ? { ...t, status: "blocked" as const, updatedAt: Date.now() } : t,
+          ),
+        },
+      }));
+      console.error("[projects] Failed to unblock task:", err);
+      throw err;
+    }
+  },
+
+  cancelTask: async (projectId, taskId, reason) => {
+    set((s) => ({
+      tasks: {
+        ...s.tasks,
+        [projectId]: (s.tasks[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: "done" as const, archivedAt: Date.now(), updatedAt: Date.now() } : t,
+        ),
+      },
+    }));
+    try {
+      await getApiClient().tasks.cancel(projectId, taskId, reason);
+    } catch (err) {
+      console.error("[projects] Failed to cancel task:", err);
+      throw err;
+    }
   },
 
   // ─── Pipelines ────────────────────────────────────────────────────

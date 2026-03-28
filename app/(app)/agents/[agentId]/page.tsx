@@ -9,6 +9,7 @@ import {
   Eye, Pencil,
 } from "lucide-react";
 import Markdown from "react-markdown";
+import { MonacoMarkdownEditor } from "@/components/mc/editors/MonacoMarkdownEditor";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { Mascot } from "@/components/shared/mascot";
 import { useProjectsStore } from "@/lib/mc/projects-store";
@@ -179,11 +180,10 @@ function FileEditor({
           <Markdown>{state.content || "*Empty file*"}</Markdown>
         </div>
       ) : (
-        <textarea
+        <MonacoMarkdownEditor
           value={state.content}
-          onChange={(e) => onContentChange(e.target.value)}
-          className="w-full rounded-md border border-line bg-surface-strong px-3 py-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50 resize-none min-h-[320px]"
-          spellCheck={false}
+          onChange={onContentChange}
+          minHeight={320}
         />
       )}
 
