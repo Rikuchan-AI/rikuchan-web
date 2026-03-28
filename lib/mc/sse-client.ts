@@ -77,6 +77,11 @@ export type SseEventMap = {
     sessionKey: string;
     thinking: boolean;
   };
+  "task:chat": {
+    taskId: string;
+    projectId: string;
+    message: { id: string; senderType: string; senderName: string; content: string; createdAt: string };
+  };
   // Phase 2: Nudge events
   "task:nudged": {
     projectId: string;

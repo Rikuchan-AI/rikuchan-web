@@ -132,16 +132,47 @@ export function wireSseToStores(): () => void {
         }
       }
 
-      useProjectsStore.setState({
-        tasks: {
-          ...ps.tasks,
-          [data.projectId]: tasks.map((t) =>
-            t.id === data.taskId
-              ? { ...t, ...(updates as Partial<Task>), updatedAt: Date.now() }
-              : t,
-          ),
-        },
-      });
+      const exists = tasks.some((t) => t.id === data.taskId);
+      if (exists) {
+        // Update existing task
+        useProjectsStore.setState({
+          tasks: {
+            ...ps.tasks,
+            [data.projectId]: tasks.map((t) =>
+              t.id === data.taskId
+                ? { ...t, ...(updates as Partial<Task>), updatedAt: Date.now() }
+                : t,
+            ),
+          },
+        });
+      } else {
+        // New task from backend (e.g. auto-created subtask) — add to store
+        const newTask: Task = {
+          id: data.taskId,
+          projectId: data.projectId,
+          title: (updates as Record<string, unknown>).title as string ?? "New task",
+          description: (updates as Record<string, unknown>).description as string ?? "",
+          status: ((updates as Partial<Task>).status ?? "backlog") as Task["status"],
+          priority: ((updates as Partial<Task>).priority ?? "medium") as Task["priority"],
+          taskType: (updates as Partial<Task>).taskType ?? "execution",
+          assignedAgentId: (updates as Partial<Task>).assignedAgentId ?? null,
+          assignedAgentName: (updates as Partial<Task>).assignedAgentName,
+          createdBy: (updates as Partial<Task>).createdBy ?? "lead-agent",
+          parentTaskId: (updates as Partial<Task>).parentTaskId,
+          subtasks: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          tags: [],
+          attachments: [],
+          ...(updates as Partial<Task>),
+        };
+        useProjectsStore.setState({
+          tasks: {
+            ...ps.tasks,
+            [data.projectId]: [...tasks, newTask],
+          },
+        });
+      }
     }),
   );
 
@@ -296,6 +327,19 @@ export function wireSseToStores(): () => void {
         title: data.title,
         message: data.body ?? "",
       });
+    }),
+  );
+
+  // ─── Task Chat (task-scoped messages from agents and humans) ───
+  cleanups.push(
+    sse.on("task:chat", (data) => {
+      if (data.taskId && data.message) {
+        useChatStore.getState().receiveTaskChatMessage(
+          data.taskId as string,
+          data.projectId as string,
+          data.message as { id: string; senderType: string; senderName: string; content: string; createdAt: string },
+        );
+      }
     }),
   );
 

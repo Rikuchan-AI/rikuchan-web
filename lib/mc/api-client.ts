@@ -15,6 +15,7 @@ import type {
   MemoryDocument,
   ProjectTrigger,
 } from "./types-project";
+import type { TaskChatMessage } from "./types-chat";
 
 // ─── Error Types ─────────────────────────────────────────────────────────────
 
@@ -196,6 +197,17 @@ class McApiClient {
       this.request<Task>(
         `/api/projects/${projectId}/tasks/${taskId}/cancel`,
         { method: "POST", body: JSON.stringify({ reason }) },
+      ),
+
+    // Task chat (task-scoped messages)
+    chatHistory: (projectId: string, taskId: string, limit = 50) =>
+      this.request<TaskChatMessage[]>(
+        `/api/projects/${projectId}/tasks/${taskId}/chat?limit=${limit}`,
+      ),
+    chatSend: (projectId: string, taskId: string, message: string) =>
+      this.request<TaskChatMessage>(
+        `/api/projects/${projectId}/tasks/${taskId}/chat`,
+        { method: "POST", body: JSON.stringify({ message }) },
       ),
   };
 

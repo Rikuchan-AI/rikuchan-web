@@ -42,6 +42,20 @@ export function chatSessionKey(opts:
   }
 }
 
+// ─── Task Chat (DB-backed, task-scoped) ────────────────────────────────────
+
+export interface TaskChatMessage {
+  id: string;
+  taskId: string;
+  projectId: string;
+  tenantId: string;
+  senderType: "agent" | "human" | "lead" | "system";
+  senderName: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string; // ISO timestamp
+}
+
 export const EM_SUGGESTED_PROMPTS = [
   "Priorize as tasks mais urgentes",
   "Qual agent está sobrecarregado?",

@@ -5,10 +5,22 @@ import type { ChatMessage, ChatMode, AgentChatSession } from "./types-chat";
 import { chatSessionKey } from "./types-chat";
 import { getApiClient } from "./api-client";
 
+interface TaskChatMsg {
+  id: string;
+  senderType: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
 interface ChatStore {
   sessions: Record<string, AgentChatSession>;
   unreadCounts: Record<string, number>;
   thinkingAgents: Set<string>;
+
+  // Task-scoped chat (DB-backed)
+  taskChatMessages: Record<string, TaskChatMsg[]>; // keyed by taskId
+  taskChatLoading: Record<string, boolean>;
 
   getChatSession: (
     opts:
@@ -27,6 +39,9 @@ interface ChatStore {
   }) => Promise<void>;
 
   receiveMessage: (sessionKey: string, message: ChatMessage) => void;
+  receiveTaskChatMessage: (taskId: string, projectId: string, message: TaskChatMsg) => void;
+  setTaskChatMessages: (taskId: string, messages: TaskChatMsg[]) => void;
+  setTaskChatLoading: (taskId: string, loading: boolean) => void;
   setThinking: (gatewaySessionKey: string, thinking: boolean) => void;
   closeSession: (sessionKey: string) => void;
   markRead: (sessionKey: string) => void;
@@ -64,6 +79,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   sessions: {},
   unreadCounts: {},
   thinkingAgents: new Set<string>(),
+  taskChatMessages: {},
+  taskChatLoading: {},
 
   _hydrateFromStorage: () => {
     set({ sessions: loadSessions() });
@@ -193,6 +210,32 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       };
     });
     get()._persistToStorage();
+  },
+
+  receiveTaskChatMessage: (taskId, _projectId, message) => {
+    set((s) => {
+      const existing = s.taskChatMessages[taskId] ?? [];
+      // Avoid duplicates
+      if (existing.some((m) => m.id === message.id)) return s;
+      return {
+        taskChatMessages: {
+          ...s.taskChatMessages,
+          [taskId]: [...existing, message],
+        },
+      };
+    });
+  },
+
+  setTaskChatMessages: (taskId, messages) => {
+    set((s) => ({
+      taskChatMessages: { ...s.taskChatMessages, [taskId]: messages },
+    }));
+  },
+
+  setTaskChatLoading: (taskId, loading) => {
+    set((s) => ({
+      taskChatLoading: { ...s.taskChatLoading, [taskId]: loading },
+    }));
   },
 
   closeSession: (sessionKey) => {

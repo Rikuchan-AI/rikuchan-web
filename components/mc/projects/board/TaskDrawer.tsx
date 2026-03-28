@@ -40,32 +40,42 @@ const statusLabels: Record<string, string> = {
   blocked: "Blocked", done: "Done", paused: "Paused",
 };
 
-/** Consolidate fragmented log entries */
-function consolidateLog(log: ExecutionMessage[]): ExecutionMessage[] {
+/** Consolidate log entries: filter out assistant (goes to Chat), deduplicate consecutive system events */
+function consolidateLog(log: ExecutionMessage[]): (ExecutionMessage & { count?: number })[] {
   if (log.length === 0) return [];
-  const result: ExecutionMessage[] = [];
+  const result: (ExecutionMessage & { count?: number })[] = [];
   for (const msg of log) {
+    // Skip assistant messages — they now appear in the Chat tab
+    if (msg.role === "assistant") continue;
+    if (!msg.content.trim()) continue;
+
     const last = result[result.length - 1];
-    if (last && last.role === msg.role && msg.role === "assistant") {
-      last.content += msg.content;
+    // Deduplicate consecutive identical system messages (e.g. "Agent run ended" x8)
+    if (last && last.role === "system" && msg.role === "system" && last.content === msg.content) {
+      last.count = (last.count ?? 1) + 1;
       last.timestamp = msg.timestamp;
     } else {
-      result.push({ ...msg });
+      result.push({ ...msg, count: 1 });
     }
   }
-  return result.filter((m) => m.content.trim().length > 0);
+  return result;
 }
 
 // ─── Execution Log Entry ────────────────────────────────────────────────────
 
-function ExecutionLogEntry({ msg }: { msg: ExecutionMessage }) {
+function ExecutionLogEntry({ msg }: { msg: ExecutionMessage & { count?: number } }) {
   const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   if (msg.role === "system") {
     return (
       <div className="flex items-center gap-2 py-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-foreground-muted/40 flex-shrink-0" />
-        <span className="text-xs text-foreground-muted">{msg.content}</span>
+        <span className="text-xs text-foreground-muted">
+          {msg.content}
+          {(msg.count ?? 1) > 1 && (
+            <span className="ml-1.5 text-foreground-muted/50">({msg.count}x)</span>
+          )}
+        </span>
         <span className="mono text-[10px] text-foreground-muted/40 ml-auto flex-shrink-0">{time}</span>
       </div>
     );
@@ -131,8 +141,8 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
   const [showReassign, setShowReassign] = useState(false);
   const [reassignAgentId, setReassignAgentId] = useState("");
 
-  const chatSession = useChatStore((s) => s.getChatSession({ mode: "task", taskId: task.id }));
-  const chatUnread = (chatSession?.messages.length ?? 0) > 0 && chatSession?.messages[chatSession.messages.length - 1]?.role === "agent";
+  const taskChatMessages = useChatStore((s) => s.taskChatMessages[task.id] ?? []);
+  const chatUnread = taskChatMessages.length > 0 && taskChatMessages[taskChatMessages.length - 1]?.senderType === "agent";
 
   const assignedMember = project?.roster.find((m) => m.agentId === task.assignedAgentId);
   const roster = project?.roster.filter((m) => m.role !== "lead") ?? [];
@@ -441,8 +451,9 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                 <div className="h-full overflow-y-auto p-4 space-y-2">
                   {/* Task result for completed tasks */}
                   {task.status === "done" && (() => {
-                    const consolidated = consolidateLog(task.executionLog ?? []);
-                    const resultMsg = [...consolidated].reverse().find((m) => m.role === "assistant" && m.content.length > 50);
+                    // Use executionOutput or fallback to last assistant entry from raw log
+                    const resultContent = task.executionOutput
+                      ?? [...(task.executionLog ?? [])].reverse().find((m) => m.role === "assistant" && m.content.length > 50)?.content;
                     return (
                       <div className="rounded-lg border border-accent/20 bg-accent-soft/30 p-4 mb-2 space-y-3">
                         <div className="flex items-center justify-between">
@@ -454,10 +465,10 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                             <span className="mono text-xs text-foreground-muted">{Math.round((task.completedAt - task.startedAt) / 1000)}s</span>
                           )}
                         </div>
-                        {resultMsg && (
+                        {resultContent && (
                           <div className="rounded-md bg-surface border border-line p-3 max-h-[200px] overflow-y-auto">
                             <div className="text-sm text-foreground leading-relaxed prose-sm prose-invert max-w-none [&_p]:mb-1.5 [&_ul]:ml-4 [&_ul]:list-disc [&_li]:mb-0.5 [&_code]:bg-surface-strong [&_code]:rounded [&_code]:px-1 [&_code]:text-xs [&_strong]:font-semibold">
-                              <Markdown>{resultMsg.content}</Markdown>
+                              <Markdown>{resultContent}</Markdown>
                             </div>
                           </div>
                         )}
