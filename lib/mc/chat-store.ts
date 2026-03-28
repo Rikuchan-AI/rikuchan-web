@@ -215,8 +215,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   receiveTaskChatMessage: (taskId, _projectId, message) => {
     set((s) => {
       const existing = s.taskChatMessages[taskId] ?? [];
-      // Avoid duplicates
+      // Avoid duplicates by real ID
       if (existing.some((m) => m.id === message.id)) return s;
+      // Replace optimistic message if SSE brings the real one (same content + senderType)
+      const optimisticIdx = message.senderType === "human"
+        ? existing.findIndex((m) => m.id.startsWith("optimistic-") && m.content === message.content)
+        : -1;
+      if (optimisticIdx >= 0) {
+        const updated = [...existing];
+        updated[optimisticIdx] = message;
+        return { taskChatMessages: { ...s.taskChatMessages, [taskId]: updated } };
+      }
       return {
         taskChatMessages: {
           ...s.taskChatMessages,

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "react-markdown";
+import { AlertCircle } from "lucide-react";
 import { ChatInput } from "@/components/mc/projects/chat/ChatInput";
 import { TypingIndicator } from "@/components/mc/projects/chat/ChatBubble";
 import { useChatStore } from "@/lib/mc/chat-store";
@@ -17,9 +18,16 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function mapMessages(data: unknown[]): { id: string; senderType: string; senderName: string; content: string; createdAt: string }[] {
+  return (data as { id: string; senderType: string; senderName: string; content: string; createdAt: string }[]).map((m) => ({
+    id: m.id, senderType: m.senderType, senderName: m.senderName, content: m.content, createdAt: m.createdAt,
+  }));
+}
+
 export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messages = useChatStore((s) => s.taskChatMessages[task.id]);
@@ -37,20 +45,9 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
     store.setTaskChatLoading(task.id, true);
     getApiClient().tasks.chatHistory(project.id, task.id, 100)
       .then((data) => {
-        if (cancelled) return;
-        useChatStore.getState().setTaskChatMessages(
-          task.id,
-          (data as unknown as { id: string; senderType: string; senderName: string; content: string; createdAt: string }[]).map((m) => ({
-            id: m.id,
-            senderType: m.senderType,
-            senderName: m.senderName,
-            content: m.content,
-            createdAt: m.createdAt,
-          })),
-        );
+        if (!cancelled) useChatStore.getState().setTaskChatMessages(task.id, mapMessages(data as unknown[]));
       })
       .catch(() => {
-        // On error, set empty array so we don't retry infinitely
         if (!cancelled) useChatStore.getState().setTaskChatMessages(task.id, []);
       })
       .finally(() => {
@@ -65,9 +62,16 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages?.length]);
 
+  // Clear error after 5s
+  useEffect(() => {
+    if (!sendError) return;
+    const t = setTimeout(() => setSendError(null), 5000);
+    return () => clearTimeout(t);
+  }, [sendError]);
+
   const handleSend = useCallback(async (content: string) => {
-    if (!task.assignedAgentId) return;
     setSending(true);
+    setSendError(null);
     setInput("");
 
     // Optimistic: add message immediately
@@ -81,27 +85,20 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
     });
 
     try {
-      await getApiClient().tasks.chatSend(project.id, task.id, content);
+      const result = await getApiClient().tasks.chatSend(project.id, task.id, content) as unknown as { delivered?: boolean };
+      if (result && !result.delivered) {
+        setSendError("Message saved but agent is offline. It will be delivered when the agent reconnects.");
+      }
     } catch {
-      // Remove optimistic message on failure by re-fetching
+      setSendError("Failed to send message.");
+      // Re-fetch to remove optimistic message
       getApiClient().tasks.chatHistory(project.id, task.id, 100)
-        .then((data) => {
-          useChatStore.getState().setTaskChatMessages(
-            task.id,
-            (data as unknown as { id: string; senderType: string; senderName: string; content: string; createdAt: string }[]).map((m) => ({
-              id: m.id,
-              senderType: m.senderType,
-              senderName: m.senderName,
-              content: m.content,
-              createdAt: m.createdAt,
-            })),
-          );
-        })
+        .then((data) => useChatStore.getState().setTaskChatMessages(task.id, mapMessages(data as unknown[])))
         .catch(() => {});
     } finally {
       setSending(false);
     }
-  }, [task.id, task.assignedAgentId, project.id]);
+  }, [task.id, project.id]);
 
   if (isLoading) {
     return (
@@ -121,13 +118,28 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
         </div>
       )}
 
+      {/* Error banner */}
+      {sendError && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-danger-soft border border-danger/15 px-3 py-2">
+          <AlertCircle size={13} className="text-danger shrink-0" />
+          <span className="text-xs text-danger">{sendError}</span>
+        </div>
+      )}
+
+      {/* No agent warning */}
+      {!task.assignedAgentId && task.status !== "done" && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-warm-soft border border-warm/15 px-3 py-2">
+          <span className="text-xs text-warm">No agent assigned. Messages are saved but won&apos;t be delivered until an agent is assigned.</span>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {(!messages || messages.length === 0) && (
           <p className="text-center text-xs text-foreground-muted italic mt-8">
             {task.assignedAgentId
               ? `Messages from ${task.assignedAgentName ?? "the agent"} will appear here`
-              : "Assign an agent to start chatting"}
+              : "Send a message to start the conversation"}
           </p>
         )}
         {messages?.map((msg) => {
@@ -170,8 +182,8 @@ export function TaskChatPanel({ task, project }: TaskChatPanelProps) {
           value={input}
           onChange={setInput}
           onSend={handleSend}
-          placeholder={task.assignedAgentId ? `Message ${task.assignedAgentName ?? "agent"}...` : "Assign an agent first"}
-          disabled={!task.assignedAgentId}
+          placeholder={`Message ${task.assignedAgentName ?? "about this task"}...`}
+          disabled={task.status === "done"}
           sending={sending}
         />
       </div>
