@@ -92,8 +92,8 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
       }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span
             className={`inline-block h-2 w-2 rounded-full shrink-0 ${pulsatingStatuses.has(agent.status) ? "animate-pulse" : ""}`}
             style={{ backgroundColor: statusBorderColor[agent.status] ?? "#71717a" }}
@@ -102,6 +102,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
             <h3
               className="text-sm font-semibold tracking-[-0.03em] text-foreground leading-tight truncate"
               style={{ fontFamily: "var(--font-display)" }}
+              title={agent.name}
             >
               {agent.name}
             </h3>
