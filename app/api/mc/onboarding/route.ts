@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("[Onboarding] Supabase update failed:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to update onboarding state" }, { status: 500 });
     }
 
     // 2. Persist gateway + model settings to MC backend
@@ -59,7 +59,25 @@ export async function POST(req: NextRequest) {
     const preferences: Record<string, unknown> = {};
 
     if (body.gateway_url) {
-      settingsPayload.gatewayUrl = body.gateway_url;
+      // Validate gateway URL to prevent SSRF
+      try {
+        const gwUrl = new URL(String(body.gateway_url));
+        if (!["http:", "https:"].includes(gwUrl.protocol)) {
+          return NextResponse.json({ error: "Invalid gateway URL protocol" }, { status: 400 });
+        }
+        // Block internal/private IPs
+        const hostname = gwUrl.hostname.toLowerCase();
+        if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" ||
+            hostname.startsWith("10.") || hostname.startsWith("172.") || hostname.startsWith("192.168.") ||
+            hostname === "[::1]" || hostname.endsWith(".internal") || hostname === "metadata.google.internal") {
+          if (process.env.NODE_ENV === "production") {
+            return NextResponse.json({ error: "Gateway URL cannot point to internal addresses" }, { status: 400 });
+          }
+        }
+        settingsPayload.gatewayUrl = gwUrl.toString();
+      } catch {
+        return NextResponse.json({ error: "Invalid gateway URL" }, { status: 400 });
+      }
     }
     if (body.gateway_token) {
       preferences.gatewayToken = body.gateway_token;

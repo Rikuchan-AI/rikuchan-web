@@ -56,15 +56,14 @@ export async function GET() {
     );
 
     return NextResponse.json({
-      configPath,
       freeModels,
       allowlistedRefs,
     });
   } catch (error) {
+    console.error("[models/free] Failed to load OpenClaw config:", error);
     return NextResponse.json(
       {
-        error: `Failed to load OpenClaw free models: ${String(error)}`,
-        configPath,
+        error: "Failed to load free models",
         freeModels: [],
         allowlistedRefs: [],
       },

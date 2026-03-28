@@ -18,10 +18,44 @@ export const maxDuration = 300;
 
 const SSE_CONNECT_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
+
+// Allowed backend path prefixes — requests outside this list are rejected
+const ALLOWED_PATH_PREFIXES = [
+  "/api/projects",
+  "/api/tasks",
+  "/api/agents",
+  "/api/sessions",
+  "/api/groups",
+  "/api/settings",
+  "/api/events",
+  "/api/gateway",
+  "/api/audit",
+  "/api/memory",
+  "/api/notifications",
+  "/api/heartbeat",
+  "/api/activation",
+  "/api/delegation",
+  "/api/chat",
+  "/api/agent",
+];
+
+function isAllowedPath(path: string): boolean {
+  return ALLOWED_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + "/") || path.startsWith(prefix + "?"));
+}
 
 async function proxy(req: Request) {
   const url = new URL(req.url);
   const backendPath = url.pathname.replace(/^\/api\/mc\/proxy/, "");
+
+  // Security: reject paths not in the allowlist
+  if (!isAllowedPath(backendPath)) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden path" }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const target = `${BACKEND_URL}${backendPath}${url.search}`;
 
   const headers = new Headers();
@@ -33,11 +67,16 @@ async function proxy(req: Request) {
 
   const isSSE = backendPath === "/api/events";
 
-  console.log(`[proxy] ${req.method} ${backendPath} → ${target}`);
-
-  const body = req.method !== "GET" && req.method !== "HEAD"
-    ? await req.arrayBuffer()
-    : undefined;
+  let body: ArrayBuffer | undefined;
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    body = await req.arrayBuffer();
+    if (body.byteLength > MAX_BODY_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "Request body too large" }),
+        { status: 413, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  }
 
   const ac = new AbortController();
   const timeout = setTimeout(
@@ -58,7 +97,7 @@ async function proxy(req: Request) {
     clearTimeout(timeout);
     console.error(`[proxy] ${backendPath} failed:`, err);
     return new Response(
-      JSON.stringify({ error: "upstream unreachable", detail: String(err) }),
+      JSON.stringify({ error: "upstream unreachable" }),
       { status: 502, headers: { "Content-Type": "application/json" } },
     );
   }

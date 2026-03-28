@@ -38,14 +38,17 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
     }
-    // Allow unknown types (just block truly dangerous ones)
-    if (file.type && ALLOWED_TYPES.size > 0 && !ALLOWED_TYPES.has(file.type) && !file.type.startsWith("text/")) {
-      // Still allow if it has a safe extension
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const safeExts = new Set(["md", "txt", "json", "csv", "yaml", "yml", "ts", "tsx", "js", "jsx", "py", "go", "rs", "rb", "sh", "toml", "pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "zip"]);
-      if (!safeExts.has(ext)) {
-        return NextResponse.json({ error: `File type not allowed: ${file.type}` }, { status: 400 });
-      }
+    // Block dangerous extensions regardless of MIME type
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const dangerousExts = new Set(["exe", "bat", "cmd", "com", "msi", "scr", "pif", "vbs", "vbe", "js", "jse", "wsf", "wsh", "ps1", "dll", "sys", "drv"]);
+    if (dangerousExts.has(ext)) {
+      return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+    }
+
+    // Validate MIME type or safe extension
+    const safeExts = new Set(["md", "txt", "json", "csv", "yaml", "yml", "ts", "tsx", "jsx", "py", "go", "rs", "rb", "sh", "toml", "pdf", "png", "jpg", "jpeg", "gif", "webp", "svg", "zip"]);
+    if (file.type && !ALLOWED_TYPES.has(file.type) && !file.type.startsWith("text/") && !safeExts.has(ext)) {
+      return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
