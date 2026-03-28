@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useGatewayStore, mapGatewayAgent } from "@/lib/mc/gateway-store";
 import { useProjectsStore } from "@/lib/mc/projects-store";
 import { useNotificationsStore } from "@/lib/mc/notifications-store";
+import { useAuthContext } from "@/lib/mc/auth-provider";
 import { initApiClient, getApiClient } from "@/lib/mc/api-client";
 import { initSseClient, getSseClient } from "@/lib/mc/sse-client";
 import { gatewayModelsToGroups, MODEL_GROUPS } from "@/lib/mc/models";
@@ -63,6 +64,7 @@ function DisconnectedBanner() {
 
 export function GatewayProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
+  const { ready: authReady } = useAuthContext();
   const cleanupRef = useRef<(() => void) | null>(null);
   const bootedRef = useRef(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -80,6 +82,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!authReady) return;
     if (bootedRef.current) return;
     bootedRef.current = true;
 
@@ -255,7 +258,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
       cleanupRef.current?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authReady]);
 
   const status = useGatewayStore((s) => s.status);
   const connectedAt = useGatewayStore((s) => s.connectedAt);

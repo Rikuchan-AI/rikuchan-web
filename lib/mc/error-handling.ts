@@ -30,8 +30,8 @@ export function handleMcError(error: unknown, toast?: { error: (title: string, o
       toast.error("Delegation failed", { description: error.message });
       break;
     case "UNAUTHORIZED":
-      // Session expired — redirect to sign in
-      if (typeof window !== "undefined") window.location.href = "/sign-in";
+      // Session expired — redirect to login
+      if (typeof window !== "undefined") window.location.href = "/login";
       break;
     case "FORBIDDEN":
       toast.error("Permission denied");

@@ -22,8 +22,13 @@ export default clerkMiddleware(async (auth, req) => {
   // Public routes don't need auth
   if (isPublicRoute(req)) return;
 
-  // Protect all non-public routes
-  await auth.protect();
+  // Check auth
+  const { userId } = await auth();
+  if (!userId) {
+    const signInUrl = new URL("/login", req.url);
+    signInUrl.searchParams.set("redirect_url", req.nextUrl.pathname);
+    return NextResponse.redirect(signInUrl);
+  }
 
   // Admin-only route check
   if (isAdminOnlyRoute(req)) {

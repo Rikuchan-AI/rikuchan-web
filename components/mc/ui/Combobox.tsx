@@ -143,8 +143,8 @@ export function Combobox({
         groups.push({ group: g, items: [o] });
       }
     }
-    return groups.map((g) => (
-      <div key={g.group}>
+    return groups.map((g, i) => (
+      <div key={`${g.group}-${i}`}>
         {g.group && (
           <div className="px-3 py-1 text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
             {g.group}

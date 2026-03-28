@@ -10,12 +10,16 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth.protect();
+  // Auth is enforced by the proxy — use auth() to read session data
+  const session = await auth();
+  if (!session.userId) {
+    redirect("/login");
+  }
 
   // Ensure tenant exists and check onboarding
   try {
     const { tenantId, userId } = await resolveTenantId();
-    await ensureTenant(tenantId, userId, session.orgId);
+    await ensureTenant(tenantId, userId, session.orgId ?? undefined);
 
     const onboardingCompleted = await checkTenantOnboarding(tenantId);
     if (!onboardingCompleted) {
