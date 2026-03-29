@@ -384,10 +384,10 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
                 )}
               </div>
               {/* Files count */}
-              {(task.attachments?.length ?? 0) + detectedFiles.length > 0 && (
+              {(task.attachments?.length ?? 0) + (task.outputFiles?.length ?? 0) + detectedFiles.length > 0 && (
                 <div className="flex items-center gap-1.5 px-3 py-2.5 border-r border-line text-foreground-muted">
                   <Paperclip size={11} />
-                  <span className="mono text-[11px]">{(task.attachments?.length ?? 0) + detectedFiles.length}</span>
+                  <span className="mono text-[11px]">{(task.attachments?.length ?? 0) + (task.outputFiles?.length ?? 0) + detectedFiles.length}</span>
                 </div>
               )}
               {/* Running indicator */}
@@ -415,7 +415,7 @@ export function TaskDrawer({ task, projectId, onClose }: TaskDrawerProps) {
               {([
                 { id: "chat" as const, label: "Chat", badge: chatUnread },
                 { id: "log" as const, label: "Log" },
-                { id: "files" as const, label: "Files", count: (task.attachments?.length ?? 0) + detectedFiles.length },
+                { id: "files" as const, label: "Files", count: (task.attachments?.length ?? 0) + (task.outputFiles?.length ?? 0) + detectedFiles.length },
                 { id: "details" as const, label: "Details" },
                 { id: "timeline" as const, label: "Timeline" },
               ]).map((tab) => (

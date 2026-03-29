@@ -149,6 +149,7 @@ export function CreateTaskModal({ projectId, roster, onClose }: CreateTaskModalP
       subtasks: [],
       tags: allTags,
       attachments: [],
+      outputFiles: [],
       contextNote: contextNote.trim() || undefined,
       contextFiles: contextFiles.length > 0 ? contextFiles : undefined,
       createdAt: now,

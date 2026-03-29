@@ -77,6 +77,7 @@ function NewTaskForm({
       subtasks: [],
       tags: [],
       attachments: [],
+      outputFiles: [],
       createdAt: now,
       updatedAt: now,
     };

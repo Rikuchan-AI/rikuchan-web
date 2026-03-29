@@ -164,6 +164,7 @@ export function wireSseToStores(): () => void {
           updatedAt: Date.now(),
           tags: [],
           attachments: [],
+          outputFiles: [],
           ...(updates as Partial<Task>),
         };
         useProjectsStore.setState({
