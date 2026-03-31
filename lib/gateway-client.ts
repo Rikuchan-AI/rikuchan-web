@@ -32,6 +32,30 @@ export type ProviderConnectResult = {
   auth_kind: string;
 };
 
+export type ProviderStatus = {
+  provider: string;
+  family: string;
+  display_name: string;
+  credential_mode: "api_key" | "oauth";
+  connected: boolean;
+  status: "ready" | "oauth_required" | "oauth_supported" | "api_key_required";
+  auth_kind: string | null;
+  last_validated_at: string | null;
+  manage_scope: "tenant";
+  can_manage: boolean;
+};
+
+export type ProviderOAuthSession = {
+  session_id: string;
+  provider: string;
+  account_label: string;
+  status: string;
+  authorize_url: string | null;
+  error_message: string | null;
+  completed_at: string | null;
+  expires_at: string | null;
+};
+
 export async function clientCreateApiKey(
   token: string,
   body: { name: string; scopes?: string[]; rate_limit_rpm?: number; expires_at?: string | null },
@@ -72,6 +96,33 @@ export async function clientConnectProvider(
 export async function clientDisconnectProvider(token: string, provider: string): Promise<void> {
   return clientFetch(`/v1/settings/providers/${provider}`, {
     method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function clientListProviders(token: string): Promise<ProviderStatus[]> {
+  return clientFetch("/v1/settings/providers", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function clientStartProviderOAuth(
+  token: string,
+  provider: string,
+  accountLabel = "default",
+): Promise<ProviderOAuthSession> {
+  return clientFetch("/v1/settings/providers/oauth/start", {
+    method: "POST",
+    body: JSON.stringify({ provider, account_label: accountLabel }),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function clientGetProviderOAuthStatus(
+  token: string,
+  sessionId: string,
+): Promise<ProviderOAuthSession> {
+  return clientFetch(`/v1/settings/providers/oauth/${sessionId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }

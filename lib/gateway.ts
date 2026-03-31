@@ -115,15 +115,32 @@ export async function getUsageHistory(days = 30): Promise<UsageHistory> {
 
 export type ProviderStatus = {
   provider: string;
+  family: string;
+  display_name: string;
+  credential_mode: "api_key" | "oauth";
   connected: boolean;
+  status: "ready" | "oauth_required" | "oauth_supported" | "api_key_required";
   auth_kind: string | null;
   last_validated_at: string | null;
+  manage_scope: "tenant";
+  can_manage: boolean;
 };
 
 export type ProviderConnectResult = {
   status: string;
   provider: string;
   auth_kind: string;
+};
+
+export type ProviderOAuthSession = {
+  session_id: string;
+  provider: string;
+  account_label: string;
+  status: string;
+  authorize_url: string | null;
+  error_message: string | null;
+  completed_at: string | null;
+  expires_at: string | null;
 };
 
 export type Workspace = {
@@ -146,6 +163,20 @@ export async function connectProvider(provider: string, apiKey: string): Promise
 
 export async function disconnectProvider(provider: string): Promise<void> {
   return gatewayFetch(`/v1/settings/providers/${provider}`, { method: "DELETE" });
+}
+
+export async function startProviderOAuth(
+  provider: string,
+  accountLabel = "default",
+): Promise<ProviderOAuthSession> {
+  return gatewayFetch("/v1/settings/providers/oauth/start", {
+    method: "POST",
+    body: JSON.stringify({ provider, account_label: accountLabel }),
+  });
+}
+
+export async function getProviderOAuthStatus(sessionId: string): Promise<ProviderOAuthSession> {
+  return gatewayFetch(`/v1/settings/providers/oauth/${sessionId}`);
 }
 
 export async function getWorkspace(): Promise<Workspace> {

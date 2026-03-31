@@ -42,7 +42,7 @@ async function getCachedLimits(tenantId: string): Promise<Record<string, number>
 
 const RESOURCE_TABLE_MAP: Record<string, { table: string; countBy: string }> = {
   max_projects: { table: "mc_projects", countBy: "tenant_id" },
-  max_api_keys: { table: "api_keys", countBy: "user_id" },
+  max_api_keys: { table: "api_keys", countBy: "tenant_id" },
 };
 
 async function countResource(tenantId: string, resource: string, projectId?: string): Promise<number> {

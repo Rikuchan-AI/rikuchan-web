@@ -5,16 +5,16 @@ import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/shared/button";
 import { useToast } from "@/components/shared/toast";
 import { ProviderIcon } from "@/components/shared/provider-icon";
-import { clientConnectProvider, clientDisconnectProvider } from "@/lib/gateway-client";
+import {
+  type ProviderStatus,
+  clientConnectProvider,
+  clientDisconnectProvider,
+  clientGetProviderOAuthStatus,
+  clientListProviders,
+  clientStartProviderOAuth,
+} from "@/lib/gateway-client";
 
-type ProviderStatus = {
-  provider: string;
-  connected: boolean;
-  auth_kind: string | null;
-  last_validated_at: string | null;
-};
-
-const PROVIDER_LABELS: Record<string, string> = {
+const FAMILY_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   google: "Google AI",
@@ -23,6 +23,28 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: "DeepSeek",
   mistral: "Mistral",
 };
+
+const API_KEY_PLACEHOLDERS: Record<string, string> = {
+  anthropic: "Anthropic API key or Claude setup token",
+  openai: "OpenAI API key",
+  xai: "xAI API key",
+  zai_general: "Z.AI API key",
+  deepseek: "DeepSeek API key",
+  mistral: "Mistral API key",
+};
+
+function statusLabel(provider: ProviderStatus): string {
+  if (provider.status === "ready" && provider.connected) return "Connected";
+  if (provider.status === "oauth_required") return "Reconnect needed";
+  if (provider.status === "oauth_supported") return "Ready to connect";
+  return "Not connected";
+}
+
+function oauthButtonLabel(provider: ProviderStatus): string {
+  if (provider.provider === "openai-codex") return "Connect with ChatGPT";
+  if (provider.provider === "google") return "Connect with Google";
+  return "Connect";
+}
 
 export function SettingsForm({
   initialProviders,
@@ -34,46 +56,104 @@ export function SettingsForm({
   const { getToken } = useAuth();
   const toast = useToast();
   const [providers, setProviders] = useState(initialProviders);
-  const [connecting, setConnecting] = useState<string | null>(null);
-  const [connectKey, setConnectKey] = useState("");
-  const [connectProvider, setConnectProvider] = useState<string | null>(null);
+  const [busyProvider, setBusyProvider] = useState<string | null>(null);
+  const [expandedApiKeyProvider, setExpandedApiKeyProvider] = useState<string | null>(null);
+  const [draftKeys, setDraftKeys] = useState<Record<string, string>>({});
 
-  async function handleConnect(provider: string) {
-    if (!connectKey.trim()) return;
-    setConnecting(provider);
+  const families = providers.reduce<Record<string, ProviderStatus[]>>((acc, provider) => {
+    const family = provider.family || provider.provider;
+    acc[family] ||= [];
+    acc[family].push(provider);
+    return acc;
+  }, {});
+
+  async function refreshProviders(token: string) {
+    const nextProviders = await clientListProviders(token);
+    setProviders(nextProviders);
+    return nextProviders;
+  }
+
+  async function handleConnectApiKey(provider: string) {
+    const apiKey = (draftKeys[provider] || "").trim();
+    if (!apiKey) return;
+
+    setBusyProvider(provider);
     try {
       const token = await getToken();
       if (!token) return;
-      const result = await clientConnectProvider(token, provider, connectKey.trim());
-      setProviders((prev) =>
-        prev.map((p) =>
-          p.provider === provider
-            ? { ...p, connected: true, auth_kind: result.auth_kind }
-            : p,
-        ),
-      );
-      setConnectProvider(null);
-      setConnectKey("");
-      toast.success(`${PROVIDER_LABELS[provider] || provider} connected`);
-    } catch (e) {
-      toast.error(`Failed to connect ${PROVIDER_LABELS[provider] || provider}`);
+      const result = await clientConnectProvider(token, provider, apiKey);
+      await refreshProviders(token);
+      setExpandedApiKeyProvider(null);
+      setDraftKeys((prev) => ({ ...prev, [provider]: "" }));
+      toast.success(`${result.provider} connected for this workspace`);
+    } catch {
+      toast.error(`Failed to connect ${provider}`);
     } finally {
-      setConnecting(null);
+      setBusyProvider(null);
+    }
+  }
+
+  async function handleStartOAuth(provider: string) {
+    setBusyProvider(provider);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const session = await clientStartProviderOAuth(token, provider);
+      if (!session.authorize_url) {
+        throw new Error("Missing authorize URL");
+      }
+
+      const popup = window.open(session.authorize_url, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        toast.error("Allow popups to complete the provider login");
+      }
+
+      const deadline = Date.now() + 2 * 60_000;
+      let status = session.status;
+      let errorMessage = session.error_message;
+
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await clientGetProviderOAuthStatus(token, session.session_id);
+        status = current.status;
+        errorMessage = current.error_message;
+
+        if (status === "completed") {
+          await refreshProviders(token);
+          toast.success(`${provider} connected for this workspace`);
+          return;
+        }
+
+        if (status === "error") {
+          throw new Error(errorMessage || "OAuth connection failed");
+        }
+      }
+
+      await refreshProviders(token);
+      toast.error(`Timed out waiting for ${provider} login to complete`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Failed to connect ${provider}`;
+      toast.error(message);
+    } finally {
+      setBusyProvider(null);
     }
   }
 
   async function handleDisconnect(provider: string) {
-    if (!confirm(`Disconnect ${PROVIDER_LABELS[provider] || provider}?`)) return;
+    if (!confirm(`Disconnect ${provider} for the whole workspace?`)) return;
+
+    setBusyProvider(provider);
     try {
       const token = await getToken();
       if (!token) return;
       await clientDisconnectProvider(token, provider);
-      setProviders((prev) =>
-        prev.map((p) => (p.provider === provider ? { ...p, connected: false, auth_kind: null } : p)),
-      );
-      toast.success(`${PROVIDER_LABELS[provider] || provider} disconnected`);
-    } catch (e) {
-      toast.error(`Failed to disconnect ${PROVIDER_LABELS[provider] || provider}`);
+      await refreshProviders(token);
+      toast.success(`${provider} disconnected`);
+    } catch {
+      toast.error(`Failed to disconnect ${provider}`);
+    } finally {
+      setBusyProvider(null);
     }
   }
 
@@ -96,53 +176,106 @@ export function SettingsForm({
 
       <section className="rounded-lg border border-line bg-surface p-6">
         <p className="mono text-xs uppercase tracking-[0.18em] text-accent">Provider connections</p>
-        <p className="mt-3 text-sm text-foreground-soft">Connect your own provider credentials for direct access, including Claude setup tokens on Anthropic.</p>
-        <div className="mt-6 space-y-3">
-          {providers.map((p) => (
-            <div key={p.provider}>
-              <div className="flex items-center justify-between rounded-md border border-line bg-surface-muted p-4">
-                <div className="flex items-center gap-3">
-                  <span className={`h-2.5 w-2.5 rounded-full ${p.connected ? "bg-accent" : "bg-foreground-muted"}`} />
-                  <ProviderIcon provider={p.provider} size="sm" />
-                  <span className="text-sm font-medium text-foreground">{PROVIDER_LABELS[p.provider] || p.provider}</span>
-                  {p.connected && p.auth_kind && (
-                    <span className="rounded bg-surface-strong px-2 py-0.5 text-xs text-foreground-muted">{p.auth_kind}</span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {p.connected ? (
-                    <Button variant="ghost" size="md" onClick={() => handleDisconnect(p.provider)}>Disconnect</Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={() => setConnectProvider(connectProvider === p.provider ? null : p.provider)}
-                    >
-                      Connect
-                    </Button>
-                  )}
+        <p className="mt-3 text-sm text-foreground-soft">
+          Provider credentials are shared across the workspace tenant. Admins can connect or disconnect them; everyone else just uses the shared connection.
+        </p>
+        <div className="mt-6 space-y-4">
+          {Object.entries(families).map(([family, methods]) => (
+            <div key={family} className="rounded-lg border border-line bg-surface-muted">
+              <div className="flex items-center gap-3 border-b border-line px-4 py-4">
+                <ProviderIcon provider={family} size="sm" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{FAMILY_LABELS[family] || family}</p>
+                  <p className="text-xs text-foreground-soft">Tenant-wide connection methods</p>
                 </div>
               </div>
-              {connectProvider === p.provider && !p.connected && (
-                <div className="mt-2 flex gap-3 rounded-md border border-line bg-surface p-4">
-                  <input
-                    type="password"
-                    value={connectKey}
-                    onChange={(e) => setConnectKey(e.target.value)}
-                    placeholder={
-                      p.provider === "anthropic"
-                        ? "Anthropic API key or Claude setup token"
-                        : `${PROVIDER_LABELS[p.provider] || p.provider} API key`
-                    }
-                    className="flex-1 rounded-md border border-line-strong bg-surface-muted px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && handleConnect(p.provider)}
-                  />
-                  <Button size="md" onClick={() => handleConnect(p.provider)} disabled={connecting === p.provider || !connectKey.trim()}>
-                    {connecting === p.provider ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              )}
+
+              <div className="space-y-3 p-4">
+                {methods.map((provider) => {
+                  const canEdit = provider.can_manage;
+                  const isBusy = busyProvider === provider.provider;
+                  const isExpanded = expandedApiKeyProvider === provider.provider;
+
+                  return (
+                    <div key={provider.provider}>
+                      <div className="flex flex-col gap-4 rounded-md border border-line bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${provider.connected ? "bg-accent" : "bg-foreground-muted"}`} />
+                            <span className="text-sm font-medium text-foreground">{provider.display_name}</span>
+                            <span className="rounded bg-surface-strong px-2 py-0.5 text-xs text-foreground-muted">
+                              {statusLabel(provider)}
+                            </span>
+                            {provider.auth_kind && (
+                              <span className="rounded bg-surface-strong px-2 py-0.5 text-xs text-foreground-muted">
+                                {provider.auth_kind}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-foreground-soft">
+                            {provider.credential_mode === "oauth"
+                              ? "Browser-based workspace connection"
+                              : "Workspace API key storage"}
+                          </p>
+                          {provider.last_validated_at && (
+                            <p className="text-xs text-foreground-muted">Validated at {new Date(provider.last_validated_at).toLocaleString()}</p>
+                          )}
+                          {!canEdit && (
+                            <p className="text-xs text-foreground-muted">Admin permission required to change this connection.</p>
+                          )}
+                        </div>
+
+                        {canEdit && (
+                          <div className="flex gap-2">
+                            {provider.connected ? (
+                              <Button variant="ghost" size="md" onClick={() => handleDisconnect(provider.provider)} disabled={isBusy}>
+                                {isBusy ? "Disconnecting..." : "Disconnect"}
+                              </Button>
+                            ) : provider.credential_mode === "oauth" ? (
+                              <Button variant="secondary" size="md" onClick={() => handleStartOAuth(provider.provider)} disabled={isBusy}>
+                                {isBusy ? "Waiting..." : oauthButtonLabel(provider)}
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="md"
+                                onClick={() =>
+                                  setExpandedApiKeyProvider(isExpanded ? null : provider.provider)
+                                }
+                              >
+                                {isExpanded ? "Cancel" : "Connect"}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {canEdit && provider.credential_mode === "api_key" && !provider.connected && isExpanded && (
+                        <div className="mt-2 flex gap-3 rounded-md border border-line bg-surface p-4">
+                          <input
+                            type="password"
+                            value={draftKeys[provider.provider] || ""}
+                            onChange={(event) =>
+                              setDraftKeys((prev) => ({ ...prev, [provider.provider]: event.target.value }))
+                            }
+                            placeholder={API_KEY_PLACEHOLDERS[provider.provider] || `${provider.display_name} API key`}
+                            className="flex-1 rounded-md border border-line-strong bg-surface-muted px-4 py-2 text-sm text-foreground outline-none focus:border-accent"
+                            autoFocus
+                            onKeyDown={(event) => event.key === "Enter" && handleConnectApiKey(provider.provider)}
+                          />
+                          <Button
+                            size="md"
+                            onClick={() => handleConnectApiKey(provider.provider)}
+                            disabled={isBusy || !(draftKeys[provider.provider] || "").trim()}
+                          >
+                            {isBusy ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
