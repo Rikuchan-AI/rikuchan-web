@@ -13,6 +13,10 @@ import {
   clientListProviders,
   clientStartProviderOAuth,
 } from "@/lib/gateway-client";
+import {
+  clientGetLocalProviderOAuthStatus,
+  clientStartLocalProviderOAuth,
+} from "@/lib/local-agent-client";
 
 const FAMILY_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
@@ -99,7 +103,9 @@ export function SettingsForm({
       const token = await getToken();
       if (!token) return;
 
-      const session = await clientStartProviderOAuth(token, provider);
+      const session = provider === "openai-codex"
+        ? await clientStartLocalProviderOAuth(provider)
+        : await clientStartProviderOAuth(token, provider);
       if (!session.authorize_url) {
         throw new Error("Missing authorize URL");
       }
@@ -115,7 +121,9 @@ export function SettingsForm({
 
       while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const current = await clientGetProviderOAuthStatus(token, session.session_id);
+        const current = provider === "openai-codex"
+          ? await clientGetLocalProviderOAuthStatus(session.session_id)
+          : await clientGetProviderOAuthStatus(token, session.session_id);
         status = current.status;
         errorMessage = current.error_message;
 
