@@ -10,11 +10,11 @@ import { useGatewayGate } from "@/hooks/use-gateway-gate";
 export default function SessionsPage() {
   const { connected, GatewayRequiredScreen } = useGatewayGate();
   const sessions = useGatewayStore(useShallow((s) => s.sessions));
-
-  if (!connected) return <GatewayRequiredScreen feature="Sessões" />;
   const agents = useGatewayStore(useShallow((s) => s.agents));
   const [filterAgent, setFilterAgent] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+
+  if (!connected) return <GatewayRequiredScreen feature="Sessoes" />;
 
   const filtered = sessions.filter((s) => {
     if (filterAgent && s.agentId !== filterAgent) return false;
@@ -36,7 +36,6 @@ export default function SessionsPage() {
         </span>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3">
         <Combobox
           value={filterAgent}
@@ -62,7 +61,6 @@ export default function SessionsPage() {
         />
       </div>
 
-      {/* Session list */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <p className="text-foreground-muted text-sm">No sessions found</p>

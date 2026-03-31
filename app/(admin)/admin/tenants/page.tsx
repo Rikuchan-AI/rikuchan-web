@@ -6,7 +6,7 @@ async function getTenants() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from("tenants")
-    .select("*")
+    .select("id,type,name,plan,suspended,created_at")
     .order("created_at", { ascending: false });
   return data || [];
 }

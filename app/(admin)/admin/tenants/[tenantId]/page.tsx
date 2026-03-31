@@ -13,7 +13,11 @@ async function getTenantDetail(tenantId: string) {
     { count: projectCount },
     { count: taskCount },
   ] = await Promise.all([
-    supabase.from("tenants").select("*").eq("id", tenantId).single(),
+    supabase
+      .from("tenants")
+      .select("id,name,type,plan,suspended,owner_user_id,clerk_org_id,slug,created_at,updated_at")
+      .eq("id", tenantId)
+      .single(),
     supabase.from("mc_projects").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     supabase.from("mc_tasks").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
   ]);
@@ -22,7 +26,7 @@ async function getTenantDetail(tenantId: string) {
 
   const { data: planData } = await supabase
     .from("tenant_plans")
-    .select("*")
+    .select("plan,limits")
     .eq("plan", tenant.plan)
     .single();
 

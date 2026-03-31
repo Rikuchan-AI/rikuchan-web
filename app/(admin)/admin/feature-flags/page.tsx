@@ -4,7 +4,10 @@ import { FlagsList } from "./flags-list";
 
 async function getFlags() {
   const supabase = getSupabaseAdmin();
-  const { data } = await supabase.from("feature_flags").select("*").order("key");
+  const { data } = await supabase
+    .from("feature_flags")
+    .select("key,description,enabled_globally,enabled_plans,enabled_tenants")
+    .order("key");
   return data || [];
 }
 

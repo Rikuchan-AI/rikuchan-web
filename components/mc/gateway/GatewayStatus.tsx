@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { Eye, EyeOff, RefreshCw, Settings } from "lucide-react";
 import { useGatewayStore } from "@/lib/mc/gateway-store";
@@ -138,14 +139,14 @@ export function GatewayStatus({ presetName, presetUrl, presetToken }: GatewaySta
                 />
               ) : (
                 <div className="flex items-center gap-2 rounded-md border border-line bg-surface-strong px-3 py-2">
-                  <Settings size={13} className="text-foreground-muted" />
-                  <span className="text-xs text-foreground-muted">
-                    Nenhum gateway salvo.{" "}
-                    <a href="/agents/settings" className="text-accent hover:underline">
-                      Configurar nas Settings
-                    </a>
-                  </span>
-                </div>
+                    <Settings size={13} className="text-foreground-muted" />
+                    <span className="text-xs text-foreground-muted">
+                      Nenhum gateway salvo.{" "}
+                      <Link href="/agents/settings" className="text-accent hover:underline">
+                        Configurar nas Settings
+                      </Link>
+                    </span>
+                  </div>
               )}
             </div>
           )}

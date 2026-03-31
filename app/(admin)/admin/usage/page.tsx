@@ -5,7 +5,7 @@ async function getUsageData() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from("tenant_usage")
-    .select("*")
+    .select("tenant_id,tokens_consumed,requests_count,estimated_cost_usd,date")
     .order("date", { ascending: false })
     .limit(100);
   return data || [];
