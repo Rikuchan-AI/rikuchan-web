@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-03-30
+
+### Admin Query Hygiene and Validation Stability
+
+- **Admin Supabase projections** - admin pages for usage, tenants, tenant detail, and feature flags now request explicit columns instead of `select("*")`, reducing payload size without changing UI behavior.
+- **Sessions page lint fix** - `app/(app)/agents/sessions/page.tsx` now keeps hook order stable, unblocking lint/build without changing the user flow.
+- **Gateway status navigation** - `GatewayStatus.tsx` now uses framework-native navigation primitives for the dashboard link.
+- **ESLint config refresh** - `eslint.config.mjs` now consumes the current Next flat configs directly, keeping `npm run lint` and `npm run build` green while the remaining repo-wide warnings are still being migrated.
+
 ## 2026-03-22
 
 ### Multi-Tenancy + Back Office (ADR-005)
