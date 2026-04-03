@@ -13,6 +13,10 @@ const BACKEND_URL = process.env.MC_BACKEND_URL
  * Works both locally and in production on Railway.
  */
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Allow long-running SSE streams without Next.js killing the route
 export const maxDuration = 300;
 
@@ -104,6 +108,17 @@ async function proxy(req: Request) {
   clearTimeout(timeout);
 
   if (isSSE) {
+    const upstreamContentType = upstream.headers.get("Content-Type") ?? "";
+    if (!upstream.ok || !upstreamContentType.includes("text/event-stream")) {
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: {
+          "Content-Type": upstreamContentType || "application/json",
+          "Cache-Control": upstream.headers.get("Cache-Control") ?? "no-cache, no-transform",
+        },
+      });
+    }
+
     // Pipe upstream through a TransformStream so stream errors close
     // gracefully instead of crashing the route handler with a 500.
     const { readable, writable } = new TransformStream();
@@ -126,6 +141,7 @@ async function proxy(req: Request) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
       },
     });

@@ -17,6 +17,10 @@ const MC_BACKEND_URL = process.env.NEXT_PUBLIC_MC_BACKEND_URL ?? "";
 
 // Use local proxy to avoid HTTP/2 issues with Railway CDN + SSE
 const MC_PROXY_URL = "/api/mc/proxy";
+const MC_SSE_URL =
+  process.env.NODE_ENV === "development" && MC_BACKEND_URL
+    ? MC_BACKEND_URL
+    : MC_PROXY_URL;
 
 function DisconnectedBanner() {
   const status = useGatewayStore((s) => s.status);
@@ -90,7 +94,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
 
     // Initialize clients — use local proxy to avoid HTTP/2 + CDN issues with SSE
     initApiClient(MC_PROXY_URL, tokenGetter);
-    initSseClient(MC_PROXY_URL, tokenGetter);
+    initSseClient(MC_SSE_URL, tokenGetter);
 
     // Hydrate gateway config from localStorage cache
     useGatewayStore.getState().hydrateConfig();
@@ -187,7 +191,7 @@ export function GatewayProvider({ children }: { children: React.ReactNode }) {
 
         // 6. Connect SSE (deltas)
         sse.connect().catch((err) => {
-          console.error("[mc] SSE connect failed:", err);
+          console.warn("[mc] SSE connect unavailable:", err);
         });
 
         // Check gateway connection status from backend

@@ -18,7 +18,7 @@ export type SseEventMap = {
     activeProjects?: number;
     [k: string]: unknown;
   };
-  "gateway:error": { error: string };
+  "gateway:error": { error?: string; message?: string };
   "agent:status": {
     projectId: string;
     agentId: string;
@@ -214,12 +214,13 @@ export class SseClient {
       // Fetch with fresh token on each attempt
       fetch: async (input, init) => {
         const token = await self.getToken();
+        const headers = new Headers(init?.headers);
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
         return fetch(input, {
           ...init,
-          headers: {
-            ...init?.headers,
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
         });
       },
     });

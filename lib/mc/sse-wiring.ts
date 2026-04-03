@@ -33,7 +33,8 @@ export function wireSseToStores(): () => void {
   cleanups.push(
     sse.on("gateway:error", (data) => {
       useGatewayStore.setState({ status: "error" });
-      console.error("[sse] Gateway error:", data.error);
+      const message = data.error ?? data.message ?? "Unknown gateway error";
+      console.warn("[sse] Gateway error:", message);
     }),
   );
 
