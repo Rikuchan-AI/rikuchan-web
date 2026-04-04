@@ -30,7 +30,7 @@ export function EmbeddingPipeline({ canManage }: { canManage: boolean }) {
   const { reindex } = useCorpusActions();
   const toast = useToast();
 
-  const [confirmType, setConfirmType] = useState<"failed" | "stuck" | "all" | null>(null);
+  const [confirmType, setConfirmType] = useState<"failed" | "all" | null>(null);
   const [acting, setActing] = useState(false);
 
   if (!stats) return null;
@@ -49,7 +49,7 @@ export function EmbeddingPipeline({ canManage }: { canManage: boolean }) {
         ? "degraded"
         : "offline";
 
-  async function handleReindex(scope: "failed" | "stuck" | "all") {
+  async function handleReindex(scope: "failed" | "all") {
     setActing(true);
     try {
       const result = await reindex({ scope });
@@ -88,9 +88,6 @@ export function EmbeddingPipeline({ canManage }: { canManage: boolean }) {
               <span className="text-foreground-muted ml-4">|</span>
               <span className="text-red-400">{formatNumber(stats.failed)} failed</span>
             </>
-          )}
-          {stats.stuck > 0 && (
-            <span className="text-amber-400">({stats.stuck} stuck)</span>
           )}
         </div>
 
@@ -153,15 +150,6 @@ export function EmbeddingPipeline({ canManage }: { canManage: boolean }) {
                 Re-embed Failed ({stats.failed})
               </button>
             )}
-            {stats.stuck > 0 && (
-              <button
-                onClick={() => setConfirmType("stuck")}
-                disabled={acting}
-                className="rounded-lg border border-line-strong bg-transparent px-3 py-1.5 text-xs text-foreground-soft hover:bg-surface-strong transition-colors disabled:opacity-50"
-              >
-                Reset Stuck ({stats.stuck})
-              </button>
-            )}
             <button
               onClick={() => setConfirmType("all")}
               disabled={acting}
@@ -181,15 +169,6 @@ export function EmbeddingPipeline({ canManage }: { canManage: boolean }) {
         confirmLabel="Re-embed Failed"
         variant="warning"
         onConfirm={() => handleReindex("failed")}
-        onCancel={() => setConfirmType(null)}
-      />
-      <ConfirmDialog
-        open={confirmType === "stuck"}
-        title="Reset stuck chunks"
-        description={`This will reset ${stats.stuck} chunks stuck in processing (>10min) back to pending.`}
-        confirmLabel="Reset Stuck"
-        variant="warning"
-        onConfirm={() => handleReindex("stuck")}
         onCancel={() => setConfirmType(null)}
       />
       <ConfirmDialog

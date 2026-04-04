@@ -70,12 +70,12 @@ export interface QualityAlert {
 }
 
 export interface ReindexRequest {
-  scope: "all" | "failed" | "stuck" | "collection";
+  scope: "all" | "failed" | "collection";
   filter?: string;
 }
 
 export interface CleanupRequest {
-  type: "micro_chunks" | "stuck_processing";
+  type: "micro_chunks";
   dryRun?: boolean;
 }
 
