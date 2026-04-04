@@ -92,8 +92,9 @@ export const useCorpusStore = create<CorpusStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [stats, sources, distribution, collections, activity, quality] =
-        await Promise.all([
+      // Use Promise.allSettled so individual failures don't block everything
+      const [statsR, sourcesR, distributionR, collectionsR, activityR, qualityR] =
+        await Promise.allSettled([
           corpusFetch<CorpusStats>("/api/corpus/stats"),
           corpusFetch<CorpusSource[]>("/api/corpus/sources"),
           corpusFetch<ChunkDistribution>("/api/corpus/distribution"),
@@ -102,15 +103,17 @@ export const useCorpusStore = create<CorpusStore>((set, get) => ({
           corpusFetch<QualityAlert[]>("/api/corpus/quality"),
         ]);
 
+      const prev = get();
       set({
-        stats,
-        sources,
-        distribution,
-        collections,
-        activity,
-        quality,
+        stats: statsR.status === "fulfilled" ? statsR.value : prev.stats,
+        sources: sourcesR.status === "fulfilled" ? sourcesR.value : prev.sources,
+        distribution: distributionR.status === "fulfilled" ? distributionR.value : prev.distribution,
+        collections: collectionsR.status === "fulfilled" ? collectionsR.value : prev.collections,
+        activity: activityR.status === "fulfilled" ? activityR.value : prev.activity,
+        quality: qualityR.status === "fulfilled" ? qualityR.value : prev.quality,
         loading: false,
         lastFetchedAt: Date.now(),
+        error: statsR.status === "rejected" ? String(statsR.reason) : null,
       });
     } catch (err) {
       set({
