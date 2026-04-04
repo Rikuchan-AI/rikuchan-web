@@ -39,9 +39,6 @@ export function QualityAlerts({ canManage }: { canManage: boolean }) {
       if (alert.type === "failed_embeddings") {
         const result = await reindex({ scope: "failed" });
         toast.success(`${result.affected} failed chunks queued for re-embed`);
-      } else if (alert.type === "stuck_processing") {
-        const result = await reindex({ scope: "stuck" });
-        toast.success(`${result.affected} stuck chunks reset`);
       } else if (alert.type === "micro_chunks") {
         const result = await cleanup({ type: "micro_chunks", dryRun: false });
         toast.success(`${result.affectedCount} micro chunks archived`);
