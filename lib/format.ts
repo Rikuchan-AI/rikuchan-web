@@ -35,3 +35,28 @@ export function periodLabel(period: string): string {
   if (days === 365) return "365 days";
   return `${days} days`;
 }
+
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+  return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
+export function timeAgo(isoDate: string | null): string {
+  if (!isoDate) return "never";
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  if (diffMs < 0) return "just now";
+  if (diffMs < 60_000) return `${Math.round(diffMs / 1000)}s ago`;
+  if (diffMs < 3_600_000) return `${Math.round(diffMs / 60_000)}m ago`;
+  if (diffMs < 86_400_000) return `${Math.round(diffMs / 3_600_000)}h ago`;
+  return `${Math.round(diffMs / 86_400_000)}d ago`;
+}

@@ -16,6 +16,19 @@ import type {
   ProjectTrigger,
 } from "./types-project";
 import type { TaskChatMessage } from "./types-chat";
+import type {
+  CorpusStats,
+  CorpusSource,
+  ChunkDistribution,
+  CorpusCollection,
+  IngestActivity,
+  QualityAlert,
+  ReindexRequest,
+  ReindexResponse,
+  CleanupRequest,
+  CleanupResponse,
+  BulkDeleteRequest,
+} from "./types-corpus";
 
 // ─── Error Types ─────────────────────────────────────────────────────────────
 
@@ -295,6 +308,32 @@ class McApiClient {
       this.request<void>(`/api/notifications/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ read: true }),
+      }),
+  };
+
+  // ─── Corpus (Knowledge Base) ───
+
+  corpus = {
+    stats: () => this.request<CorpusStats>("/api/corpus/stats"),
+    sources: () => this.request<CorpusSource[]>("/api/corpus/sources"),
+    distribution: () => this.request<ChunkDistribution>("/api/corpus/distribution"),
+    collections: () => this.request<CorpusCollection[]>("/api/corpus/collections"),
+    activity: () => this.request<IngestActivity[]>("/api/corpus/activity"),
+    quality: () => this.request<QualityAlert[]>("/api/corpus/quality"),
+    reindex: (data: ReindexRequest) =>
+      this.request<ReindexResponse>("/api/corpus/reindex", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    cleanup: (data: CleanupRequest) =>
+      this.request<CleanupResponse>("/api/corpus/cleanup", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    deleteChunks: (data: BulkDeleteRequest) =>
+      this.request<{ affectedCount: number }>("/api/corpus/chunks", {
+        method: "DELETE",
+        body: JSON.stringify(data),
       }),
   };
 

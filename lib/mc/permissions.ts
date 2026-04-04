@@ -35,6 +35,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "analytics.view",
   // Settings
   "settings.workspace", "settings.mc",
+  // Corpus (Knowledge Base)
+  "corpus.view", "corpus.manage",
 ];
 
 const OPERATOR_PERMISSIONS: Permission[] = [
@@ -52,6 +54,8 @@ const OPERATOR_PERMISSIONS: Permission[] = [
   "members.view",
   // Billing (view only)
   "billing.view",
+  // Corpus (view only)
+  "corpus.view",
 ];
 
 const ROLE_PERMISSIONS: Record<TenantRole, Set<Permission>> = {

@@ -42,6 +42,7 @@ const ALLOWED_PATH_PREFIXES = [
   "/api/delegation",
   "/api/chat",
   "/api/agent",
+  "/api/corpus",
 ];
 
 function isAllowedPath(path: string): boolean {
