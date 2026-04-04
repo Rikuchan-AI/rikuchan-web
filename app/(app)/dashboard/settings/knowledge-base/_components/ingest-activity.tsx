@@ -37,7 +37,7 @@ export function IngestActivity() {
           const label = TYPE_LABELS[item.type] ?? item.type;
 
           return (
-            <div key={`${item.window}-${item.type}-${idx}`} className="flex items-start gap-3 py-2">
+            <div key={`${item.time_window}-${item.type}-${idx}`} className="flex items-start gap-3 py-2">
               {/* Timeline dot + line */}
               <div className="flex flex-col items-center pt-1">
                 <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
@@ -50,7 +50,7 @@ export function IngestActivity() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span className="text-xs text-foreground-muted font-mono shrink-0">
-                    {formatWindow(item.window)}
+                    {formatWindow(item.time_window)}
                   </span>
                   <span className="text-sm text-foreground">
                     {item.count} chunk{item.count !== 1 ? "s" : ""} {label}

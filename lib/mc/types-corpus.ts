@@ -54,10 +54,9 @@ export interface CorpusCollection {
 }
 
 export interface IngestActivity {
-  window: string;
+  time_window: string;
   type: string;
   count: number;
-  sources?: string[];
 }
 
 export interface QualityAlert {
