@@ -35,7 +35,6 @@ export function IngestActivity() {
         {activity.map((item, idx) => {
           const dotColor = TYPE_COLORS[item.type] ?? "bg-zinc-500";
           const label = TYPE_LABELS[item.type] ?? item.type;
-          const sources = item.sources?.filter((s) => s !== "unknown") ?? [];
 
           return (
             <div key={`${item.window}-${item.type}-${idx}`} className="flex items-start gap-3 py-2">
@@ -57,11 +56,6 @@ export function IngestActivity() {
                     {item.count} chunk{item.count !== 1 ? "s" : ""} {label}
                   </span>
                 </div>
-                {sources.length > 0 && (
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    {sources.join(", ")}
-                  </p>
-                )}
               </div>
             </div>
           );

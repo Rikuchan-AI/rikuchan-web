@@ -57,7 +57,7 @@ export interface IngestActivity {
   window: string;
   type: string;
   count: number;
-  sources: string[];
+  sources?: string[];
 }
 
 export interface QualityAlert {
