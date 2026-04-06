@@ -59,7 +59,7 @@ export default function OnboardingGatewayPage() {
           signal: AbortSignal.timeout(10_000),
         });
       }
-      router.push(`/onboarding/model?intent=${intent}`);
+      router.push(`/onboarding/knowledge?intent=${intent}`);
     } catch {
       setErrorMsg("Failed to save gateway configuration");
       setState("error");
@@ -71,7 +71,7 @@ export default function OnboardingGatewayPage() {
     router.push(`/onboarding/model?intent=${intent}`);
   }
 
-  const stepLabel = intent === "team" ? "Step 3 of 4" : "Step 1 of 2";
+  const stepLabel = intent === "team" ? "Step 3 of 5" : "Step 1 of 3";
 
   return (
     <div className="space-y-6">

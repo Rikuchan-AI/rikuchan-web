@@ -54,7 +54,7 @@ export default function OnboardingModelPage() {
     router.push("/dashboard");
   }
 
-  const stepLabel = intent === "team" ? "Step 4 of 4" : "Step 2 of 2";
+  const stepLabel = intent === "team" ? "Step 5 of 5" : "Step 3 of 3";
 
   return (
     <div className="space-y-6">

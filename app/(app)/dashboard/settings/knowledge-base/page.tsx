@@ -11,6 +11,7 @@ import { SourceBreakdown } from "./_components/source-breakdown";
 import { QualityAlerts } from "./_components/quality-alerts";
 import { CollectionManager } from "./_components/collection-manager";
 import { IngestActivity } from "./_components/ingest-activity";
+import { KnowledgeProfile } from "./_components/knowledge-profile";
 import { RefreshCw } from "lucide-react";
 
 export default function KnowledgeBasePage() {
@@ -25,6 +26,47 @@ export default function KnowledgeBasePage() {
   })));
 
   const canManage = can("corpus.manage");
+  const lastFetchedAt = useCorpusStore((s) => s.lastFetchedAt);
+
+  // First load: never fetched yet
+  const isInitialLoad = !lastFetchedAt && loading;
+  // Error on first load: no data at all
+  const isFirstLoadError = !lastFetchedAt && !loading && !!error;
+
+  // Initial loading state
+  if (isInitialLoad) {
+    return (
+      <div className="space-y-6">
+        <Header onRefresh={hydrate} loading={loading} />
+        <div className="flex items-center justify-center rounded-lg border border-line bg-surface p-12">
+          <RefreshCw className="h-5 w-5 animate-spin text-foreground-muted" />
+          <span className="ml-3 text-sm text-foreground-soft">Loading corpus data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state: backend unreachable and no cached data
+  if (isFirstLoadError) {
+    return (
+      <div className="space-y-6">
+        <Header onRefresh={hydrate} loading={loading} />
+        <div className="flex flex-col items-center justify-center rounded-lg border border-danger/30 bg-danger/10 p-12 text-center">
+          <p className="text-sm text-danger">{error}</p>
+          <p className="mt-2 text-xs text-foreground-soft">
+            Verifique se o backend do Mission Control esta rodando e tente novamente.
+          </p>
+          <button
+            onClick={hydrate}
+            className="mt-4 flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm text-foreground-soft hover:bg-surface-strong hover:text-foreground transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Empty state: no data yet
   if (!loading && !error && stats && stats.total_chunks === 0) {
@@ -51,6 +93,7 @@ export default function KnowledgeBasePage() {
         </div>
       )}
 
+      <KnowledgeProfile canManage={canManage} />
       <CorpusOverview />
       <EmbeddingPipeline canManage={canManage} />
 
