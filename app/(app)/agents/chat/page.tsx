@@ -25,7 +25,7 @@ export default function ChatListPageWrapper() {
 }
 
 function ChatListPage() {
-  const { connected, GatewayRequiredScreen } = useGatewayGate();
+  const { connected, GatewayOfflineBanner } = useGatewayGate();
   const conversations = useDirectChatStore((s) => s.conversations);
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);
@@ -51,8 +51,6 @@ function ChatListPage() {
     const id = createConversation(model, agentParam, agent?.name);
     router.replace(`/agents/chat/${id}`);
   }, [searchParams, agents, createConversation, router]);
-
-  if (!connected) return <GatewayRequiredScreen feature="Chat" />;
 
   const handleNew = () => {
     const id = createConversation();
@@ -82,6 +80,8 @@ function ChatListPage() {
       <p className="text-sm text-foreground-muted">
         Ask questions directly to the gateway. Conversations are saved locally.
       </p>
+
+      {!connected && <GatewayOfflineBanner message="Envio de mensagens requer conexão com o gateway. Conversas salvas continuam acessíveis." />}
 
       {conversations.length === 0 ? (
         <EmptyState

@@ -105,7 +105,7 @@ OPENAI_API_KEY=rk_live_your_token`,
     items: [
       {
         title: "Hybrid search pipeline",
-        body: "Every search query goes through:\n\n1. **Embedding** — `nomic-embed-text` via Ollama (768 dimensions)\n2. **Vector search** — cosine similarity in LanceDB\n3. **BM25 search** — lexical keyword matching\n4. **RRF merge** — Reciprocal Rank Fusion combines both result sets\n5. **BGE reranking** — `bge-reranker-base` re-scores the merged results for final relevance",
+        body: "Every search query goes through:\n\n1. **Embedding** — `multilingual-e5-base` via TEI (768 dimensions)\n2. **Vector search** — cosine similarity in Supabase pgvector\n3. **BM25 search** — lexical keyword matching\n4. **RRF merge** — Reciprocal Rank Fusion combines both result sets\n5. **BGE reranking** — `bge-reranker-base` re-scores the merged results for final relevance",
       },
       {
         title: "Score interpretation",
@@ -161,13 +161,13 @@ rikuchan watch /path/to/docs/`,
       },
       {
         title: "Memory search in agents",
-        body: "Every agent with `memory_search` in its tool list can semantically search the shared knowledge base. The provider is Ollama with `nomic-embed-text`.\n\nMemory sources include `MEMORY.md`, `memory/*.md` files, and session transcripts.",
+        body: "Every agent with `memory_search` in its tool list can semantically search the shared knowledge base. The provider is TEI with `multilingual-e5-base`.\n\nMemory sources include `MEMORY.md`, `memory/*.md` files, and session transcripts.",
         code: `// openclaw.json — agent defaults
 {
   "memorySearch": {
     "enabled": true,
-    "provider": "ollama",
-    "model": "nomic-embed-text",
+    "provider": "tei",
+    "model": "multilingual-e5-base",
     "sources": ["memory", "sessions"],
     "query": {
       "maxResults": 8,
@@ -270,7 +270,7 @@ RIKUCHAN_LOG_LEVEL=INFO`,
     items: [
       {
         title: "Embedding model fine-tuning",
-        body: "The default embedding model (`nomic-embed-text`) can be fine-tuned on domain-specific data to improve retrieval accuracy. The process:\n\n1. **Export training pairs** — use the RAG feedback loop to extract positive/negative query-document pairs\n2. **Fine-tune** — train a custom embedding model using sentence-transformers\n3. **Deploy** — serve the fine-tuned model via Ollama with a custom Modelfile\n4. **Re-embed** — re-index the knowledge base with the new model",
+        body: "The default embedding model (`multilingual-e5-base`) can be fine-tuned on domain-specific data to improve retrieval accuracy. The process:\n\n1. **Export training pairs** — use the RAG feedback loop to extract positive/negative query-document pairs\n2. **Fine-tune** — train a custom embedding model using sentence-transformers\n3. **Deploy** — serve the fine-tuned model via TEI\n4. **Re-embed** — re-index the knowledge base with the new model",
       },
       {
         title: "Reranker tuning",
