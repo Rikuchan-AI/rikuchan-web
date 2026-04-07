@@ -221,7 +221,7 @@ export function AgentCard({ agent, index = 0 }: AgentCardProps) {
       {/* Action buttons */}
       <div className="flex items-center gap-2 border-t border-[rgba(255,255,255,0.06)] pt-2.5">
         <Link
-          href={`/agents/chat?agent=${agent.id}`}
+          href={`/dashboard/chat?agent=${agent.id}`}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-foreground-muted hover:text-foreground hover:bg-surface-strong transition-colors"
         >
           <MessageSquare size={11} />

@@ -289,7 +289,7 @@ export default function ConversationPage() {
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="text-sm text-foreground-muted">Conversation not found</p>
         <button
-          onClick={() => router.push("/agents/chat")}
+          onClick={() => router.push("/dashboard/chat")}
           className="mt-3 text-sm font-medium text-accent hover:text-accent-deep transition-colors"
         >
           Back to conversations
@@ -307,7 +307,7 @@ export default function ConversationPage() {
       <div className="flex items-center gap-3 border-b border-line px-1 py-3">
         <button
           aria-label="Back to conversations"
-          onClick={() => router.push("/agents/chat")}
+          onClick={() => router.push("/dashboard/chat")}
           className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-strong hover:text-foreground"
         >
           <ArrowLeft size={16} />

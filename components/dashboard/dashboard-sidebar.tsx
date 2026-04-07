@@ -43,6 +43,7 @@ interface NavItem {
 
 const platformLinks: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Chat", href: "/dashboard/chat", icon: MessageSquare },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { label: "API keys", href: "/dashboard/api-keys", icon: Key, requiredPermission: "api_keys.view" },
   { label: "Billing", href: "/dashboard/billing", icon: CreditCard, requiredPermission: "billing.manage" },
@@ -61,18 +62,13 @@ const mcLinks: NavItem[] = [
   { label: "MC Settings", href: "/agents/settings", icon: SlidersHorizontal, requiredPermission: "settings.mc" },
 ];
 
-const chatLinks: NavItem[] = [
-  { label: "Chat", href: "/agents/chat", icon: MessageSquare },
-];
-
 interface CollapsedState {
   mc: boolean;
-  chat: boolean;
   platform: boolean;
 }
 
 function useCollapsedState(): [CollapsedState, (section: keyof CollapsedState) => void] {
-  const [collapsed, setCollapsed] = useState<CollapsedState>({ mc: false, chat: false, platform: false });
+  const [collapsed, setCollapsed] = useState<CollapsedState>({ mc: false, platform: false });
 
   useEffect(() => {
     try {
@@ -202,23 +198,9 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" />
 
-      {/* Chat — always available */}
-      <div className="mt-8 space-y-1">
-        <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
-        {!collapsed.chat &&
-          chatLinks.map((link) => (
-            <NavLink
-              key={link.href}
-              {...link}
-              pathname={pathname}
-              onNavigate={onNavigate}
-            />
-          ))}
-      </div>
-
       {/* Mission Control */}
       {MC_ENABLED && (
-        <div className="mt-6 space-y-1">
+        <div className="mt-8 space-y-1">
           <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
           {!collapsed.mc &&
             visibleMcLinks.map((link) => (

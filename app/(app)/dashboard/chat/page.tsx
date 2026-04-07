@@ -49,12 +49,12 @@ function ChatListPage() {
     const agent = agents.find((a) => a.id === agentParam);
     const model = agent?.model;
     const id = createConversation(model, agentParam, agent?.name);
-    router.replace(`/agents/chat/${id}`);
+    router.replace(`/dashboard/chat/${id}`);
   }, [searchParams, agents, createConversation, router]);
 
   const handleNew = () => {
     const id = createConversation();
-    router.push(`/agents/chat/${id}`);
+    router.push(`/dashboard/chat/${id}`);
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -97,8 +97,8 @@ function ChatListPage() {
               key={conv.id}
               role="button"
               tabIndex={0}
-              onClick={() => router.push(`/agents/chat/${conv.id}`)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/agents/chat/${conv.id}`); }}
+              onClick={() => router.push(`/dashboard/chat/${conv.id}`)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/dashboard/chat/${conv.id}`); }}
               className="group flex w-full cursor-pointer items-center justify-between rounded-lg border border-line bg-surface p-4 text-left transition-colors hover:border-accent/30 hover:bg-surface-strong"
             >
               <div className="min-w-0 flex-1">

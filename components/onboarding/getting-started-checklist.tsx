@@ -32,7 +32,7 @@ function useOperatorItems(): ChecklistItem[] {
     { id: "account", label: "Accept invite", href: "#", autoDetect: () => true },
     { id: "explore", label: "Explore the board", href: "/agents/projects" },
     { id: "task", label: "Create your first task", href: "/agents/projects" },
-    { id: "chat", label: "Chat with an agent", href: "/agents/chat" },
+    { id: "chat", label: "Chat with an agent", href: "/dashboard/chat" },
   ], []);
 }
 
