@@ -48,9 +48,7 @@ const platformLinks: NavItem[] = [
   { label: "Billing", href: "/dashboard/billing", icon: CreditCard, requiredPermission: "billing.manage" },
   { label: "Plans", href: "/dashboard/plans", icon: Sparkles, requiredPermission: "billing.manage" },
   { label: "Members", href: "/dashboard/settings/members", icon: UsersRound, requiredPermission: "members.view" },
-  ...(MC_ENABLED
-    ? [{ label: "Knowledge Base", href: "/dashboard/settings/knowledge-base", icon: Database, requiredPermission: "corpus.view" as Permission }]
-    : []),
+  { label: "Knowledge Base", href: "/dashboard/settings/knowledge-base", icon: Database, requiredPermission: "corpus.view" as Permission },
   { label: "Settings", href: "/dashboard/settings", icon: Settings, requiredPermission: "settings.workspace" },
 ];
 
@@ -204,21 +202,19 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex min-h-screen flex-col border-r border-line bg-surface p-5 lg:sticky lg:top-0">
       <LogoLockup href="/" />
 
-      {/* Chat */}
-      {MC_ENABLED && (
-        <div className="mt-8 space-y-1">
-          <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
-          {!collapsed.chat &&
-            chatLinks.map((link) => (
-              <NavLink
-                key={link.href}
-                {...link}
-                pathname={pathname}
-                onNavigate={onNavigate}
-              />
-            ))}
-        </div>
-      )}
+      {/* Chat — always available */}
+      <div className="mt-8 space-y-1">
+        <SectionHeader label="Chat" collapsed={collapsed.chat} onToggle={() => toggle("chat")} />
+        {!collapsed.chat &&
+          chatLinks.map((link) => (
+            <NavLink
+              key={link.href}
+              {...link}
+              pathname={pathname}
+              onNavigate={onNavigate}
+            />
+          ))}
+      </div>
 
       {/* Mission Control */}
       {MC_ENABLED && (
