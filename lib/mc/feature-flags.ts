@@ -1,37 +1,29 @@
-import { getSupabaseAdmin } from "./supabase-server";
+import { auth } from "@clerk/nextjs/server";
 
-interface FeatureFlag {
-  key: string;
-  description: string | null;
-  enabled_globally: boolean;
-  enabled_plans: string[];
-  enabled_tenants: string[];
-}
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
 
-// Cache flags for 30s to avoid DB hits on every check
-let flagsCache: { flags: FeatureFlag[]; expiresAt: number } | null = null;
-const FLAGS_TTL_MS = 30_000;
-
-async function loadFlags(): Promise<FeatureFlag[]> {
-  if (flagsCache && flagsCache.expiresAt > Date.now()) return flagsCache.flags;
-
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase.from("feature_flags").select("*");
-  const flags = (data || []) as FeatureFlag[];
-  flagsCache = { flags, expiresAt: Date.now() + FLAGS_TTL_MS };
-  return flags;
-}
-
-export async function isFeatureEnabled(tenantId: string, flagKey: string, tenantPlan?: string): Promise<boolean> {
-  const flags = await loadFlags();
-  const flag = flags.find((f) => f.key === flagKey);
-  if (!flag) return false;
-  if (flag.enabled_globally) return true;
-  if (flag.enabled_tenants.includes(tenantId)) return true;
-  if (tenantPlan && flag.enabled_plans.includes(tenantPlan)) return true;
+export async function isFeatureEnabled(tenantId: string, flagKey: string, _tenantPlan?: string): Promise<boolean> {
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const res = await fetch(`${API_URL}/api/feature-flags/check?key=${encodeURIComponent(flagKey)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(5000),
+      next: { revalidate: 30 },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.enabled ?? false;
+    }
+  } catch {
+    // fallback
+  }
   return false;
 }
 
 export function invalidateFlagsCache(): void {
-  flagsCache = null;
+  // Cache is now server-side in rikuchan-api — no local cache to invalidate
 }

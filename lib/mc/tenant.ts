@@ -1,6 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "./supabase-server";
 import { type TenantRole, type Permission, can, meetsMinimumRole, normalizeClerkRole } from "./permissions";
 
 export interface TenantContext {
@@ -26,32 +25,16 @@ export async function resolveTenantId(): Promise<TenantContext> {
 
 /**
  * Auto-provision a tenant record on first access.
- * Uses upsert to avoid race conditions.
+ * Now delegates to rikuchan-api via GET /tenants/me.
  */
 export async function ensureTenant(
-  tenantId: string,
-  userId: string,
-  orgId?: string | null,
+  _tenantId: string,
+  _userId: string,
+  _orgId?: string | null,
 ): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("tenants")
-    .select("id")
-    .eq("id", tenantId)
-    .single();
-
-  if (!data) {
-    await supabase.from("tenants").upsert(
-      {
-        id: tenantId,
-        type: orgId ? "org" : "personal",
-        owner_user_id: userId,
-        clerk_org_id: orgId || null,
-        plan: "free",
-      },
-      { onConflict: "id" },
-    );
-  }
+  // Tenant auto-provisioning now happens server-side in rikuchan-api
+  // when GET /tenants/me or GET /tenants/onboarding is called.
+  // This function is kept for backward compat with callers.
 }
 
 /**
@@ -83,25 +66,26 @@ export async function requirePermission(ctx: TenantContext, permission: Permissi
 
 /**
  * Check if the tenant has completed onboarding.
- * Returns true for tenants created before onboarding feature was deployed.
+ * Calls rikuchan-api GET /tenants/onboarding/check.
  */
 export async function checkTenantOnboarding(tenantId: string): Promise<boolean> {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("tenants")
-    .select("onboarding_completed, created_at")
-    .eq("id", tenantId)
-    .single();
-
-  if (!data) return false;
-  if (data.onboarding_completed) return true;
-
-  // Auto-complete for tenants created before onboarding feature
-  const ONBOARDING_LAUNCH = "2026-03-23T00:00:00Z";
-  if (new Date(data.created_at) < new Date(ONBOARDING_LAUNCH)) {
-    await supabase.from("tenants").update({ onboarding_completed: true }).eq("id", tenantId);
-    return true;
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
+    const res = await fetch(`${API_URL}/api/tenants/onboarding/check`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.completed ?? false;
+    }
+  } catch {
+    // fallback
   }
-
   return false;
 }

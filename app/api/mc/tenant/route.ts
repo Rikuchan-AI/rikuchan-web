@@ -1,44 +1,26 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
-import { resolveTenantId, ensureTenant } from "@/lib/mc/tenant";
+import { auth } from "@clerk/nextjs/server";
+
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
 
 export async function GET() {
   try {
-    const { tenantId, userId } = await resolveTenantId();
-    const supabase = getSupabaseAdmin();
+    const { getToken } = await auth();
+    const token = await getToken();
 
-    // Ensure tenant exists (auto-provision on first access)
-    const { orgId } = await import("@clerk/nextjs/server").then((m) => m.auth());
-    await ensureTenant(tenantId, userId, orgId);
+    const res = await fetch(`${API_URL}/api/tenants/me`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(5000),
+    });
 
-    // Fetch tenant + plan info in one go
-    const { data: tenant } = await supabase
-      .from("tenants")
-      .select("id, type, plan, name, slug, suspended")
-      .eq("id", tenantId)
-      .single();
-
-    if (!tenant) {
+    if (!res.ok) {
       return NextResponse.json({ plan: "free", display_name: "Free" });
     }
 
-    const { data: planData } = await supabase
-      .from("tenant_plans")
-      .select("display_name, limits, features, price_usd")
-      .eq("plan", tenant.plan)
-      .single();
-
-    return NextResponse.json({
-      tenantId: tenant.id,
-      type: tenant.type,
-      plan: tenant.plan,
-      display_name: planData?.display_name || "Free",
-      name: tenant.name,
-      suspended: tenant.suspended,
-      limits: planData?.limits || {},
-      features: planData?.features || {},
-      price_usd: planData?.price_usd || 0,
-    });
+    return NextResponse.json(await res.json());
   } catch {
     return NextResponse.json({ plan: "free", display_name: "Free" });
   }

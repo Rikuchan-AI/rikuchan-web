@@ -10,6 +10,11 @@ const MAX_BODY_SIZE = 10 * 1024 * 1024;
 const ALLOWED_PATH_PREFIXES = [
   "/api/corpus",
   "/api/knowledge-profile",
+  "/api/tenants",
+  "/api/gateway",
+  "/api/feature-flags",
+  "/api/plan-limits",
+  "/api/admin",
 ];
 
 function isAllowedPath(path: string): boolean {

@@ -1,14 +1,20 @@
 import Link from "next/link";
-import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
+import { auth } from "@clerk/nextjs/server";
 import { AdminShell } from "@/components/admin/admin-shell";
 
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
+
 async function getTenants() {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("tenants")
-    .select("id,type,name,plan,suspended,created_at")
-    .order("created_at", { ascending: false });
-  return data || [];
+  const { getToken } = await auth();
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/admin/tenants`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return body.data || [];
 }
 
 export default async function AdminTenantsPage() {
@@ -36,20 +42,20 @@ export default async function AdminTenantsPage() {
               </tr>
             </thead>
             <tbody>
-              {tenants.map((t) => (
-                <tr key={t.id} className="border-b border-line/50 hover:bg-surface-strong/50 transition">
-                  <td className="px-4 py-3 font-mono text-xs text-foreground-soft">{t.id.slice(0, 16)}...</td>
+              {tenants.map((t: Record<string, unknown>) => (
+                <tr key={t.id as string} className="border-b border-line/50 hover:bg-surface-strong/50 transition">
+                  <td className="px-4 py-3 font-mono text-xs text-foreground-soft">{(t.id as string).slice(0, 16)}...</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                       t.type === "org" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
                     }`}>
-                      {t.type}
+                      {t.type as string}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-foreground">{t.name || "-"}</td>
+                  <td className="px-4 py-3 text-foreground">{(t.name as string) || "-"}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent border border-accent/20">
-                      {t.plan}
+                      {t.plan as string}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -60,7 +66,7 @@ export default async function AdminTenantsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-foreground-muted">
-                    {new Date(t.created_at).toLocaleDateString()}
+                    {new Date(t.created_at as string).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
                     <Link

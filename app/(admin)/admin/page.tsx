@@ -1,29 +1,18 @@
-import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
+import { auth } from "@clerk/nextjs/server";
 import { AdminShell } from "@/components/admin/admin-shell";
 
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
+
 async function getOverviewMetrics() {
-  const supabase = getSupabaseAdmin();
-
-  const [
-    { count: totalTenants },
-    { data: planBreakdown },
-    { count: totalProjects },
-  ] = await Promise.all([
-    supabase.from("tenants").select("id", { count: "exact", head: true }),
-    supabase.from("tenants").select("plan"),
-    supabase.from("mc_projects").select("id", { count: "exact", head: true }),
-  ]);
-
-  const planCounts: Record<string, number> = {};
-  for (const row of planBreakdown || []) {
-    planCounts[row.plan] = (planCounts[row.plan] || 0) + 1;
-  }
-
-  return {
-    totalTenants: totalTenants || 0,
-    totalProjects: totalProjects || 0,
-    planCounts,
-  };
+  const { getToken } = await auth();
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/admin/overview`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+  });
+  if (!res.ok) return { totalTenants: 0, totalProjects: 0, planCounts: {} };
+  return res.json();
 }
 
 export default async function AdminOverviewPage() {
@@ -47,7 +36,7 @@ export default async function AdminOverviewPage() {
             {Object.entries(metrics.planCounts).map(([plan, count]) => (
               <div key={plan} className="flex items-center justify-between text-sm">
                 <span className="text-foreground-soft capitalize">{plan}</span>
-                <span className="font-mono text-foreground">{count}</span>
+                <span className="font-mono text-foreground">{count as number}</span>
               </div>
             ))}
           </div>

@@ -1,41 +1,23 @@
 import { notFound } from "next/navigation";
-import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
+import { auth } from "@clerk/nextjs/server";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { TenantActions } from "./tenant-actions";
+
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
 
 type Props = { params: Promise<{ tenantId: string }> };
 
 async function getTenantDetail(tenantId: string) {
-  const supabase = getSupabaseAdmin();
-
-  const [
-    { data: tenant },
-    { count: projectCount },
-    { count: taskCount },
-  ] = await Promise.all([
-    supabase
-      .from("tenants")
-      .select("id,name,type,plan,suspended,owner_user_id,clerk_org_id,slug,created_at,updated_at")
-      .eq("id", tenantId)
-      .single(),
-    supabase.from("mc_projects").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
-    supabase.from("mc_tasks").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
-  ]);
-
-  if (!tenant) return null;
-
-  const { data: planData } = await supabase
-    .from("tenant_plans")
-    .select("plan,limits")
-    .eq("plan", tenant.plan)
-    .single();
-
-  return {
-    ...tenant,
-    projectCount: projectCount || 0,
-    taskCount: taskCount || 0,
-    planDetails: planData,
-  };
+  const { getToken } = await auth();
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/admin/tenants/${tenantId}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return body.data;
 }
 
 export default async function TenantDetailPage({ params }: Props) {

@@ -1,14 +1,19 @@
-import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
+import { auth } from "@clerk/nextjs/server";
 import { AdminShell } from "@/components/admin/admin-shell";
 
+const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
+
 async function getUsageData() {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("tenant_usage")
-    .select("tenant_id,tokens_consumed,requests_count,estimated_cost_usd,date")
-    .order("date", { ascending: false })
-    .limit(100);
-  return data || [];
+  const { getToken } = await auth();
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/api/admin/usage`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return body.data || [];
 }
 
 export default async function AdminUsagePage() {
