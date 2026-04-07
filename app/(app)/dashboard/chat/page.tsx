@@ -3,10 +3,8 @@
 import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDirectChatStore } from "@/lib/mc/direct-chat-store";
-import { useGatewayStore } from "@/lib/mc/gateway-store";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
-import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -25,12 +23,10 @@ export default function ChatListPageWrapper() {
 }
 
 function ChatListPage() {
-  const { connected, GatewayOfflineBanner } = useGatewayGate();
   const conversations = useDirectChatStore((s) => s.conversations);
   const createConversation = useDirectChatStore((s) => s.createConversation);
   const deleteConversation = useDirectChatStore((s) => s.deleteConversation);
   const hydrate = useDirectChatStore((s) => s._hydrate);
-  const agents = useGatewayStore((s) => s.agents);
   const router = useRouter();
   const searchParams = useSearchParams();
   const autoCreated = useRef(false);
@@ -40,17 +36,15 @@ function ChatListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-create conversation when arriving from agent card with ?agent=
+  // Auto-create conversation when arriving with ?agent=
   useEffect(() => {
     if (autoCreated.current) return;
     const agentParam = searchParams.get("agent");
     if (!agentParam) return;
     autoCreated.current = true;
-    const agent = agents.find((a) => a.id === agentParam);
-    const model = agent?.model;
-    const id = createConversation(model, agentParam, agent?.name);
+    const id = createConversation(undefined, agentParam);
     router.replace(`/dashboard/chat/${id}`);
-  }, [searchParams, agents, createConversation, router]);
+  }, [searchParams, createConversation, router]);
 
   const handleNew = () => {
     const id = createConversation();
@@ -80,8 +74,6 @@ function ChatListPage() {
       <p className="text-sm text-foreground-muted">
         Ask questions directly to the gateway. Conversations are saved locally.
       </p>
-
-      {!connected && <GatewayOfflineBanner message="Envio de mensagens requer conexão com o gateway. Conversas salvas continuam acessíveis." />}
 
       {conversations.length === 0 ? (
         <EmptyState
