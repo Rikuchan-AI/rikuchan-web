@@ -112,7 +112,7 @@ export const useCorpusStore = create<CorpusStore>((set, get) => ({
         activity: activityR.status === "fulfilled" ? activityR.value : prev.activity,
         quality: qualityR.status === "fulfilled" ? qualityR.value : prev.quality,
         loading: false,
-        lastFetchedAt: Date.now(),
+        lastFetchedAt: statsR.status === "fulfilled" ? Date.now() : prev.lastFetchedAt,
         error: statsR.status === "rejected" ? String(statsR.reason) : null,
       });
     } catch (err) {

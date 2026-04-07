@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Code, Scale, BarChart3, Megaphone, ShoppingCart, Calculator, Heart, GraduationCap, Ticket, Building2, ChevronDown, Loader2 } from "lucide-react";
-import { useMCFetch } from "@/hooks/use-mc-fetch";
-
 const ORG_TYPE_META: Record<string, { label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   software_dev: { label: "Tecnologia", Icon: Code },
   legal: { label: "Juridico", Icon: Scale },
@@ -47,7 +45,6 @@ interface Profile {
 }
 
 export function KnowledgeProfile({ canManage }: { canManage: boolean }) {
-  const mcFetch = useMCFetch();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,7 +54,7 @@ export function KnowledgeProfile({ canManage }: { canManage: boolean }) {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const res = await mcFetch("/api/knowledge-profile");
+      const res = await fetch("/api/knowledge-profile");
       if (res.ok) {
         const { data } = await res.json();
         setProfile(data);
@@ -67,7 +64,7 @@ export function KnowledgeProfile({ canManage }: { canManage: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [mcFetch]);
+  }, []);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
@@ -77,7 +74,7 @@ export function KnowledgeProfile({ canManage }: { canManage: boolean }) {
     setError("");
     setSuccess("");
     try {
-      const res = await mcFetch("/api/knowledge-profile", {
+      const res = await fetch("/api/knowledge-profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),

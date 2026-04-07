@@ -48,7 +48,9 @@ const platformLinks: NavItem[] = [
   { label: "Billing", href: "/dashboard/billing", icon: CreditCard, requiredPermission: "billing.manage" },
   { label: "Plans", href: "/dashboard/plans", icon: Sparkles, requiredPermission: "billing.manage" },
   { label: "Members", href: "/dashboard/settings/members", icon: UsersRound, requiredPermission: "members.view" },
-  { label: "Knowledge Base", href: "/dashboard/settings/knowledge-base", icon: Database, requiredPermission: "corpus.view" },
+  ...(MC_ENABLED
+    ? [{ label: "Knowledge Base", href: "/dashboard/settings/knowledge-base", icon: Database, requiredPermission: "corpus.view" as Permission }]
+    : []),
   { label: "Settings", href: "/dashboard/settings", icon: Settings, requiredPermission: "settings.workspace" },
 ];
 

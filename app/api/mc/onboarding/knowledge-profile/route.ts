@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveTenantId, ensureTenant } from "@/lib/mc/tenant";
 import { auth } from "@clerk/nextjs/server";
 
+const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
+
 const BACKEND_URL =
   process.env.MC_BACKEND_URL ??
   process.env.NEXT_PUBLIC_MC_BACKEND_URL ??
   "";
 
 export async function POST(req: NextRequest) {
+  if (!MC_ENABLED) {
+    return NextResponse.json({ error: "Mission Control is disabled" }, { status: 503 });
+  }
   try {
     const { tenantId, userId } = await resolveTenantId();
     const { orgId } = await auth();

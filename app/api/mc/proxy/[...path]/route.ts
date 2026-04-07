@@ -1,3 +1,5 @@
+const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
+
 const BACKEND_URL = process.env.MC_BACKEND_URL
   ?? process.env.NEXT_PUBLIC_MC_BACKEND_URL
   ?? "";
@@ -50,6 +52,13 @@ function isAllowedPath(path: string): boolean {
 }
 
 async function proxy(req: Request) {
+  if (!MC_ENABLED) {
+    return new Response(
+      JSON.stringify({ error: "Mission Control is disabled" }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const url = new URL(req.url);
   const backendPath = url.pathname.replace(/^\/api\/mc\/proxy/, "");
 

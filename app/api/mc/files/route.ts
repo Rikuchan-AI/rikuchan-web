@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/mc/supabase-server";
 import { resolveTenantId } from "@/lib/mc/tenant";
 
+const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
+
 const BUCKET = "task-attachments";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = new Set([
@@ -22,6 +24,9 @@ const ALLOWED_TYPES = new Set([
  * Returns: { path, url }
  */
 export async function POST(req: NextRequest) {
+  if (!MC_ENABLED) {
+    return NextResponse.json({ error: "Mission Control is disabled" }, { status: 503 });
+  }
   try {
     const { tenantId } = await resolveTenantId();
     const formData = await req.formData();
@@ -95,6 +100,9 @@ export async function POST(req: NextRequest) {
  * Generate a signed URL for downloading a file.
  */
 export async function GET(req: NextRequest) {
+  if (!MC_ENABLED) {
+    return NextResponse.json({ error: "Mission Control is disabled" }, { status: 503 });
+  }
   try {
     const { tenantId } = await resolveTenantId();
     const filePath = req.nextUrl.searchParams.get("path");

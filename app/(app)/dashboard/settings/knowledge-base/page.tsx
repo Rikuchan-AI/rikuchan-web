@@ -12,10 +12,24 @@ import { QualityAlerts } from "./_components/quality-alerts";
 import { CollectionManager } from "./_components/collection-manager";
 import { IngestActivity } from "./_components/ingest-activity";
 import { KnowledgeProfile } from "./_components/knowledge-profile";
-import { RefreshCw } from "lucide-react";
+import { Database, RefreshCw } from "lucide-react";
+
+const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
 
 export default function KnowledgeBasePage() {
   useCorpusPolling();
+
+  if (!MC_ENABLED) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-line bg-surface p-12 text-center">
+        <Database size={32} className="text-foreground-muted" />
+        <p className="mt-4 text-lg font-medium text-foreground">Knowledge Base desabilitada</p>
+        <p className="mt-2 text-sm text-foreground-soft">
+          Ative o Mission Control para usar a Knowledge Base.
+        </p>
+      </div>
+    );
+  }
 
   const { can } = usePermissions();
   const { loading, error, stats, hydrate } = useCorpusStore(useShallow((s) => ({
