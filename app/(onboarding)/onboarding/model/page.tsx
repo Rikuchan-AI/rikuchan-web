@@ -44,13 +44,17 @@ export default function OnboardingModelPage() {
     }
   }
 
-  function handleSkip() {
-    // Mark completed without model selection
-    fetch("/api/mc/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed: true, intent }),
-    });
+  async function handleSkip() {
+    setLoading(true);
+    try {
+      await fetch("/api/mc/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: true, intent }),
+      });
+    } catch {
+      // best-effort
+    }
     router.push("/dashboard");
   }
 

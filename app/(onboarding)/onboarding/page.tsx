@@ -1,10 +1,30 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { User, Users } from "lucide-react";
 
+async function markOnboardingComplete(intent: string) {
+  await fetch("/api/mc/onboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ completed: true, intent }),
+  });
+}
+
 export default function OnboardingIntentPage() {
   const router = useRouter();
+  const [skipping, setSkipping] = useState(false);
+
+  async function handleSkip() {
+    setSkipping(true);
+    try {
+      await markOnboardingComplete("skipped");
+      router.push("/dashboard");
+    } catch {
+      router.push("/dashboard");
+    }
+  }
 
   return (
     <div className="space-y-8 text-center">
@@ -48,9 +68,9 @@ export default function OnboardingIntentPage() {
 
       <p className="text-xs text-foreground-muted">
         You can change this later in settings.{" "}
-        <a href="/dashboard" className="text-accent hover:text-accent/80 transition">
-          Skip setup
-        </a>
+        <button onClick={handleSkip} disabled={skipping} className="text-accent hover:text-accent/80 transition">
+          {skipping ? "Skipping..." : "Skip setup"}
+        </button>
       </p>
     </div>
   );

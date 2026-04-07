@@ -1,25 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useOrganizationList } from "@clerk/nextjs";
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
+import { useOrganizationList, useOrganization } from "@clerk/nextjs";
 
 export default function OnboardingOrgPage() {
   const router = useRouter();
-  const { createOrganization } = useOrganizationList();
+  const { createOrganization, setActive, userMemberships } = useOrganizationList({
+    userMemberships: { infinite: true },
+  });
+  const { organization: activeOrg } = useOrganization();
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugEdited, setSlugEdited] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function handleNameChange(value: string) {
-    setName(value);
-    if (!slugEdited) setSlug(slugify(value));
+  // If user already has an org (e.g. from a previous incomplete onboarding), skip creation
+  useEffect(() => {
+    if (activeOrg) {
+      router.replace("/onboarding/invite");
+      return;
+    }
+    const existing = userMemberships?.data?.[0]?.organization;
+    if (existing && setActive) {
+      setActive({ organization: existing.id }).then(() => {
+        router.replace("/onboarding/invite");
+      });
+    }
+  }, [activeOrg, userMemberships?.data, setActive, router]);
+
+  async function handleSkipAll() {
+    setLoading(true);
+    try {
+      await fetch("/api/mc/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: true, intent: "team" }),
+      });
+      router.push("/dashboard");
+    } catch {
+      router.push("/dashboard");
+    }
   }
 
   async function handleContinue() {
@@ -28,10 +48,21 @@ export default function OnboardingOrgPage() {
     setError("");
 
     try {
-      await createOrganization({ name: name.trim(), slug: slug || undefined });
+      const org = await createOrganization({ name: name.trim() });
+      if (setActive) await setActive({ organization: org.id });
       router.push("/onboarding/invite");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create organization");
+      const msg = e instanceof Error ? e.message : "Failed to create organization";
+      // If org with this name already exists, try to continue
+      if (msg.toLowerCase().includes("taken") || msg.toLowerCase().includes("already")) {
+        const existing = userMemberships?.data?.[0]?.organization;
+        if (existing && setActive) {
+          await setActive({ organization: existing.id });
+          router.push("/onboarding/invite");
+          return;
+        }
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -41,9 +72,9 @@ export default function OnboardingOrgPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wider text-foreground-muted">Step 1 of 4 — Create organization</p>
-        <a href="/dashboard" className="text-xs text-accent hover:text-accent/80 transition">
+        <button onClick={handleSkipAll} disabled={loading} className="text-xs text-accent hover:text-accent/80 transition">
           Skip all
-        </a>
+        </button>
       </div>
 
       <div>
@@ -57,23 +88,10 @@ export default function OnboardingOrgPage() {
           <input
             type="text"
             value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Acme Labs"
             className="mt-1 w-full rounded-md border border-line bg-surface-strong px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent focus:outline-none"
           />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-foreground">URL</label>
-          <div className="mt-1 flex items-center rounded-md border border-line bg-surface-strong overflow-hidden">
-            <span className="px-3 py-2.5 text-sm text-foreground-muted bg-surface border-r border-line">rikuchan.tech/org/</span>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => { setSlug(e.target.value); setSlugEdited(true); }}
-              className="flex-1 bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none"
-            />
-          </div>
         </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
