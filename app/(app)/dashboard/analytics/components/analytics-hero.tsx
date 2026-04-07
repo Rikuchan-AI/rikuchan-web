@@ -1,4 +1,4 @@
-import type { AnalyticsSummary } from "@/lib/gateway";
+import type { AnalyticsSummary } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { formatUSD, periodLabel } from "@/lib/format";

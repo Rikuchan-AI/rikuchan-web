@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 const MC_ENABLED = process.env.NEXT_PUBLIC_MC_ENABLED === "true";
 
 const BACKEND_URL =
+  process.env.RIKUCHAN_API_URL ??
   process.env.MC_BACKEND_URL ??
   process.env.NEXT_PUBLIC_MC_BACKEND_URL ??
   "";

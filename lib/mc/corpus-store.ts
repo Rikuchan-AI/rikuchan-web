@@ -17,7 +17,7 @@ import type {
 // Direct fetch helper (bypasses McApiClient — works outside GatewayProvider)
 // ---------------------------------------------------------------------------
 
-const MC_PROXY_URL = "/api/mc/proxy";
+const API_PROXY_URL = "/api/rikuchan-api/proxy";
 
 let _tokenGetter: (() => Promise<string | null>) | null = null;
 
@@ -28,7 +28,7 @@ export function setCorpusTokenGetter(fn: () => Promise<string | null>) {
 
 async function corpusFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = _tokenGetter ? await _tokenGetter() : null;
-  const res = await fetch(`${MC_PROXY_URL}${path}`, {
+  const res = await fetch(`${API_PROXY_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -10,7 +10,7 @@ import {
   type SavingsBreakdown,
   type ProviderBreakdown,
   type Insight,
-} from "@/lib/gateway";
+} from "@/lib/api";
 import { AnalyticsHero } from "./components/analytics-hero";
 import { SavingsTimeline } from "./components/savings-timeline";
 import { SavingsBreakdown as SavingsBreakdownSection } from "./components/savings-breakdown";

@@ -1,7 +1,7 @@
 "use client";
 
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import type { AnalyticsTimeline } from "@/lib/gateway";
+import type { AnalyticsTimeline } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { formatUSD, shortDate } from "@/lib/format";

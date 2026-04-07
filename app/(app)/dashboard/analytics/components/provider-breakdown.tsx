@@ -1,7 +1,7 @@
 "use client";
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import type { ProviderBreakdown as ProviderBreakdownType } from "@/lib/gateway";
+import type { ProviderBreakdown as ProviderBreakdownType } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { formatUSD, formatNumber } from "@/lib/format";

@@ -44,7 +44,7 @@ const ALLOWED_PATH_PREFIXES = [
   "/api/delegation",
   "/api/chat",
   "/api/agent",
-  "/api/corpus",
+  // "/api/corpus" — moved to rikuchan-api
 ];
 
 function isAllowedPath(path: string): boolean {

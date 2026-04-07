@@ -1,4 +1,4 @@
-import type { Insight } from "@/lib/gateway";
+import type { Insight } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { ConfidenceBadge } from "./confidence-badge";

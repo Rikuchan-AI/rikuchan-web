@@ -1,4 +1,4 @@
-import type { SavingsBreakdown as SavingsBreakdownType, SavingsVector } from "@/lib/gateway";
+import type { SavingsBreakdown as SavingsBreakdownType, SavingsVector } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { formatUSD } from "@/lib/format";
