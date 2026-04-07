@@ -215,8 +215,10 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
       </div>
 
+      <hr className="my-3 border-line" />
+
       {/* Analytics */}
-      <div className="mt-6 space-y-1">
+      <div className="space-y-1">
         <SectionHeader label="Analytics" collapsed={collapsed.analytics} onToggle={() => toggle("analytics")} />
         {!collapsed.analytics &&
           analyticsLinks.map((link) => (
@@ -226,23 +228,28 @@ export function DashboardSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Mission Control */}
       {MC_ENABLED && (
-        <div className="mt-6 space-y-1">
-          <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
-          {!collapsed.mc &&
-            visibleMcLinks.map((link) => (
-              <NavLink
-                key={link.href}
-                {...link}
-                pathname={pathname}
-                onNavigate={onNavigate}
-                badge={mcBadges[link.href]}
-              />
-            ))}
-        </div>
+        <>
+          <hr className="my-3 border-line" />
+          <div className="space-y-1">
+            <SectionHeader label="Mission Control" collapsed={collapsed.mc} onToggle={() => toggle("mc")} />
+            {!collapsed.mc &&
+              visibleMcLinks.map((link) => (
+                <NavLink
+                  key={link.href}
+                  {...link}
+                  pathname={pathname}
+                  onNavigate={onNavigate}
+                  badge={mcBadges[link.href]}
+                />
+              ))}
+          </div>
+        </>
       )}
 
+      <hr className="my-3 border-line" />
+
       {/* Platform */}
-      <div className={cn(MC_ENABLED ? "mt-6" : "mt-8", "space-y-1")}>
+      <div className="space-y-1">
         <SectionHeader label="Platform" collapsed={collapsed.platform} onToggle={() => toggle("platform")} />
         {!collapsed.platform &&
           visiblePlatformLinks.map((link) => (
