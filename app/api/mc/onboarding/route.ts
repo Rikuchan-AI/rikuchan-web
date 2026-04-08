@@ -40,18 +40,11 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    const { getToken, userId } = await auth();
+    const { getToken } = await auth();
     const token = await getToken();
 
-    console.log("[Onboarding] POST auth debug:", {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      userId,
-      apiUrl: API_URL,
-    });
-
     // 1. Update onboarding state via rikuchan-api
-    const apiRes = await fetch(`${API_URL}/api/tenants/onboarding`, {
+    await fetch(`${API_URL}/api/tenants/onboarding`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -63,8 +56,6 @@ export async function POST(req: NextRequest) {
       }),
       signal: AbortSignal.timeout(5000),
     });
-
-    console.log("[Onboarding] API response:", { status: apiRes.status, ok: apiRes.ok });
 
     // 2. Persist gateway + model settings to MC backend
     const settingsPayload: Record<string, unknown> = {};

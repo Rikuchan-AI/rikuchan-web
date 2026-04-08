@@ -70,15 +70,9 @@ export async function requirePermission(ctx: TenantContext, permission: Permissi
  */
 export async function checkTenantOnboarding(tenantId: string): Promise<boolean> {
   try {
-    const { getToken, userId } = await auth();
+    const { getToken } = await auth();
     const token = await getToken();
     const API_URL = process.env.RIKUCHAN_API_URL || "http://localhost:3002";
-    console.log("[Onboarding] checkTenantOnboarding debug:", {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      userId,
-      apiUrl: API_URL,
-    });
     const res = await fetch(`${API_URL}/api/tenants/onboarding/check`, {
       headers: {
         "Content-Type": "application/json",
