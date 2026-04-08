@@ -16,7 +16,7 @@ export default function AgentsPage() {
   const status = useGatewayStore((s) => s.status);
   const latencyMs = useGatewayStore((s) => s.latencyMs);
   const configUrl = useGatewayStore((s) => s.config.url);
-  const { connected, GatewayRequiredScreen } = useGatewayGate();
+  const { connected, loading, GatewayRequiredScreen, GatewayLoadingScreen } = useGatewayGate();
 
   const isConnected = status === "connected";
   const [gatewayExpanded, setGatewayExpanded] = useState(!isConnected);
@@ -26,6 +26,7 @@ export default function AgentsPage() {
     setGatewayExpanded(!isConnected);
   }, [isConnected]);
 
+  if (loading) return <GatewayLoadingScreen />;
   if (!connected) return <GatewayRequiredScreen feature="Agentes" />;
 
   return (

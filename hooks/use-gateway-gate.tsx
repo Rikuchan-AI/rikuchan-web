@@ -14,9 +14,20 @@ import { RikuLoader } from "@/components/shared/riku-loader";
  */
 export function useGatewayGate() {
   const status = useGatewayStore((s) => s.status);
+  const configHydrated = useGatewayStore((s) => s._configHydrated);
   const connected = status === "connected";
+  const loading = status === "connecting" || !configHydrated;
 
-  return { connected, GatewayOfflineBanner, GatewayRequiredScreen };
+  return { connected, loading, GatewayOfflineBanner, GatewayRequiredScreen, GatewayLoadingScreen };
+}
+
+/** Loading state while gateway connection is being established */
+function GatewayLoadingScreen() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center px-6">
+      <RikuLoader size="md" />
+    </div>
+  );
 }
 
 /** Inline banner for pages that partially work without gateway */

@@ -8,12 +8,13 @@ import { Combobox } from "@/components/mc/ui/Combobox";
 import { useGatewayGate } from "@/hooks/use-gateway-gate";
 
 export default function SessionsPage() {
-  const { connected, GatewayRequiredScreen } = useGatewayGate();
+  const { connected, loading, GatewayRequiredScreen, GatewayLoadingScreen } = useGatewayGate();
   const sessions = useGatewayStore(useShallow((s) => s.sessions));
   const agents = useGatewayStore(useShallow((s) => s.agents));
   const [filterAgent, setFilterAgent] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  if (loading) return <GatewayLoadingScreen />;
   if (!connected) return <GatewayRequiredScreen feature="Sessoes" />;
 
   const filtered = sessions.filter((s) => {
